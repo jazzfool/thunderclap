@@ -1,4 +1,4 @@
-<p align="left">
+<p align="center">
     <img src=".media/reui.png" width="150px"/>
 </p>
 
