@@ -244,10 +244,19 @@ fn main() {
                 *control_flow = ControlFlow::Exit;
             }
             Event::WindowEvent {
+                event: WindowEvent::HiDpiFactorChanged(hidpi_factor),
+                ..
+            } => {
+                gfx_aux.scale = Vector::new(hidpi_factor as _, hidpi_factor as _);
+                let size = context.window().inner_size().to_physical(hidpi_factor);
+                window_size = (size.width as _, size.height as _);
+                showcase.repaint();
+            }
+            Event::WindowEvent {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                let size = size.to_physical(hidpi_factor);
+                let size = size.to_physical(gfx_aux.scale.x as _);
                 window_size = (size.width as _, size.height as _);
             }
             Event::WindowEvent {
