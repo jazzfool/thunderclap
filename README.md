@@ -2,7 +2,7 @@
     <img src=".media/reui.png" width="150px"/>
 </p>
 
-## Themable GUI toolkit
+## <p align="center">Themable GUI toolkit</p>
 
 <img align="right" src=".media/showcase.png" width="110px"/>
 
