@@ -4,9 +4,7 @@
 
 ## Themable GUI toolkit
 
----
-
-<img style="float: right" src=".media/showcase.png" width="110px"/>
+<img align="right" src=".media/showcase.png" width="110px"/>
 
 ## Using Reui
 The only notable difference between Reclutch on how you should use widgets is
