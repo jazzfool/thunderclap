@@ -17,7 +17,7 @@ use {
 /// #[widget_children_trait(reui::base::WidgetChildren)]
 /// struct MyWidget;
 /// ```
-pub trait WidgetChildren: Widget + HasTheme {
+pub trait WidgetChildren: Widget + HasTheme + Repaintable {
     /// Returns a list of all the children as a vector of immutable `dyn WidgetChildren`.
     fn children(
         &self,
@@ -45,7 +45,13 @@ pub trait WidgetChildren: Widget + HasTheme {
     }
 }
 
-/// Implemented by all widgets that can be moved/positioned.
+/// Implemented by widgets that can be repainted.
+pub trait Repaintable: Widget {
+    /// Repaints the widget (typically means invoking `repaint` on the inner command group).
+    fn repaint(&mut self);
+}
+
+/// Implemented by widgets that can be moved/positioned.
 pub trait Movable: Widget {
     /// Changes the current position of the widget.
     fn set_position(&mut self, position: Point);
@@ -53,7 +59,7 @@ pub trait Movable: Widget {
     fn position(&self) -> Point;
 }
 
-/// Implemented by all widgets that can be resized.
+/// Implemented by widgets that can be resized.
 pub trait Resizable: Widget {
     /// Changes the current size of the widget.
     fn set_size(&mut self, size: Size);
@@ -61,7 +67,7 @@ pub trait Resizable: Widget {
     fn size(&self) -> Size;
 }
 
-/// Implemented by all widgets that can be moved and resized.
+/// Implemented by widgets that can be moved and resized.
 ///
 /// There's no need to implement this manually, as long as `Movable` and `Resizable`
 /// have been implemented, this will be automatically implemented alongside them.

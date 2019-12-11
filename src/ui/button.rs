@@ -213,6 +213,12 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
     }
 }
 
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Repaintable for Button<U, G> {
+    fn repaint(&mut self) {
+        self.command_group.repaint();
+    }
+}
+
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for Button<U, G> {
     fn set_position(&mut self, position: Point) {
         self.rect.origin = position;

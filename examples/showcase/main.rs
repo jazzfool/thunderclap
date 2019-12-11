@@ -5,6 +5,7 @@ use {
     },
     reui::{
         base, draw,
+        prelude::*,
         reclutch::{
             display::{
                 self, Color, CommandGroup, DisplayCommand, DisplayText, FontInfo, GraphicsDisplay,
@@ -130,6 +131,13 @@ impl Widget for Showcase {
 
         self.command_group_post
             .push(display, &[DisplayCommand::Restore], false);
+    }
+}
+
+impl base::Repaintable for Showcase {
+    fn repaint(&mut self) {
+        self.command_group_pre.repaint();
+        self.command_group_post.repaint();
     }
 }
 

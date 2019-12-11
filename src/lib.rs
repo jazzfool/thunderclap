@@ -10,5 +10,5 @@ pub mod themes;
 pub mod ui;
 
 pub mod prelude {
-    pub use crate::base::{Movable, Rectangular, Resizable};
+    pub use crate::base::{Movable, Rectangular, Repaintable, Resizable, WidgetChildren};
 }
