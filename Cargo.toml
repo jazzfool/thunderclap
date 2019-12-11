@@ -1,0 +1,16 @@
+[package]
+name = "reui"
+version = "0.0.0"
+authors = ["jazzfool <saveuselon@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+reclutch = { git = "https://github.com/jazzfool/reclutch" }
+bitflags = "1.2"
+
+[[example]]
+name = "showcase"
+required-features = ["reclutch/skia"]
+
+[dev-dependencies]
+glutin = "0.22.0-alpha5"
