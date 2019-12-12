@@ -123,6 +123,12 @@ pub trait GraphicalAuxiliary {
     fn scaling(&self) -> f32;
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct ConsumableEventInner<T> {
+    marker: RefCell<bool>,
+    data: T,
+}
+
 /// Event data that can be "consumed". This is needed for events such as clicking and typing.
 /// Those kinds of events aren't typically received by multiple widgets.
 ///
@@ -136,19 +142,16 @@ pub trait GraphicalAuxiliary {
 ///
 /// Also note that the usage of "consume" is completely unrelated to the consume/move
 /// semantics of Rust. In fact, nothing is actually consumed in this implementation.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConsumableEvent<T> {
-    marker: Rc<RefCell<bool>>,
-    data: T,
-}
+#[derive(Debug, PartialEq)]
+pub struct ConsumableEvent<T>(Rc<ConsumableEventInner<T>>);
 
 impl<T> ConsumableEvent<T> {
     /// Creates a unconsumed event, initialized with `val`.
     pub fn new(val: T) -> Self {
-        ConsumableEvent {
-            marker: Rc::new(RefCell::new(true)),
+        ConsumableEvent(Rc::new(ConsumableEventInner {
+            marker: RefCell::new(true),
             data: val,
-        }
+        }))
     }
 
     /// Returns the event data as long as **both** the following conditions are satisfied:
@@ -161,10 +164,10 @@ impl<T> ConsumableEvent<T> {
     where
         P: FnMut(&T) -> bool,
     {
-        let mut is_consumed = self.marker.borrow_mut();
-        if *is_consumed && pred(&self.data) {
+        let mut is_consumed = self.0.marker.borrow_mut();
+        if *is_consumed && pred(&self.0.data) {
             *is_consumed = false;
-            Some(&self.data)
+            Some(&self.0.data)
         } else {
             None
         }
@@ -173,7 +176,13 @@ impl<T> ConsumableEvent<T> {
     /// Returns the inner event data regardless of consumption.
     #[inline(always)]
     pub fn get(&self) -> &T {
-        &self.data
+        &self.0.data
+    }
+}
+
+impl<T> Clone for ConsumableEvent<T> {
+    fn clone(&self) -> Self {
+        ConsumableEvent(self.0.clone())
     }
 }
 
