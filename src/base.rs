@@ -214,6 +214,7 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
         data: Self::PushData,
         child: T,
     ) -> LayedOut<T, Self>;
+
     /// De-registers a widget from the layout and returns the original widget, stripped of additional data.
     ///
     /// If `restore_original` is `true`, then the original `Rect` (when the widget was `push`ed) will be restored.
@@ -222,6 +223,7 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
         child: LayedOut<T, Self>,
         restore_original: bool,
     ) -> T;
+
     /// Updates the layout of a list of children.
     fn update_layout(
         &mut self,
@@ -280,30 +282,25 @@ impl<T: WidgetChildren + Rectangular, L: Layout> Widget for LayedOut<T, L> {
     type GraphicalAux = T::GraphicalAux;
     type DisplayObject = T::DisplayObject;
 
-    fn bounds(&self) -> Rect {
-        self.widget.bounds()
-    }
-
-    fn update(&mut self, aux: &mut T::UpdateAux) {
-        self.widget.update(aux)
-    }
-
-    fn draw(
-        &mut self,
-        display: &mut dyn GraphicsDisplay<T::DisplayObject>,
-        aux: &mut T::GraphicalAux,
-    ) {
-        self.widget.draw(display, aux)
+    delegate! {
+        target self.widget {
+            fn bounds(&self) -> Rect;
+            fn update(&mut self, aux: &mut T::UpdateAux);
+            fn draw(
+                &mut self,
+                display: &mut dyn GraphicsDisplay<T::DisplayObject>,
+                aux: &mut T::GraphicalAux,
+            );
+        }
     }
 }
 
 impl<T: WidgetChildren + Rectangular, L: Layout> draw::HasTheme for LayedOut<T, L> {
-    fn theme(&mut self) -> &mut dyn draw::Themed {
-        self.widget.theme()
-    }
-
-    fn resize_from_theme(&mut self, aux: &dyn GraphicalAuxiliary) {
-        self.widget.resize_from_theme(aux)
+    delegate! {
+        target self.widget {
+            fn theme(&mut self) -> &mut dyn draw::Themed;
+            fn resize_from_theme(&mut self, aux: &dyn GraphicalAuxiliary);
+        }
     }
 }
 
