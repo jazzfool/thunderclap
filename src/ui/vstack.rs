@@ -98,8 +98,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
     fn update_layout(
         &mut self,
         children: Vec<
-            base::ActivelyLayedOut<
-                '_,
+            &mut dyn base::LayedOutTrait<
                 Self::UpdateAux,
                 Self::GraphicalAux,
                 Self::DisplayObject,
@@ -109,10 +108,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
     ) {
         if !self.dirty
             && !children.iter().any(|child| {
-                child.widget.rect()
+                let (child_widget, child_data) = child.as_ref();
+                child_widget.rect()
                     != *self
                         .rects
-                        .get(&child.data.id)
+                        .get(&child_data.id)
                         .expect("invalid layout child ID")
             })
         {
@@ -122,12 +122,14 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
 
         let mut advance = self.rect.origin.y;
         for child in children {
-            advance += child.data.data.top_margin;
+            let (child_widget, child_data) = child.both_mut();
 
-            let mut rect = child.widget.rect();
+            advance += child_data.data.top_margin;
+
+            let mut rect = child_widget.rect();
             rect.origin.y = advance;
 
-            rect.origin.x = match child.data.data.alignment {
+            rect.origin.x = match child_data.data.alignment {
                 VStackAlignment::Left => self.rect.origin.x,
                 VStackAlignment::Middle => display::center_horizontally(rect, self.rect).x,
                 VStackAlignment::Right => {
@@ -139,10 +141,10 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
                 }
             };
 
-            child.widget.set_rect(rect);
-            *self.rects.get_mut(&child.data.id).unwrap() = rect;
+            child_widget.set_rect(rect);
+            *self.rects.get_mut(&child_data.id).unwrap() = rect;
 
-            advance += rect.size.height + child.data.data.bottom_margin;
+            advance += rect.size.height + child_data.data.bottom_margin;
         }
         self.dirty = false;
     }

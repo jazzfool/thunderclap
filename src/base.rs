@@ -147,7 +147,7 @@ impl<T> ConsumableEvent<T> {
     pub fn new(val: T) -> Self {
         ConsumableEvent {
             marker: Rc::new(RefCell::new(true)),
-            data: val
+            data: val,
         }
     }
 
@@ -202,33 +202,30 @@ pub enum MouseButton {
     Right,
 }
 
+/// Marks a widget as usable inside a [`LayedOut`] structure.
+pub trait LayableWidget: WidgetChildren + Rectangular {}
+
+impl<T: WidgetChildren + Rectangular> LayableWidget for T {}
+
 /// Attachment of layout data to a widget, which is then used to update the widget
 /// rectangle based on a layout.
-pub trait Layout: WidgetChildren + Rectangular + Sized {
+pub trait Layout: LayableWidget + Sized {
     type PushData;
     type ChildData: Sized;
 
     /// "Registers" a widget to the layout and returns the registration information as `LayedOut`.
-    fn push<T: WidgetChildren + Rectangular>(
-        &mut self,
-        data: Self::PushData,
-        child: T,
-    ) -> LayedOut<T, Self>;
+    fn push<T: LayableWidget>(&mut self, data: Self::PushData, child: T) -> LayedOut<T, Self>;
 
     /// De-registers a widget from the layout and returns the original widget, stripped of additional data.
     ///
     /// If `restore_original` is `true`, then the original `Rect` (when the widget was `push`ed) will be restored.
-    fn remove<T: WidgetChildren + Rectangular>(
-        &mut self,
-        child: LayedOut<T, Self>,
-        restore_original: bool,
-    ) -> T;
+    fn remove<T: LayableWidget>(&mut self, child: LayedOut<T, Self>, restore_original: bool) -> T;
 
     /// Updates the layout of a list of children.
     fn update_layout(
         &mut self,
         children: Vec<
-            ActivelyLayedOut<'_, Self::UpdateAux, Self::GraphicalAux, Self::DisplayObject, Self>,
+            &mut dyn LayedOutTrait<Self::UpdateAux, Self::GraphicalAux, Self::DisplayObject, Self>,
         >,
     );
 }
@@ -236,12 +233,35 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
 /// A widget with extra attached information required for a layout.
 #[derive(WidgetChildren)]
 #[widget_children_trait(WidgetChildren)]
-pub struct LayedOut<T: WidgetChildren + Rectangular, L: Layout> {
+pub struct LayedOut<T: LayableWidget, L: Layout> {
     pub widget: T,
     pub data: L::ChildData,
 }
 
-impl<T: WidgetChildren + Rectangular, L: Layout> LayedOut<T, L> {
+pub trait LayedOutTrait<U, G, D, L: Layout> {
+    fn widget_mut(
+        &mut self,
+    ) -> &mut dyn LayableWidget<UpdateAux = U, GraphicalAux = G, DisplayObject = D>;
+    fn data_mut(&mut self) -> &mut L::ChildData;
+
+    /// Borrow the [`LayedOut`] structure immutable.
+    fn as_ref(
+        &self,
+    ) -> (
+        &dyn LayableWidget<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
+        &L::ChildData,
+    );
+
+    /// Borrow the [`LayedOut`] structure mutable.
+    fn both_mut(
+        &mut self,
+    ) -> (
+        &mut dyn LayableWidget<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
+        &mut L::ChildData,
+    );
+}
+
+impl<T: LayableWidget, L: Layout> LayedOut<T, L> {
     /// Creates a new `LayedOut`.
     #[inline]
     pub fn new(widget: T, data: L::ChildData) -> Self {
@@ -251,33 +271,77 @@ impl<T: WidgetChildren + Rectangular, L: Layout> LayedOut<T, L> {
     /// Dynamically and mutably borrows the inner widget and layout data.
     ///
     /// Required for `update_layout`.
-    pub fn activate(
-        &mut self,
-    ) -> ActivelyLayedOut<'_, T::UpdateAux, T::GraphicalAux, T::DisplayObject, L> {
-        ActivelyLayedOut {
-            widget: &mut self.widget,
-            data: &mut self.data,
-        }
+    #[inline(always)]
+    pub fn activate(&mut self) -> &mut dyn LayedOutTrait<U, G, D, L: Layout> {
+        &mut self
     }
 }
 
-impl<T: WidgetChildren + Rectangular, L: Layout> std::ops::Deref for LayedOut<T, L> {
+impl<T: LayableWidget, L: Layout> std::ops::Deref for LayedOut<T, L> {
     type Target = T;
 
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.widget
     }
 }
 
-impl<T: WidgetChildren + Rectangular, L: Layout> std::ops::DerefMut for LayedOut<T, L> {
-    #[inline]
+impl<T: LayableWidget, L: Layout> std::ops::DerefMut for LayedOut<T, L> {
+    #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.widget
     }
 }
 
-impl<T: WidgetChildren + Rectangular, L: Layout> Widget for LayedOut<T, L> {
+impl<T: LayableWidget, L: Layout> LayedOutTrait<T::UpdateAux, T::GraphicalAux, T::DisplayObject, L>
+    for LayedOut<T, L>
+{
+    #[inline]
+    fn widget_mut(
+        &mut self,
+    ) -> &mut dyn LayableWidget<
+        UpdateAux = T::UpdateAux,
+        GraphicalAux = T::GraphicalAux,
+        DisplayObject = T::DisplayObject,
+    > {
+        &mut self.widget
+    }
+
+    #[inline]
+    fn data_mut(&mut self) -> &mut L::ChildData {
+        &mut self.data
+    }
+
+    #[inline]
+    fn as_ref(
+        &self,
+    ) -> (
+        &dyn LayableWidget<
+            UpdateAux = T::UpdateAux,
+            GraphicalAux = T::GraphicalAux,
+            DisplayObject = T::DisplayObject,
+        >,
+        &L::ChildData,
+    ) {
+        (&self.widget, &self.data)
+    }
+
+    #[inline]
+    fn both_mut(
+        &mut self,
+    ) -> (
+        &mut dyn LayableWidget<
+            UpdateAux = T::UpdateAux,
+            GraphicalAux = T::GraphicalAux,
+            DisplayObject = T::DisplayObject,
+        >,
+        &mut L::ChildData,
+    ) {
+        (&mut self.widget, &mut self.data)
+    }
+}
+
+impl<T: LayableWidget, L: Layout> Widget for LayedOut<T, L> {
     type UpdateAux = T::UpdateAux;
     type GraphicalAux = T::GraphicalAux;
     type DisplayObject = T::DisplayObject;
@@ -295,7 +359,7 @@ impl<T: WidgetChildren + Rectangular, L: Layout> Widget for LayedOut<T, L> {
     }
 }
 
-impl<T: WidgetChildren + Rectangular, L: Layout> draw::HasTheme for LayedOut<T, L> {
+impl<T: LayableWidget, L: Layout> draw::HasTheme for LayedOut<T, L> {
     delegate! {
         target self.widget {
             fn theme(&mut self) -> &mut dyn draw::Themed;
@@ -304,16 +368,10 @@ impl<T: WidgetChildren + Rectangular, L: Layout> draw::HasTheme for LayedOut<T, 
     }
 }
 
-impl<T: WidgetChildren + Rectangular, L: Layout> Repaintable for LayedOut<T, L> {
+impl<T: LayableWidget, L: Layout> Repaintable for LayedOut<T, L> {
     fn repaint(&mut self) {
         self.widget.repaint()
     }
-}
-
-/// Mutable and dynamic borrow of the inner content of `LayedOut`.
-pub struct ActivelyLayedOut<'a, U, G, D, L: Layout> {
-    pub widget: &'a mut dyn Rectangular<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
-    pub data: &'a mut L::ChildData,
 }
 
 /// Propagates `update` for the children of a widget.

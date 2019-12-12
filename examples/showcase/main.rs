@@ -145,10 +145,10 @@ impl Widget for Showcase {
         base::invoke_update(self, aux);
 
         self.v_stack.update_layout(vec![
-            self.button_1.activate(),
-            self.button_2.activate(),
-            self.button_3.activate(),
-            self.button_4.activate(),
+            &mut self.button_1,
+            &mut self.button_2,
+            &mut self.button_3,
+            &mut self.button_4,
         ]);
     }
 
