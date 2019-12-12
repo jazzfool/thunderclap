@@ -272,8 +272,8 @@ impl<T: LayableWidget, L: Layout> LayedOut<T, L> {
     ///
     /// Required for `update_layout`.
     #[inline(always)]
-    pub fn activate(&mut self) -> &mut dyn LayedOutTrait<U, G, D, L: Layout> {
-        &mut self
+    pub fn activate(&mut self) -> &mut dyn LayedOutTrait<T::UpdateAux, T::GraphicalAux, T::DisplayObject, L> {
+        self
     }
 }
 

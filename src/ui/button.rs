@@ -119,6 +119,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
         let bounds = self.bounds();
         let cmd_group = &mut self.command_group;
+        let mut repaint_needed = false;
 
         {
             let interaction = &mut self.interaction;
@@ -136,7 +137,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                             }) {
                                 interaction.insert(state::InteractionState::PRESSED);
                                 on_press.emit_owned(*pos);
-                                cmd_group.repaint();
+                                repaint_needed = true;
                             }
                         }
                         base::WindowEvent::MouseRelease(release_event) => {
@@ -147,7 +148,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                                 interaction.remove(state::InteractionState::PRESSED);
                                 interaction.insert(state::InteractionState::FOCUSED);
                                 on_release.emit_owned(*pos);
-                                cmd_group.repaint();
+                                repaint_needed = true;
                             }
                         }
                         base::WindowEvent::MouseMove(move_event) => {
@@ -155,12 +156,12 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                                 if !interaction.contains(state::InteractionState::HOVERED) {
                                     interaction.insert(state::InteractionState::HOVERED);
                                     on_mouse_enter.emit_owned(pos.clone());
-                                    cmd_group.repaint();
+                                    repaint_needed = true;
                                 }
                             } else if interaction.contains(state::InteractionState::HOVERED) {
                                 interaction.remove(state::InteractionState::HOVERED);
                                 on_mouse_leave.emit_owned(move_event.get().clone());
-                                cmd_group.repaint();
+                                repaint_needed = true;
                             }
                         }
                         base::WindowEvent::ClearFocus => {
@@ -172,12 +173,16 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
         }
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
-            self.command_group.repaint();
+            repaint_needed = true;
             if was_focused {
                 self.on_blur.emit_owned(());
             } else {
                 self.on_focus.emit_owned(());
             }
+        }
+
+        if repaint_needed {
+            cmd_group.repaint();
         }
     }
 
