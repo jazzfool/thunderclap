@@ -89,7 +89,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
     fn remove<T: base::WidgetChildren + base::Rectangular>(
         &mut self,
         child: base::LayedOut<T, Self>,
-        restore_original: bool,
+        _restore_original: bool,
     ) -> T {
         self.dirty = true;
 

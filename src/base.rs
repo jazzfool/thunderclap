@@ -12,7 +12,8 @@ use {
 /// This is used as an alternative to `reclutch::widget::WidgetChildren`.
 ///
 /// You can still use this with the derive macro as follows:
-/// ```rust
+/// ```ignore
+/// use reclutch::WidgetChildren;
 /// #[derive(WidgetChildren)]
 /// #[widget_children_trait(reui::base::WidgetChildren)]
 /// struct MyWidget;
@@ -149,17 +150,21 @@ impl<T> ConsumableEvent<T> {
     ///
     /// The point of the predicate is to let the caller see if the event actually applies
     /// to them before consuming needlessly.
-    pub fn with<P: FnMut(&T) -> bool>(&self, mut pred: P) -> Option<&T> {
-        if *self.0.borrow() {
-            if pred(&self.1) {
-                *self.0.borrow_mut() = false;
-                return Some(&self.1);
-            }
+    pub fn with<P>(&self, mut pred: P) -> Option<&T>
+    where
+        P: FnMut(&T) -> bool,
+    {
+        let mut is_consumed = self.0.borrow_mut();
+        if *is_consumed && pred(&self.1) {
+            *is_consumed = false;
+            Some(&self.1)
+        } else {
+            None
         }
-        None
     }
 
     /// Returns the inner event data regardless of consumption.
+    #[inline(always)]
     pub fn get(&self) -> &T {
         &self.1
     }
