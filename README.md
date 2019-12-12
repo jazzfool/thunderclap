@@ -27,3 +27,12 @@ struct MyWidget;
 ## Widget List (so far)
 - Button
 - Vertical Stack
+
+## License
+
+Reui is licensed under either
+
+- [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- [MIT](http://opensource.org/licenses/MIT)
+
+at your choosing.
