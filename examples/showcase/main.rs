@@ -8,9 +8,8 @@ use {
         prelude::*,
         reclutch::{
             display::{
-                self, Color, CommandGroup, DisplayCommand, DisplayText, FontInfo, GraphicsDisplay,
-                Point, Rect, ResourceData, ResourceDescriptor, ResourceReference, SharedData, Size,
-                Vector,
+                self, Color, CommandGroup, DisplayCommand, FontInfo, GraphicsDisplay, Point, Rect,
+                ResourceData, ResourceDescriptor, ResourceReference, SharedData, Size, Vector,
             },
             event::RcEventQueue,
             prelude::*,
@@ -58,22 +57,20 @@ impl base::GraphicalAuxiliary for GraphicalAux {
     }
 }
 
+type ShowCaseLayedOutButton =
+    base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>;
+
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
 struct Showcase {
     #[widget_child]
-    button_1:
-        base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>,
-    // er, this could be a little less ugly probably somehow maybe...
+    button_1: ShowCaseLayedOutButton,
     #[widget_child]
-    button_2:
-        base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>,
+    button_2: ShowCaseLayedOutButton,
     #[widget_child]
-    button_3:
-        base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>,
+    button_3: ShowCaseLayedOutButton,
     #[widget_child]
-    button_4:
-        base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>,
+    button_4: ShowCaseLayedOutButton,
     #[widget_child]
     v_stack: ui::VStack<UpdateAux, GraphicalAux>,
 

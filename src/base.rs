@@ -326,7 +326,7 @@ pub struct ActivelyLayedOut<'a, U, G, D, L: Layout> {
 
 /// Propagates `update` for the children of a widget.
 pub fn invoke_update<U, G, D>(
-    widget: &mut impl WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
+    widget: &mut dyn WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
     aux: &mut U,
 ) {
     // Iterate in reverse because most visually forefront widgets should get events first.
@@ -337,7 +337,7 @@ pub fn invoke_update<U, G, D>(
 
 /// Propagates `draw` for the children of a widget.
 pub fn invoke_draw<U, G, D>(
-    widget: &mut impl WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
+    widget: &mut dyn WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
     display: &mut dyn GraphicsDisplay<D>,
     aux: &mut G,
 ) {

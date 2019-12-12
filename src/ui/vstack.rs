@@ -108,46 +108,44 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
             >,
         >,
     ) {
-        if !self.dirty {
-            for child in &children {
-                if let Some(rect) = self.rects.get(&child.data.id) {
-                    if *rect != child.widget.rect() {
-                        self.dirty = true;
-                    }
-                } else {
-                    panic!("invalid layout child ID");
-                }
-            }
+        if !self.dirty
+            && !children.iter().any(|child| {
+                child.widget.rect()
+                    != *self
+                        .rects
+                        .get(&child.data.id)
+                        .expect("invalid layout child ID")
+            })
+        {
+            // nothing to update
+            return;
         }
 
-        if self.dirty {
-            let mut advance = self.rect.origin.y;
-            for child in children {
-                advance += child.data.data.top_margin;
+        let mut advance = self.rect.origin.y;
+        for child in children {
+            advance += child.data.data.top_margin;
 
-                let mut rect = child.widget.rect();
-                rect.origin.y = advance;
+            let mut rect = child.widget.rect();
+            rect.origin.y = advance;
 
-                match child.data.data.alignment {
-                    VStackAlignment::Left => rect.origin.x = self.rect.origin.x,
-                    VStackAlignment::Middle => {
-                        rect.origin.x = display::center_horizontally(rect, self.rect).x
-                    }
-                    VStackAlignment::Right => {
-                        rect.origin.x = self.rect.origin.x + self.rect.size.width - rect.size.width
-                    }
-                    VStackAlignment::Stretch => {
-                        rect.origin.x = self.rect.origin.x;
-                        rect.size.width = self.rect.size.width;
-                    }
+            rect.origin.x = match child.data.data.alignment {
+                VStackAlignment::Left => self.rect.origin.x,
+                VStackAlignment::Middle => display::center_horizontally(rect, self.rect).x,
+                VStackAlignment::Right => {
+                    self.rect.origin.x + self.rect.size.width - rect.size.width
                 }
+                VStackAlignment::Stretch => {
+                    rect.size.width = self.rect.size.width;
+                    self.rect.origin.x
+                }
+            };
 
-                child.widget.set_rect(rect);
-                *self.rects.get_mut(&child.data.id).unwrap() = rect;
+            child.widget.set_rect(rect);
+            *self.rects.get_mut(&child.data.id).unwrap() = rect;
 
-                advance += rect.size.height + child.data.data.bottom_margin;
-            }
+            advance += rect.size.height + child.data.data.bottom_margin;
         }
+        self.dirty = false;
     }
 }
 
