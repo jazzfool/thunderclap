@@ -1,5 +1,6 @@
 use {
     crate::draw,
+    delegate::delegate,
     reclutch::{
         display::{Color, FontInfo, GraphicsDisplay, Point, Rect, ResourceReference, Size},
         event::RcEventQueue,
@@ -136,12 +137,18 @@ pub trait GraphicalAuxiliary {
 /// Also note that the usage of "consume" is completely unrelated to the consume/move
 /// semantics of Rust. In fact, nothing is actually consumed in this implementation.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ConsumableEvent<T>(Rc<RefCell<bool>>, T);
+pub struct ConsumableEvent<T> {
+    marker: Rc<RefCell<bool>>,
+    data: T,
+}
 
 impl<T> ConsumableEvent<T> {
     /// Creates a unconsumed event, initialized with `val`.
     pub fn new(val: T) -> Self {
-        ConsumableEvent(Rc::new(RefCell::new(true)), val)
+        ConsumableEvent {
+            marker: Rc::new(RefCell::new(true)),
+            data: val
+        }
     }
 
     /// Returns the event data as long as **both** the following conditions are satisfied:
@@ -154,10 +161,10 @@ impl<T> ConsumableEvent<T> {
     where
         P: FnMut(&T) -> bool,
     {
-        let mut is_consumed = self.0.borrow_mut();
-        if *is_consumed && pred(&self.1) {
+        let mut is_consumed = self.marker.borrow_mut();
+        if *is_consumed && pred(&self.data) {
             *is_consumed = false;
-            Some(&self.1)
+            Some(&self.data)
         } else {
             None
         }
@@ -166,7 +173,7 @@ impl<T> ConsumableEvent<T> {
     /// Returns the inner event data regardless of consumption.
     #[inline(always)]
     pub fn get(&self) -> &T {
-        &self.1
+        &self.data
     }
 }
 
@@ -228,19 +235,15 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
 #[derive(WidgetChildren)]
 #[widget_children_trait(WidgetChildren)]
 pub struct LayedOut<T: WidgetChildren + Rectangular, L: Layout> {
-    widget: T,
-    data: L::ChildData,
+    pub widget: T,
+    pub data: L::ChildData,
 }
 
 impl<T: WidgetChildren + Rectangular, L: Layout> LayedOut<T, L> {
     /// Creates a new `LayedOut`.
+    #[inline]
     pub fn new(widget: T, data: L::ChildData) -> Self {
         LayedOut { widget, data }
-    }
-
-    /// Returns `self` as a tuple.
-    pub fn decompose(self) -> (T, L::ChildData) {
-        (self.widget, self.data)
     }
 
     /// Dynamically and mutably borrows the inner widget and layout data.
@@ -254,27 +257,19 @@ impl<T: WidgetChildren + Rectangular, L: Layout> LayedOut<T, L> {
             data: &mut self.data,
         }
     }
-
-    /// Returns the attached layout data immutably.
-    pub fn data(&self) -> &L::ChildData {
-        &self.data
-    }
-
-    /// Returns the attached layout data mutably.
-    pub fn data_mut(&mut self) -> &mut L::ChildData {
-        &mut self.data
-    }
 }
 
 impl<T: WidgetChildren + Rectangular, L: Layout> std::ops::Deref for LayedOut<T, L> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.widget
     }
 }
 
 impl<T: WidgetChildren + Rectangular, L: Layout> std::ops::DerefMut for LayedOut<T, L> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.widget
     }

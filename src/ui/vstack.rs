@@ -92,8 +92,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
         _restore_original: bool,
     ) -> T {
         self.dirty = true;
-
-        child.decompose().0
+        child.widget
     }
 
     fn update_layout(
