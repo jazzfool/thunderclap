@@ -227,17 +227,20 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
 /// A widget with extra attached information required for a layout.
 #[derive(WidgetChildren)]
 #[widget_children_trait(WidgetChildren)]
-pub struct LayedOut<T: WidgetChildren + Rectangular, L: Layout>(T, L::ChildData);
+pub struct LayedOut<T: WidgetChildren + Rectangular, L: Layout> {
+    widget: T,
+    data: L::ChildData,
+}
 
 impl<T: WidgetChildren + Rectangular, L: Layout> LayedOut<T, L> {
     /// Creates a new `LayedOut`.
     pub fn new(widget: T, data: L::ChildData) -> Self {
-        LayedOut(widget, data)
+        LayedOut { widget, data }
     }
 
     /// Returns `self` as a tuple.
     pub fn decompose(self) -> (T, L::ChildData) {
-        (self.0, self.1)
+        (self.widget, self.data)
     }
 
     /// Dynamically and mutably borrows the inner widget and layout data.
@@ -247,19 +250,19 @@ impl<T: WidgetChildren + Rectangular, L: Layout> LayedOut<T, L> {
         &mut self,
     ) -> ActivelyLayedOut<'_, T::UpdateAux, T::GraphicalAux, T::DisplayObject, L> {
         ActivelyLayedOut {
-            widget: &mut self.0,
-            data: &mut self.1,
+            widget: &mut self.widget,
+            data: &mut self.data,
         }
     }
 
     /// Returns the attached layout data immutably.
     pub fn data(&self) -> &L::ChildData {
-        &self.1
+        &self.data
     }
 
     /// Returns the attached layout data mutably.
     pub fn data_mut(&mut self) -> &mut L::ChildData {
-        &mut self.1
+        &mut self.data
     }
 }
 
@@ -267,13 +270,13 @@ impl<T: WidgetChildren + Rectangular, L: Layout> std::ops::Deref for LayedOut<T,
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.widget
     }
 }
 
 impl<T: WidgetChildren + Rectangular, L: Layout> std::ops::DerefMut for LayedOut<T, L> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.widget
     }
 }
 
@@ -283,11 +286,11 @@ impl<T: WidgetChildren + Rectangular, L: Layout> Widget for LayedOut<T, L> {
     type DisplayObject = T::DisplayObject;
 
     fn bounds(&self) -> Rect {
-        self.0.bounds()
+        self.widget.bounds()
     }
 
     fn update(&mut self, aux: &mut T::UpdateAux) {
-        self.0.update(aux)
+        self.widget.update(aux)
     }
 
     fn draw(
@@ -295,23 +298,23 @@ impl<T: WidgetChildren + Rectangular, L: Layout> Widget for LayedOut<T, L> {
         display: &mut dyn GraphicsDisplay<T::DisplayObject>,
         aux: &mut T::GraphicalAux,
     ) {
-        self.0.draw(display, aux)
+        self.widget.draw(display, aux)
     }
 }
 
 impl<T: WidgetChildren + Rectangular, L: Layout> draw::HasTheme for LayedOut<T, L> {
     fn theme(&mut self) -> &mut dyn draw::Themed {
-        self.0.theme()
+        self.widget.theme()
     }
 
     fn resize_from_theme(&mut self, aux: &dyn GraphicalAuxiliary) {
-        self.0.resize_from_theme(aux)
+        self.widget.resize_from_theme(aux)
     }
 }
 
 impl<T: WidgetChildren + Rectangular, L: Layout> Repaintable for LayedOut<T, L> {
     fn repaint(&mut self) {
-        self.0.repaint()
+        self.widget.repaint()
     }
 }
 
