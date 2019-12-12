@@ -15,10 +15,8 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **Outgoing Event Queues:**
     - `on_press`: The button was pressed.
     - `on_release`: The button was released. Complements `on_press`.
-    - `on_mouse_enter`: The cursor began overlapping the button.
-    - `on_mouse_leave`: The cursor stopped overlapping the button. Complements `on_mouse_enter`.
-    - `on_focus`: The button gained focus.
-    - `on_blur`: The button lost focus. Complements `on_focus`.
+    - `on_mouse_inside`: The cursor began or stopped overlapping the button.
+    - `on_focus`: The button gained or lost focus.
 
 ## Abstract Widgets
 

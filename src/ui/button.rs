@@ -28,18 +28,11 @@ where
     /// Emitted when the button is released.
     /// Corresponds to `WindowEvent::MouseRelease`.
     pub on_release: RcEventQueue<Point>,
-    /// Emitted when the mouse enters the button boundaries.
+    /// Emitted when the mouse enters (`true`) or leaves (`false`) the button boundaries.
     /// Corresponds to `WindowEvent::MouseMove`.
-    pub on_mouse_enter: RcEventQueue<Point>,
-    /// Emitted when the mouse leaves the button boundaries.
-    /// Corresponds to `WindowEvent::MouseMove`.
-    /// Complements `on_mouse_enter`.
-    pub on_mouse_leave: RcEventQueue<Point>,
-    /// Emitted when focus is gained.
-    pub on_focus: RcEventQueue<()>,
-    /// Emitted when focus is lost.
-    /// Complements `on_focus`.
-    pub on_blur: RcEventQueue<()>,
+    pub on_mouse_inside: RcEventQueue<(Point, bool)>,
+    /// Emitted when focus is gained (`true`) or lost (`false`).
+    pub on_focus: RcEventQueue<bool>,
 
     text: DisplayText,
     text_size: Option<f32>,
@@ -83,10 +76,8 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
         Self {
             on_press: RcEventQueue::new(),
             on_release: RcEventQueue::new(),
-            on_mouse_enter: RcEventQueue::new(),
-            on_mouse_leave: RcEventQueue::new(),
+            on_mouse_inside: RcEventQueue::new(),
             on_focus: RcEventQueue::new(),
-            on_blur: RcEventQueue::new(),
 
             text,
             text_size,
@@ -125,8 +116,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
             let interaction = &mut self.interaction;
             let on_press = &mut self.on_press;
             let on_release = &mut self.on_release;
-            let on_mouse_enter = &mut self.on_mouse_enter;
-            let on_mouse_leave = &mut self.on_mouse_leave;
+            let on_mouse_inside = &mut self.on_mouse_inside;
 
             self.window_listener.with(|events| {
                 for event in events {
@@ -155,12 +145,12 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                             if let Some(pos) = move_event.with(|pos| bounds.contains(*pos)) {
                                 if !interaction.contains(state::InteractionState::HOVERED) {
                                     interaction.insert(state::InteractionState::HOVERED);
-                                    on_mouse_enter.emit_owned(pos.clone());
+                                    on_mouse_inside.emit_owned((pos.clone(), true));
                                     repaint_needed = true;
                                 }
                             } else if interaction.contains(state::InteractionState::HOVERED) {
                                 interaction.remove(state::InteractionState::HOVERED);
-                                on_mouse_leave.emit_owned(move_event.get().clone());
+                                on_mouse_inside.emit_owned((move_event.get().clone(), false));
                                 repaint_needed = true;
                             }
                         }
@@ -174,11 +164,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
             repaint_needed = true;
-            if was_focused {
-                self.on_blur.emit_owned(());
-            } else {
-                self.on_focus.emit_owned(());
-            }
+            self.on_focus.emit_owned(!was_focused);
         }
 
         if repaint_needed {
