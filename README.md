@@ -4,7 +4,7 @@
 
 ## <p align="center">Themable GUI toolkit</p>
 
-<img align="right" src=".media/showcase.png" width="110px"/>
+<img align="right" src=".media/showcase.png" width="200px"/>
 
 ## Using Reui
 The only notable difference between Reclutch on how you should use widgets is
@@ -26,3 +26,4 @@ struct MyWidget;
 
 ## Widget List (so far)
 - Button
+- Vertical Stack
