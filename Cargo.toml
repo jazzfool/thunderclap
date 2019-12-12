@@ -3,6 +3,7 @@ name = "reui"
 version = "0.0.0"
 authors = ["jazzfool <saveuselon@gmail.com>"]
 edition = "2018"
+license = "MIT / Apache-2.0"
 
 [dependencies]
 reclutch = { git = "https://github.com/jazzfool/reclutch" }
