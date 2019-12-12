@@ -97,24 +97,17 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
 
     fn update_layout(
         &mut self,
-        children: Vec<
-            &mut dyn base::LayedOutTrait<
-                Self::UpdateAux,
-                Self::GraphicalAux,
-                Self::DisplayObject,
-                Self,
-            >,
-        >,
+        children: Vec<&mut base::LayedOutDyn<Self, Self>>,
     ) {
-        if !self.dirty
-            && !children.iter().any(|child| {
+        if !(self.dirty
+            || children.iter().any(|child| {
                 let (child_widget, child_data) = child.as_ref();
                 child_widget.rect()
                     != *self
                         .rects
                         .get(&child_data.id)
                         .expect("invalid layout child ID")
-            })
+            }))
         {
             // nothing to update
             return;

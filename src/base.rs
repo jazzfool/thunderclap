@@ -231,12 +231,7 @@ pub trait Layout: LayableWidget + Sized {
     fn remove<T: LayableWidget>(&mut self, child: LayedOut<T, Self>, restore_original: bool) -> T;
 
     /// Updates the layout of a list of children.
-    fn update_layout(
-        &mut self,
-        children: Vec<
-            &mut dyn LayedOutTrait<Self::UpdateAux, Self::GraphicalAux, Self::DisplayObject, Self>,
-        >,
-    );
+    fn update_layout(&mut self, children: Vec<&mut LayedOutDyn<Self, Self>>);
 }
 
 /// A widget with extra attached information required for a layout.
@@ -270,6 +265,18 @@ pub trait LayedOutTrait<U, G, D, L: Layout> {
     );
 }
 
+pub type LayedOutDyn<'a, T, L> = dyn LayedOutTrait<
+        <T as Widget>::UpdateAux,
+        <T as Widget>::GraphicalAux,
+        <T as Widget>::DisplayObject,
+        L,
+    > + 'a;
+pub type LayedWidgetDyn<'a, T> = dyn LayableWidget<
+        UpdateAux = <T as Widget>::UpdateAux,
+        GraphicalAux = <T as Widget>::GraphicalAux,
+        DisplayObject = <T as Widget>::DisplayObject,
+    > + 'a;
+
 impl<T: LayableWidget, L: Layout> LayedOut<T, L> {
     /// Creates a new `LayedOut`.
     #[inline]
@@ -281,7 +288,7 @@ impl<T: LayableWidget, L: Layout> LayedOut<T, L> {
     ///
     /// Required for `update_layout`.
     #[inline(always)]
-    pub fn activate(&mut self) -> &mut dyn LayedOutTrait<T::UpdateAux, T::GraphicalAux, T::DisplayObject, L> {
+    pub fn activate(&mut self) -> &mut LayedOutDyn<'_, T, L> {
         self
     }
 }
@@ -306,13 +313,7 @@ impl<T: LayableWidget, L: Layout> LayedOutTrait<T::UpdateAux, T::GraphicalAux, T
     for LayedOut<T, L>
 {
     #[inline]
-    fn widget_mut(
-        &mut self,
-    ) -> &mut dyn LayableWidget<
-        UpdateAux = T::UpdateAux,
-        GraphicalAux = T::GraphicalAux,
-        DisplayObject = T::DisplayObject,
-    > {
+    fn widget_mut(&mut self) -> &mut LayedWidgetDyn<'_, T> {
         &mut self.widget
     }
 
@@ -322,30 +323,12 @@ impl<T: LayableWidget, L: Layout> LayedOutTrait<T::UpdateAux, T::GraphicalAux, T
     }
 
     #[inline]
-    fn as_ref(
-        &self,
-    ) -> (
-        &dyn LayableWidget<
-            UpdateAux = T::UpdateAux,
-            GraphicalAux = T::GraphicalAux,
-            DisplayObject = T::DisplayObject,
-        >,
-        &L::ChildData,
-    ) {
+    fn as_ref(&self) -> (&LayedWidgetDyn<'_, T>, &L::ChildData) {
         (&self.widget, &self.data)
     }
 
     #[inline]
-    fn both_mut(
-        &mut self,
-    ) -> (
-        &mut dyn LayableWidget<
-            UpdateAux = T::UpdateAux,
-            GraphicalAux = T::GraphicalAux,
-            DisplayObject = T::DisplayObject,
-        >,
-        &mut L::ChildData,
-    ) {
+    fn both_mut(&mut self) -> (&mut LayedWidgetDyn<'_, T>, &mut L::ChildData) {
         (&mut self.widget, &mut self.data)
     }
 }
