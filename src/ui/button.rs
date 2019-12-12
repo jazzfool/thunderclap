@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        base,
+        base::{self, Repaintable},
         draw::{self, state},
     },
     reclutch::{
@@ -213,7 +213,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Repaintable for Button<U, G> {
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Repaintable for Button<U, G> {
     fn repaint(&mut self) {
         self.command_group.repaint();
     }
@@ -222,6 +222,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Repaintable fo
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for Button<U, G> {
     fn set_position(&mut self, position: Point) {
         self.rect.origin = position;
+        self.repaint();
     }
 
     fn position(&self) -> Point {
@@ -232,6 +233,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for Bu
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for Button<U, G> {
     fn set_size(&mut self, size: Size) {
         self.rect.size = size;
+        self.repaint();
     }
 
     fn size(&self) -> Size {
