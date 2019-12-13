@@ -4,6 +4,7 @@ use {
     crate::{
         base::{self, Repaintable},
         draw::{self, state},
+        ui::ToggledEvent,
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect, Size},
@@ -14,6 +15,20 @@ use {
     std::marker::PhantomData,
 };
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ButtonEvent {
+    /// Emitted when the button is pressed or released.
+    /// Corresponds to `WindowEvent::MousePress` or `WindowEvent::MouseRelease`.
+    Press(ToggledEvent<Point>),
+
+    /// Emitted when the mouse enters (`true`) or leaves (`false`) the button boundaries.
+    /// Corresponds to `WindowEvent::MouseMove`.
+    MouseHover(ToggledEvent<Point>),
+
+    /// Emitted when focus is gained (`true`) or lost (`false`).
+    Focus(ToggledEvent<()>),
+}
+
 /// Focus-able button widget.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
@@ -22,17 +37,7 @@ where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    /// Emitted when the button is pressed.
-    /// Corresponds to `WindowEvent::MousePress`.
-    pub on_press: RcEventQueue<Point>,
-    /// Emitted when the button is released.
-    /// Corresponds to `WindowEvent::MouseRelease`.
-    pub on_release: RcEventQueue<Point>,
-    /// Emitted when the mouse enters (`true`) or leaves (`false`) the button boundaries.
-    /// Corresponds to `WindowEvent::MouseMove`.
-    pub on_mouse_inside: RcEventQueue<(Point, bool)>,
-    /// Emitted when focus is gained (`true`) or lost (`false`).
-    pub on_focus: RcEventQueue<bool>,
+    pub event_queue: RcEventQueue<ButtonEvent>,
 
     text: DisplayText,
     text_size: Option<f32>,
@@ -74,10 +79,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
         };
 
         Self {
-            on_press: RcEventQueue::new(),
-            on_release: RcEventQueue::new(),
-            on_mouse_inside: RcEventQueue::new(),
-            on_focus: RcEventQueue::new(),
+            event_queue: RcEventQueue::new(),
 
             text,
             text_size,
@@ -114,9 +116,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
         {
             let interaction = &mut self.interaction;
-            let on_press = &mut self.on_press;
-            let on_release = &mut self.on_release;
-            let on_mouse_inside = &mut self.on_mouse_inside;
+            let event_queue = &mut self.event_queue;
 
             self.window_listener.with(|events| {
                 for event in events {
@@ -126,7 +126,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                                 *button == base::MouseButton::Left && bounds.contains(*pos)
                             }) {
                                 interaction.insert(state::InteractionState::PRESSED);
-                                on_press.emit_owned(*pos);
+                                event_queue.emit_owned(ButtonEvent::Press(ToggledEvent::new(true, *pos)));
                                 repaint_needed = true;
                             }
                         }
@@ -137,7 +137,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                             }) {
                                 interaction.remove(state::InteractionState::PRESSED);
                                 interaction.insert(state::InteractionState::FOCUSED);
-                                on_release.emit_owned(*pos);
+                                event_queue.emit_owned(ButtonEvent::Press(ToggledEvent::new(false, *pos)));
                                 repaint_needed = true;
                             }
                         }
@@ -145,12 +145,12 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                             if let Some(pos) = move_event.with(|pos| bounds.contains(*pos)) {
                                 if !interaction.contains(state::InteractionState::HOVERED) {
                                     interaction.insert(state::InteractionState::HOVERED);
-                                    on_mouse_inside.emit_owned((pos.clone(), true));
+                                    event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(true, pos.clone())));
                                     repaint_needed = true;
                                 }
                             } else if interaction.contains(state::InteractionState::HOVERED) {
                                 interaction.remove(state::InteractionState::HOVERED);
-                                on_mouse_inside.emit_owned((move_event.get().clone(), false));
+                                event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(false, move_event.get().clone())));
                                 repaint_needed = true;
                             }
                         }
@@ -164,7 +164,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
             repaint_needed = true;
-            self.on_focus.emit_owned(!was_focused);
+            self.event_queue.emit_owned(ButtonEvent::Focus(ToggledEvent::new(!was_focused, ())));
         }
 
         if repaint_needed {
