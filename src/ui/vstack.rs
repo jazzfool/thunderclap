@@ -3,7 +3,7 @@ use {
     indexmap::IndexMap,
     reclutch::{
         display::{self, DisplayCommand, Point, Rect, Size},
-        event::{RcEventListener, RcEventQueue},
+        event::bidir::Queue as BidirEventQueue,
         prelude::*,
     },
     std::marker::PhantomData,
@@ -32,8 +32,7 @@ pub struct VStackData {
 #[derive(Debug)]
 struct ChildData {
     data: VStackData,
-    output: RcEventQueue<Rect>,
-    input: RcEventListener<Rect>,
+    evq: BidirEventQueue<Rect, Rect>,
     rect: Rect,
 }
 
@@ -81,23 +80,18 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
         let id = self.next_rect_id;
         self.next_rect_id += 1;
 
-        let mut output = RcEventQueue::new();
-        let input_q = RcEventQueue::new();
+        let evq = BidirEventQueue::new();
 
-        let input = input_q.listen();
-
-        child.listen_to_layout(base::LayoutEvents {
+        child.listen_to_layout(base::WidgetLayoutEventsInner {
             id,
-            rcv: &mut output,
-            notify: input_q,
+            evq: evq.secondary(),
         });
 
         self.rects.insert(
             id,
             ChildData {
                 data,
-                output,
-                input,
+                evq,
                 rect: child.rect(),
             },
         );
@@ -123,13 +117,10 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
         {
             let dirty = &mut self.dirty;
             for (_, data) in &mut self.rects {
-                let rect = &mut data.rect;
-                data.input.with(|events| {
-                    if let Some(new_ev) = events.last() {
-                        *dirty = true;
-                        *rect = *new_ev;
-                    }
-                });
+                if let Some(new_ev) = data.evq.retrieve_newest() {
+                    *dirty = true;
+                    data.rect = new_ev;
+                }
             }
         }
 
@@ -152,7 +143,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
                     }
                 };
 
-                data.output.emit_owned(rect);
+                data.evq.emit_owned(rect);
                 data.rect = rect;
 
                 advance += rect.size.height + data.data.bottom_margin;

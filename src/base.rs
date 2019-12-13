@@ -2,7 +2,7 @@ use {
     crate::draw,
     reclutch::{
         display::{Color, FontInfo, GraphicsDisplay, Point, Rect, ResourceReference, Size},
-        event::{RcEventListener, RcEventQueue},
+        event::{RcEventQueue, bidir::Secondary as BidirEventQueueSec},
         prelude::*,
         widget::Widget,
     },
@@ -211,65 +211,42 @@ pub enum MouseButton {
     Right,
 }
 
-pub struct LayoutEvents<'a> {
-    pub id: u64,
-    pub rcv: &'a mut RcEventQueue<Rect>,
-    pub notify: RcEventQueue<Rect>,
-}
-
 #[derive(Debug)]
-struct WidgetLayoutEventsInner {
+pub struct WidgetLayoutEventsInner {
     pub id: u64,
-    pub rcv: RcEventListener<Rect>,
-    pub notify: RcEventQueue<Rect>,
+    pub evq: BidirEventQueueSec<Rect, Rect>,
 }
 
 #[derive(Default, Debug)]
-pub struct WidgetLayoutEvents {
-    inner: Option<WidgetLayoutEventsInner>,
-}
+pub struct WidgetLayoutEvents(Option<WidgetLayoutEventsInner>);
 
 impl WidgetLayoutEvents {
     pub fn new() -> Self {
         Default::default()
     }
 
-    pub fn from_layout(layout: LayoutEvents<'_>) -> Self {
-        WidgetLayoutEvents {
-            inner: Some(WidgetLayoutEventsInner {
-                id: layout.id,
-                rcv: layout.rcv.listen(),
-                notify: layout.notify,
-            }),
-        }
+    pub fn from_layout(layout: WidgetLayoutEventsInner) -> Self {
+        WidgetLayoutEvents(Some(layout))
     }
 
-    pub fn update<'a>(&mut self, layout: impl Into<Option<LayoutEvents<'a>>>) {
-        *self = if let Some(layout) = layout.into() {
-            WidgetLayoutEvents::from_layout(layout)
-        } else {
-            WidgetLayoutEvents::new()
-        }
+    pub fn update<'a>(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>) {
+        self.0 = layout.into();
     }
 
     pub fn notify(&mut self, rect: Rect) {
-        if let Some(inner) = &mut self.inner {
-            inner.notify.emit_owned(rect);
+        if let Some(inner) = &mut self.0 {
+            inner.evq.emit_owned(rect);
         }
     }
 
-    pub fn receive(&mut self) -> Vec<Rect> {
-        if let Some(inner) = &mut self.inner {
-            inner.rcv.peek()
-        } else {
-            Vec::new()
-        }
+    pub fn receive(&mut self) -> Option<Rect> {
+        self.0.as_mut().and_then(|inner| inner.evq.retrieve_newest())
     }
 }
 
 /// Widget that is capable of listening to layout events.
 pub trait LayableWidget: WidgetChildren + Rectangular {
-    fn listen_to_layout<'a>(&mut self, layout: impl Into<Option<LayoutEvents<'a>>>);
+    fn listen_to_layout(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>);
 }
 
 /// Widget which emits layout events to registered widgets.

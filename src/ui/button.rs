@@ -217,7 +217,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget for Button<U, G> {
     #[inline]
-    fn listen_to_layout<'a>(&mut self, layout: impl Into<Option<base::LayoutEvents<'a>>>) {
+    fn listen_to_layout<'a>(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
         self.layout.update(layout);
     }
 }

@@ -16,3 +16,6 @@ required-features = ["reclutch/skia"]
 
 [dev-dependencies]
 glutin = "0.22.0-alpha5"
+
+[patch.'https://github.com/jazzfool/reclutch']
+reclutch = { git = "https://github.com/zserik/reclutch", branch = "bidir-evq" }
