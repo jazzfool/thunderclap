@@ -49,6 +49,7 @@ where
     painter: Box<dyn draw::Painter<state::ButtonState>>,
     command_group: CommandGroup,
     window_listener: RcEventListener<base::WindowEvent>,
+    layout: base::WidgetLayoutEvents,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -91,6 +92,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
             painter,
             command_group: CommandGroup::new(),
             window_listener: update_aux.window_queue_mut().listen(),
+            layout: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
@@ -112,7 +114,6 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
         let bounds = self.bounds();
         let cmd_group = &mut self.command_group;
-        let mut repaint_needed = false;
 
         {
             let interaction = &mut self.interaction;
@@ -126,8 +127,9 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                                 *button == base::MouseButton::Left && bounds.contains(*pos)
                             }) {
                                 interaction.insert(state::InteractionState::PRESSED);
-                                event_queue.emit_owned(ButtonEvent::Press(ToggledEvent::new(true, *pos)));
-                                repaint_needed = true;
+                                event_queue
+                                    .emit_owned(ButtonEvent::Press(ToggledEvent::new(true, *pos)));
+                                cmd_group.repaint();
                             }
                         }
                         base::WindowEvent::MouseRelease(release_event) => {
@@ -137,21 +139,27 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                             }) {
                                 interaction.remove(state::InteractionState::PRESSED);
                                 interaction.insert(state::InteractionState::FOCUSED);
-                                event_queue.emit_owned(ButtonEvent::Press(ToggledEvent::new(false, *pos)));
-                                repaint_needed = true;
+                                event_queue
+                                    .emit_owned(ButtonEvent::Press(ToggledEvent::new(false, *pos)));
+                                cmd_group.repaint();
                             }
                         }
                         base::WindowEvent::MouseMove(move_event) => {
                             if let Some(pos) = move_event.with(|pos| bounds.contains(*pos)) {
                                 if !interaction.contains(state::InteractionState::HOVERED) {
                                     interaction.insert(state::InteractionState::HOVERED);
-                                    event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(true, pos.clone())));
-                                    repaint_needed = true;
+                                    event_queue.emit_owned(ButtonEvent::MouseHover(
+                                        ToggledEvent::new(true, pos.clone()),
+                                    ));
+                                    cmd_group.repaint();
                                 }
                             } else if interaction.contains(state::InteractionState::HOVERED) {
                                 interaction.remove(state::InteractionState::HOVERED);
-                                event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(false, move_event.get().clone())));
-                                repaint_needed = true;
+                                event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(
+                                    false,
+                                    move_event.get().clone(),
+                                )));
+                                cmd_group.repaint();
                             }
                         }
                         base::WindowEvent::ClearFocus => {
@@ -163,11 +171,13 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
         }
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
-            repaint_needed = true;
-            self.event_queue.emit_owned(ButtonEvent::Focus(ToggledEvent::new(!was_focused, ())));
+            cmd_group.repaint();
+            self.event_queue
+                .emit_owned(ButtonEvent::Focus(ToggledEvent::new(!was_focused, ())));
         }
 
-        if repaint_needed {
+        for rect in self.layout.receive() {
+            self.rect = rect;
             cmd_group.repaint();
         }
     }
@@ -204,16 +214,25 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
     }
 }
 
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget for Button<U, G> {
+    fn listen_to_layout<'a>(&mut self, layout: impl Into<Option<base::LayoutEvents<'a>>>) {
+        self.layout.update(layout);
+    }
+}
+
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Repaintable for Button<U, G> {
     fn repaint(&mut self) {
         self.command_group.repaint();
     }
 }
 
+// FIXME(jazzfool): the blanket `Rectangular` implementation causes `self.layout.notify()` to be called twice.
+
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for Button<U, G> {
     fn set_position(&mut self, position: Point) {
         self.rect.origin = position;
         self.repaint();
+        self.layout.notify(self.rect);
     }
 
     fn position(&self) -> Point {
@@ -225,6 +244,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for 
     fn set_size(&mut self, size: Size) {
         self.rect.size = size;
         self.repaint();
+        self.layout.notify(self.rect);
     }
 
     fn size(&self) -> Size {

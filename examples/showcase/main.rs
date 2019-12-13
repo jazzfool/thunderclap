@@ -57,22 +57,19 @@ impl base::GraphicalAuxiliary for GraphicalAux {
     }
 }
 
-type ShowCaseLayedOutButton =
-    base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>;
-
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
 struct Showcase {
     #[widget_child]
-    button_1: ShowCaseLayedOutButton,
+    v_stack: ui::VStack<UpdateAux, GraphicalAux>, // note the order of widgets here, layout must come first to emit before sibling receive.
     #[widget_child]
-    button_2: ShowCaseLayedOutButton,
+    button_1: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
-    button_3: ShowCaseLayedOutButton,
+    button_2: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
-    button_4: ShowCaseLayedOutButton,
+    button_3: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
-    v_stack: ui::VStack<UpdateAux, GraphicalAux>,
+    button_4: ui::Button<UpdateAux, GraphicalAux>,
 
     command_group_pre: CommandGroup,
     command_group_post: CommandGroup,
@@ -95,38 +92,40 @@ impl Showcase {
             alignment: ui::VStackAlignment::Left,
         };
 
-        let button_1 = v_stack.push(
-            v_stack_data,
-            ui::simple_button("Button 1".to_string(), theme, update_aux, gfx_aux),
-        );
-        let button_2 = v_stack.push(
+        let mut button_1 = ui::simple_button("Button 1".to_string(), theme, update_aux, gfx_aux);
+        let mut button_2 = ui::simple_button("Button 2".to_string(), theme, update_aux, gfx_aux);
+        let mut button_3 = ui::simple_button("Button 3".to_string(), theme, update_aux, gfx_aux);
+        let mut button_4 = ui::simple_button("VStacks!".to_string(), theme, update_aux, gfx_aux);
+
+        v_stack.push(v_stack_data, &mut button_1);
+        v_stack.push(
             ui::VStackData {
                 alignment: ui::VStackAlignment::Middle,
                 ..v_stack_data
             },
-            ui::simple_button("Button 2".to_string(), theme, update_aux, gfx_aux),
+            &mut button_2,
         );
-        let button_3 = v_stack.push(
+        v_stack.push(
             ui::VStackData {
                 alignment: ui::VStackAlignment::Right,
                 ..v_stack_data
             },
-            ui::simple_button("Button 3".to_string(), theme, update_aux, gfx_aux),
+            &mut button_3,
         );
-        let button_4 = v_stack.push(
+        v_stack.push(
             ui::VStackData {
                 alignment: ui::VStackAlignment::Stretch,
                 ..v_stack_data
             },
-            ui::simple_button("VStacks!".to_string(), theme, update_aux, gfx_aux),
+            &mut button_4,
         );
 
         Showcase {
+            v_stack,
             button_1,
             button_2,
             button_3,
             button_4,
-            v_stack,
 
             command_group_pre: CommandGroup::new(),
             command_group_post: CommandGroup::new(),
@@ -143,13 +142,6 @@ impl Widget for Showcase {
 
     fn update(&mut self, aux: &mut UpdateAux) {
         base::invoke_update(self, aux);
-
-        self.v_stack.update_layout(vec![
-            &mut self.button_1,
-            &mut self.button_2,
-            &mut self.button_3,
-            &mut self.button_4,
-        ]);
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut GraphicalAux) {

@@ -3,6 +3,7 @@ use {
     indexmap::IndexMap,
     reclutch::{
         display::{self, DisplayCommand, Point, Rect, Size},
+        event::{RcEventListener, RcEventQueue},
         prelude::*,
     },
     std::marker::PhantomData,
@@ -28,12 +29,15 @@ pub struct VStackData {
     pub alignment: VStackAlignment,
 }
 
-pub struct VStackChildData {
+#[derive(Debug)]
+struct ChildData {
     data: VStackData,
-    id: u64,
+    output: RcEventQueue<Rect>,
+    input: RcEventListener<Rect>,
+    rect: Rect,
 }
 
-#[derive(WidgetChildren, Debug, Clone)]
+#[derive(WidgetChildren, Debug)]
 #[widget_children_trait(base::WidgetChildren)]
 pub struct VStack<U, G>
 where
@@ -41,7 +45,7 @@ where
     G: base::GraphicalAuxiliary,
 {
     rect: Rect,
-    rects: IndexMap<u64, Rect>,
+    rects: IndexMap<u64, ChildData>,
     next_rect_id: u64,
     dirty: bool,
 
@@ -69,77 +73,40 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> VStack<U, G> {
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VStack<U, G> {
     type PushData = VStackData;
-    type ChildData = VStackChildData;
 
-    fn push<T: base::WidgetChildren + base::Rectangular>(
-        &mut self,
-        data: VStackData,
-        child: T,
-    ) -> base::LayedOut<T, Self> {
+    /// "Registers" a widget to the layout.
+    fn push(&mut self, data: Self::PushData, child: &mut impl base::LayableWidget) {
         self.dirty = true;
 
         let id = self.next_rect_id;
         self.next_rect_id += 1;
 
-        self.rects.insert(id, child.rect());
+        let mut output = RcEventQueue::new();
+        let input_q = RcEventQueue::new();
 
-        base::LayedOut::new(child, VStackChildData { data, id })
+        let input = input_q.listen();
+
+        child.listen_to_layout(base::LayoutEvents {
+            id,
+            rcv: &mut output,
+            notify: input_q,
+        });
+
+        self.rects.insert(
+            id,
+            ChildData {
+                data,
+                output,
+                input,
+                rect: child.rect(),
+            },
+        );
     }
 
-    fn remove<T: base::WidgetChildren + base::Rectangular>(
-        &mut self,
-        child: base::LayedOut<T, Self>,
-        _restore_original: bool,
-    ) -> T {
-        self.dirty = true;
-        child.widget
-    }
-
-    fn update_layout(
-        &mut self,
-        children: Vec<&mut base::LayedOutDyn<Self, Self>>,
-    ) {
-        if !(self.dirty
-            || children.iter().any(|child| {
-                let (child_widget, child_data) = child.as_ref();
-                child_widget.rect()
-                    != *self
-                        .rects
-                        .get(&child_data.id)
-                        .expect("invalid layout child ID")
-            }))
-        {
-            // nothing to update
-            return;
-        }
-
-        let mut advance = self.rect.origin.y;
-        for child in children {
-            let (child_widget, child_data) = child.both_mut();
-
-            advance += child_data.data.top_margin;
-
-            let mut rect = child_widget.rect();
-            rect.origin.y = advance;
-
-            rect.origin.x = match child_data.data.alignment {
-                VStackAlignment::Left => self.rect.origin.x,
-                VStackAlignment::Middle => display::center_horizontally(rect, self.rect).x,
-                VStackAlignment::Right => {
-                    self.rect.origin.x + self.rect.size.width - rect.size.width
-                }
-                VStackAlignment::Stretch => {
-                    rect.size.width = self.rect.size.width;
-                    self.rect.origin.x
-                }
-            };
-
-            child_widget.set_rect(rect);
-            *self.rects.get_mut(&child_data.id).unwrap() = rect;
-
-            advance += rect.size.height + child_data.data.bottom_margin;
-        }
-        self.dirty = false;
+    /// De-registers a widget from the layout, optionally restoring the original widget rectangle.
+    fn remove(&mut self, child: &mut impl base::LayableWidget, _restore_original: bool) {
+        // TODO(jazzfool): `restore_original` support.
+        child.listen_to_layout(None);
     }
 }
 
@@ -150,6 +117,49 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
 
     fn bounds(&self) -> Rect {
         self.rect
+    }
+
+    fn update(&mut self, _aux: &mut U) {
+        {
+            let dirty = &mut self.dirty;
+            for (_, data) in &mut self.rects {
+                let rect = &mut data.rect;
+                data.input.with(|events| {
+                    for event in events {
+                        *dirty = true;
+                        *rect = *event;
+                    }
+                });
+            }
+        }
+
+        if self.dirty {
+            let mut advance = self.rect.origin.y;
+            for (_, data) in &mut self.rects {
+                advance += data.data.top_margin;
+
+                let mut rect = data.rect;
+                rect.origin.y = advance;
+                rect.origin.x = match data.data.alignment {
+                    VStackAlignment::Left => self.rect.origin.x,
+                    VStackAlignment::Middle => display::center_horizontally(rect, self.rect).x,
+                    VStackAlignment::Right => {
+                        self.rect.origin.x + self.rect.size.width - rect.size.width
+                    }
+                    VStackAlignment::Stretch => {
+                        rect.size.width = self.rect.size.width;
+                        self.rect.origin.x
+                    }
+                };
+
+                data.output.emit_owned(rect);
+                data.rect = rect;
+
+                advance += rect.size.height + data.data.bottom_margin;
+            }
+
+            self.dirty = false;
+        }
     }
 }
 
