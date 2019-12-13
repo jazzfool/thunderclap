@@ -2,7 +2,7 @@ use {
     crate::draw,
     reclutch::{
         display::{Color, FontInfo, GraphicsDisplay, Point, Rect, ResourceReference, Size},
-        event::{RcEventQueue, bidir::Secondary as BidirEventQueueSec},
+        event::RcEventQueue,
         prelude::*,
         widget::Widget,
     },
@@ -214,7 +214,7 @@ pub enum MouseButton {
 #[derive(Debug)]
 pub struct WidgetLayoutEventsInner {
     pub id: u64,
-    pub evq: BidirEventQueueSec<Rect, Rect>,
+    pub evq: reclutch::event::bidir_single::Secondary<Rect, Rect>,
 }
 
 #[derive(Default, Debug)]
@@ -240,7 +240,9 @@ impl WidgetLayoutEvents {
     }
 
     pub fn receive(&mut self) -> Option<Rect> {
-        self.0.as_mut().and_then(|inner| inner.evq.retrieve_newest())
+        self.0
+            .as_mut()
+            .and_then(|inner| inner.evq.retrieve_newest())
     }
 }
 
