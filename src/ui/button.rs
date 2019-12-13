@@ -177,7 +177,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                 .emit_owned(ButtonEvent::Focus(ToggledEvent::new(!was_focused, ())));
         }
 
-        for rect in self.layout.receive() {
+        if let Some(rect) = self.layout.receive() {
             self.rect = rect;
             cmd_group.repaint();
         }
