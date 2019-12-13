@@ -105,6 +105,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
     type GraphicalAux = G;
     type DisplayObject = DisplayCommand;
 
+    #[inline]
     fn bounds(&self) -> Rect {
         self.rect
     }
@@ -215,12 +216,14 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget for Button<U, G> {
+    #[inline]
     fn listen_to_layout<'a>(&mut self, layout: impl Into<Option<base::LayoutEvents<'a>>>) {
         self.layout.update(layout);
     }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Repaintable for Button<U, G> {
+    #[inline]
     fn repaint(&mut self) {
         self.command_group.repaint();
     }
@@ -235,6 +238,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for Bu
         self.layout.notify(self.rect);
     }
 
+    #[inline]
     fn position(&self) -> Point {
         self.rect.origin
     }
@@ -247,12 +251,14 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for 
         self.layout.notify(self.rect);
     }
 
+    #[inline]
     fn size(&self) -> Size {
         self.rect.size
     }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for Button<U, G> {
+    #[inline]
     fn theme(&mut self) -> &mut dyn draw::Themed {
         &mut self.painter
     }

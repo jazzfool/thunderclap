@@ -125,9 +125,9 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
             for (_, data) in &mut self.rects {
                 let rect = &mut data.rect;
                 data.input.with(|events| {
-                    for event in events {
+                    if let Some(new_ev) = events.last() {
                         *dirty = true;
-                        *rect = *event;
+                        *rect = *new_ev;
                     }
                 });
             }
@@ -164,33 +164,40 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Repaintable for VStack<U, G> {
+    #[inline]
     fn repaint(&mut self) {}
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for VStack<U, G> {
+    #[inline]
     fn set_position(&mut self, position: Point) {
         self.rect.origin = position;
     }
 
+    #[inline]
     fn position(&self) -> Point {
         self.rect.origin
     }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for VStack<U, G> {
+    #[inline]
     fn set_size(&mut self, size: Size) {
         self.rect.size = size;
     }
 
+    #[inline]
     fn size(&self) -> Size {
         self.rect.size
     }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for VStack<U, G> {
+    #[inline]
     fn theme(&mut self) -> &mut dyn draw::Themed {
         &mut self.themed
     }
 
+    #[inline]
     fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
 }
