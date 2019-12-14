@@ -10,19 +10,6 @@ use {
     std::marker::PhantomData,
 };
 
-#[macro_export]
-macro_rules! vstack {
-    (rect: $rect:expr,$($data:expr => $target:expr),*) => {
-        {
-            let mut vstack = $crate::ui::vstack::VStack::new($rect);
-            $(
-                vstack.push($data, &mut $target);
-            )*
-            vstack
-        }
-    }
-}
-
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct VStackData {
     pub top_margin: f32,

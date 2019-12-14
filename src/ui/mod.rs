@@ -10,6 +10,33 @@ use {
     reclutch::display,
 };
 
+#[macro_export]
+macro_rules! define_layout {
+    (for $layout:expr => {$($data:expr => $target:expr),*}) => {
+        {
+            use $crate::base::Layout;
+            $(
+                $layout.push($data, &mut $target);
+            )*
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! define_layouts {
+    ($(for $layout:expr => {$($data:expr => $target:expr),*}),*) => {
+        {
+            $(
+                define_layout! {
+                    for $layout => {
+                        $($data => $target),*
+                    }
+                };
+            )*
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ToggledEvent<T> {
     Start(T),
