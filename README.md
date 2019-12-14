@@ -17,6 +17,23 @@ You can still `derive` this `WidgetChildren` like so:
 struct MyWidget;
 ```
 
+### Layout
+Layout is simple and idiomatic with the provided macros:
+```rust
+let v_stack_data = VStackData::default().align(Align::Middle);
+
+define_layout! {
+    for v_stack => {
+        v_stack_data => button,
+        v_stack_data => define_layout! {
+            for another_v_stack => {
+                v_stack_data => nested_button
+            }
+        }
+    }
+}
+```
+
 ---
 
 ### You can see a rundown of all the widgets [here](Widgets.md).

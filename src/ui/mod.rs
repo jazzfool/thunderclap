@@ -16,8 +16,9 @@ macro_rules! define_layout {
         {
             use $crate::base::Layout;
             $(
-                $layout.push($data, &mut $target);
+                $layout.push($data, $target);
             )*
+            &mut $layout
         }
     }
 }
@@ -31,7 +32,7 @@ macro_rules! define_layouts {
                     for $layout => {
                         $($data => $target),*
                     }
-                };
+                }
             )*
         }
     }

@@ -86,7 +86,8 @@ impl Showcase {
         update_aux: &mut UpdateAux,
         gfx_aux: &mut GraphicalAux,
     ) -> Self {
-        let mut v_stack = ui::VStack::new(Rect::new(Point::new(50.0, 50.0), Size::new(200.0, 200.0)));
+        let mut v_stack =
+            ui::VStack::new(Rect::new(Point::new(50.0, 50.0), Size::new(200.0, 200.0)));
         let mut button_1 = ui::simple_button("Button 1".to_string(), theme, update_aux, gfx_aux);
         let mut button_2 = ui::simple_button("Button 2".to_string(), theme, update_aux, gfx_aux);
         let mut button_3 = ui::simple_button("Button 3".to_string(), theme, update_aux, gfx_aux);
@@ -100,10 +101,10 @@ impl Showcase {
 
         define_layouts! {
             for v_stack => {
-                v_stack_data => button_1,
-                v_stack_data.align(ui::Align::Middle) => button_2,
-                v_stack_data.align(ui::Align::End) => button_3,
-                v_stack_data.align(ui::Align::Stretch) => button_4
+                v_stack_data => &mut button_1,
+                v_stack_data.align(ui::Align::Middle) => &mut button_2,
+                v_stack_data.align(ui::Align::End) => &mut button_3,
+                v_stack_data.align(ui::Align::Stretch) => &mut button_4
             }
         };
 
