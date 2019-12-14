@@ -1,4 +1,5 @@
 use {
+    super::Align,
     crate::{base, draw},
     indexmap::IndexMap,
     reclutch::{
@@ -9,24 +10,41 @@ use {
     std::marker::PhantomData,
 };
 
-/// How a child should be aligned horizontally within a `VStack`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum VStackAlignment {
-    /// The child is align to the left side.
-    Left,
-    /// The child is centered.
-    Middle,
-    /// The child is align to the right side.
-    Right,
-    /// The width of the child is stretched to fill the container.
-    Stretch,
+#[macro_export]
+macro_rules! vstack {
+    (rect: $rect:expr,$($data:expr => $target:expr),*) => {
+        {
+            let mut vstack = $crate::ui::vstack::VStack::new($rect);
+            $(
+                vstack.push($data, &mut $target);
+            )*
+            vstack
+        }
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct VStackData {
     pub top_margin: f32,
     pub bottom_margin: f32,
-    pub alignment: VStackAlignment,
+    pub alignment: Align,
+}
+
+impl VStackData {
+    pub fn top_margin(self, top_margin: f32) -> VStackData {
+        VStackData { top_margin, ..self }
+    }
+
+    pub fn bottom_margin(self, bottom_margin: f32) -> VStackData {
+        VStackData {
+            bottom_margin,
+            ..self
+        }
+    }
+
+    pub fn align(self, alignment: Align) -> VStackData {
+        VStackData { alignment, ..self }
+    }
 }
 
 #[derive(Debug)]
@@ -132,12 +150,10 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
                 let mut rect = data.rect;
                 rect.origin.y = advance;
                 rect.origin.x = match data.data.alignment {
-                    VStackAlignment::Left => self.rect.origin.x,
-                    VStackAlignment::Middle => display::center_horizontally(rect, self.rect).x,
-                    VStackAlignment::Right => {
-                        self.rect.origin.x + self.rect.size.width - rect.size.width
-                    }
-                    VStackAlignment::Stretch => {
+                    Align::Begin => self.rect.origin.x,
+                    Align::Middle => display::center_horizontally(rect, self.rect).x,
+                    Align::End => self.rect.origin.x + self.rect.size.width - rect.size.width,
+                    Align::Stretch => {
                         rect.size.width = self.rect.size.width;
                         self.rect.origin.x
                     }

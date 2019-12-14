@@ -22,6 +22,9 @@ use {
 #[macro_use]
 extern crate reclutch;
 
+#[macro_use]
+extern crate reui;
+
 struct UpdateAux {
     window_queue: RcEventQueue<base::WindowEvent>,
     cursor: Point,
@@ -83,42 +86,25 @@ impl Showcase {
         update_aux: &mut UpdateAux,
         gfx_aux: &mut GraphicalAux,
     ) -> Self {
-        let mut v_stack =
-            ui::VStack::new(Rect::new(Point::new(50.0, 50.0), Size::new(200.0, 200.0)));
-
-        let v_stack_data = ui::VStackData {
-            top_margin: 10.0,
-            bottom_margin: 0.0,
-            alignment: ui::VStackAlignment::Left,
-        };
-
         let mut button_1 = ui::simple_button("Button 1".to_string(), theme, update_aux, gfx_aux);
         let mut button_2 = ui::simple_button("Button 2".to_string(), theme, update_aux, gfx_aux);
         let mut button_3 = ui::simple_button("Button 3".to_string(), theme, update_aux, gfx_aux);
         let mut button_4 = ui::simple_button("VStacks!".to_string(), theme, update_aux, gfx_aux);
 
-        v_stack.push(v_stack_data, &mut button_1);
-        v_stack.push(
-            ui::VStackData {
-                alignment: ui::VStackAlignment::Middle,
-                ..v_stack_data
-            },
-            &mut button_2,
-        );
-        v_stack.push(
-            ui::VStackData {
-                alignment: ui::VStackAlignment::Right,
-                ..v_stack_data
-            },
-            &mut button_3,
-        );
-        v_stack.push(
-            ui::VStackData {
-                alignment: ui::VStackAlignment::Stretch,
-                ..v_stack_data
-            },
-            &mut button_4,
-        );
+        let v_stack_data = ui::VStackData {
+            top_margin: 10.0,
+            bottom_margin: 0.0,
+            alignment: ui::Align::Begin,
+        };
+
+        let v_stack = vstack! {
+            rect: Rect::new(Point::new(50.0, 50.0), Size::new(200.0, 200.0)),
+
+            v_stack_data => button_1,
+            v_stack_data.align(ui::Align::Middle) => button_2,
+            v_stack_data.align(ui::Align::End) => button_3,
+            v_stack_data.align(ui::Align::Stretch) => button_4
+        };
 
         Showcase {
             v_stack,

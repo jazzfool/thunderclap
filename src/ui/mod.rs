@@ -55,6 +55,26 @@ impl<T> ToggledEvent<T> {
     }
 }
 
+/// How a child should be aligned within a layout.
+/// On which axis the align applies to depends on the layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Align {
+    /// The child is aligned to the beginning of the layout.
+    Begin,
+    /// The child is centered.
+    Middle,
+    /// The child is aligned to the end of the layout.
+    End,
+    /// The child is stretched to fill the container.
+    Stretch,
+}
+
+impl Default for Align {
+    fn default() -> Self {
+        Align::Begin
+    }
+}
+
 pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     text: String,
     theme: &dyn draw::Theme,
