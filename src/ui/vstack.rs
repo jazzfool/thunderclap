@@ -68,6 +68,7 @@ where
     dirty: bool,
 
     themed: draw::PhantomThemed,
+    layout: base::WidgetLayoutEvents,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -82,6 +83,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> VStack<U, G> {
             dirty: true,
 
             themed: Default::default(),
+            layout: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
@@ -140,6 +142,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
     }
 
     fn update(&mut self, _aux: &mut U) {
+        if let Some(rect) = self.layout.receive() {
+            self.rect = rect;
+            self.dirty = true;
+        }
+
         {
             let dirty = &mut self.dirty;
             for (_, data) in &mut self.rects {
@@ -175,6 +182,18 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
 
             self.dirty = false;
         }
+    }
+}
+
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget for VStack<U, G> {
+    #[inline]
+    fn listen_to_layout<'a>(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
+        self.layout.update(layout);
+    }
+
+    #[inline]
+    fn layout_id(&self) -> Option<u64> {
+        self.layout.id()
     }
 }
 
