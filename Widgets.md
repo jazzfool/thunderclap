@@ -13,10 +13,10 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Themed.....`** ✔️
 - **`Focusable..`** ✔️
 - **Outgoing Event Queues:**
-    - `on_press`: The button was pressed.
-    - `on_release`: The button was released. Complements `on_press`.
-    - `on_mouse_inside`: The cursor began or stopped overlapping the button.
-    - `on_focus`: The button gained or lost focus.
+    - `event_queue`: `ButtonEvent`
+        - `ButtonEvent::Press`: The button has been pressed/released.
+        - `ButtonEvent::MouseHover`: The cursor has entered/left the button boundaries.
+        - `ButtonEvent::Focus`: The button has gained/lost focus.
 
 ## Abstract Widgets
 
