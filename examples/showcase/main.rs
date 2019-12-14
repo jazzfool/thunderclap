@@ -64,8 +64,6 @@ impl base::GraphicalAuxiliary for GraphicalAux {
 #[widget_children_trait(base::WidgetChildren)]
 struct Showcase {
     #[widget_child]
-    v_stack: ui::VStack<UpdateAux, GraphicalAux>, // note the order of widgets here, layout must come first to emit before sibling receive.
-    #[widget_child]
     button_1: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
     button_2: ui::Button<UpdateAux, GraphicalAux>,
@@ -73,6 +71,8 @@ struct Showcase {
     button_3: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
     button_4: ui::Button<UpdateAux, GraphicalAux>,
+    #[widget_child]
+    v_stack: ui::VStack<UpdateAux, GraphicalAux>,
 
     command_group_pre: CommandGroup,
     command_group_post: CommandGroup,
@@ -99,7 +99,7 @@ impl Showcase {
             alignment: ui::Align::Begin,
         };
 
-        define_layouts! {
+        define_layout! {
             for v_stack => {
                 v_stack_data => &mut button_1,
                 v_stack_data.align(ui::Align::Middle) => &mut button_2,
@@ -109,11 +109,11 @@ impl Showcase {
         };
 
         Showcase {
-            v_stack,
             button_1,
             button_2,
             button_3,
             button_4,
+            v_stack,
 
             command_group_pre: CommandGroup::new(),
             command_group_post: CommandGroup::new(),
