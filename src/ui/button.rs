@@ -98,6 +98,20 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
             phantom_g: Default::default(),
         }
     }
+
+    fn derive_state(&self) -> state::ButtonState {
+        state::ButtonState {
+            rect: self.bounds(),
+            text: self.text.clone(),
+            text_size: self.text_size,
+            state: if self.disabled {
+                state::ControlState::Disabled
+            } else {
+                state::ControlState::Normal(self.interaction)
+            },
+            button_type: self.button_type,
+        }
+    }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U, G> {
@@ -184,34 +198,10 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
-        let bounds = self.bounds();
-        let text = self.text.clone();
-        let text_size = self.text_size;
-        let disabled = self.disabled;
-        let interaction = self.interaction;
-        let button_type = self.button_type;
+        let button_state = self.derive_state();
         let painter = &mut self.painter;
-
-        self.command_group.push_with(
-            display,
-            || {
-                painter.draw(
-                    state::ButtonState {
-                        rect: bounds,
-                        text,
-                        text_size,
-                        state: if disabled {
-                            state::ControlState::Disabled
-                        } else {
-                            state::ControlState::Normal(interaction)
-                        },
-                        button_type,
-                    },
-                    aux,
-                )
-            },
-            None,
-        );
+        self.command_group
+            .push_with(display, || painter.draw(button_state, aux), None);
     }
 }
 
@@ -271,11 +261,9 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for B
     fn resize_from_theme(&mut self, aux: &dyn base::GraphicalAuxiliary) {
         self.rect.size = self.painter.size_hint(
             state::ButtonState {
-                rect: self.bounds(),
-                text: self.text.clone(),
-                text_size: self.text_size,
                 state: state::ControlState::Normal(state::InteractionState::empty()),
                 button_type: state::ButtonType::Normal,
+                ..self.derive_state()
             },
             aux,
         );

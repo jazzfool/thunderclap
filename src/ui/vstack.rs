@@ -110,7 +110,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
 
     /// De-registers a widget from the layout, optionally restoring the original widget rectangle.
     fn remove(&mut self, child: &mut impl base::LayableWidget, restore_original: bool) {
-        if let Some(Some(data)) = child.layout_id().map(|id| self.rects.remove(&id)) {
+        if let Some(data) = child.layout_id().and_then(|id| self.rects.remove(&id)) {
             child.listen_to_layout(None);
             if restore_original {
                 child.set_rect(data.original_rect);
