@@ -220,6 +220,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget 
     fn listen_to_layout<'a>(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
         self.layout.update(layout);
     }
+
+    #[inline]
+    fn layout_id(&self) -> Option<u64> {
+        self.layout.id()
+    }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Repaintable for Button<U, G> {

@@ -229,6 +229,10 @@ impl WidgetLayoutEvents {
         WidgetLayoutEvents(Some(layout))
     }
 
+    pub fn id(&self) -> Option<u64> {
+        self.0.as_ref().map(|inner| inner.id)
+    }
+
     pub fn update<'a>(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>) {
         self.0 = layout.into();
     }
@@ -249,6 +253,7 @@ impl WidgetLayoutEvents {
 /// Widget that is capable of listening to layout events.
 pub trait LayableWidget: WidgetChildren + Rectangular {
     fn listen_to_layout(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>);
+    fn layout_id(&self) -> Option<u64>;
 }
 
 /// Widget which emits layout events to registered widgets.

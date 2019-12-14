@@ -52,6 +52,7 @@ struct ChildData {
     data: VStackData,
     evq: Bidir1EventQueue<Rect, Rect>,
     rect: Rect,
+    original_rect: Rect,
 }
 
 #[derive(WidgetChildren, Debug)]
@@ -105,20 +106,27 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
             evq: evq.secondary(),
         });
 
+        let rect = child.rect();
+
         self.rects.insert(
             id,
             ChildData {
                 data,
                 evq,
-                rect: child.rect(),
+                rect,
+                original_rect: rect,
             },
         );
     }
 
     /// De-registers a widget from the layout, optionally restoring the original widget rectangle.
-    fn remove(&mut self, child: &mut impl base::LayableWidget, _restore_original: bool) {
-        // TODO(jazzfool): `restore_original` support.
-        child.listen_to_layout(None);
+    fn remove(&mut self, child: &mut impl base::LayableWidget, restore_original: bool) {
+        if let Some(Some(data)) = child.layout_id().map(|id| self.rects.remove(&id)) {
+            child.listen_to_layout(None);
+            if restore_original {
+                child.set_rect(data.original_rect);
+            }
+        }
     }
 }
 
