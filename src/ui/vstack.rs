@@ -174,7 +174,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget for VStack<U, G> {
     #[inline]
-    fn listen_to_layout<'a>(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
+    fn listen_to_layout(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
         self.layout.update(layout);
     }
 
