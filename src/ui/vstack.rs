@@ -4,7 +4,7 @@ use {
     indexmap::IndexMap,
     reclutch::{
         display::{self, DisplayCommand, Point, Rect, Size},
-        event::bidir_single::Queue as Bidir1EventQueue,
+        event::bidir_single::Queue as BidirSingleEventQueue,
         prelude::*,
     },
     std::marker::PhantomData,
@@ -37,7 +37,7 @@ impl VStackData {
 #[derive(Debug)]
 struct ChildData {
     data: VStackData,
-    evq: Bidir1EventQueue<Rect, Rect>,
+    evq: BidirSingleEventQueue<Rect, Rect>,
     rect: Rect,
     original_rect: Rect,
 }
@@ -88,7 +88,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
         let id = self.next_rect_id;
         self.next_rect_id += 1;
 
-        let evq = Bidir1EventQueue::new();
+        let evq = BidirSingleEventQueue::new();
 
         child.listen_to_layout(base::WidgetLayoutEventsInner {
             id,
