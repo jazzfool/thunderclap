@@ -70,46 +70,99 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
 
         let mut interaction_state = state::InteractionState::empty();
 
-        let background = match state.state {
-            state::ControlState::Normal(interaction) => {
-                interaction_state = interaction;
+        let (background, border, text, focus) = match state.button_type {
+            state::ButtonType::Normal => match state.state {
+                state::ControlState::Normal(interaction) => {
+                    interaction_state = interaction;
 
-                if interaction
-                    .intersects(state::InteractionState::HOVERED | state::InteractionState::PRESSED)
-                {
-                    StyleColor::LinearGradient(Gradient {
-                        start: state.rect.origin,
-                        end: state.rect.origin + Size::new(0.0, state.rect.size.height),
-                        stops: vec![
-                            (0.0, base::color_from_urgba(239, 243, 246, 1.0)),
-                            (0.9, base::color_from_urgba(230, 235, 241, 1.0)),
-                        ],
-                    })
-                } else {
-                    StyleColor::LinearGradient(Gradient {
-                        start: state.rect.origin,
-                        end: state.rect.origin + Size::new(0.0, state.rect.size.height),
-                        stops: vec![
-                            (0.0, base::color_from_urgba(250, 251, 252, 1.0)),
-                            (0.9, base::color_from_urgba(239, 243, 246, 1.0)),
-                        ],
-                    })
+                    if interaction.intersects(
+                        state::InteractionState::HOVERED | state::InteractionState::PRESSED,
+                    ) {
+                        (
+                            StyleColor::LinearGradient(Gradient {
+                                start: state.rect.origin,
+                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                                stops: vec![
+                                    (0.0, base::color_from_urgba(239, 243, 246, 1.0)),
+                                    (0.9, base::color_from_urgba(230, 235, 241, 1.0)),
+                                ],
+                            }),
+                            base::color_from_urgba(27, 31, 35, 0.35).into(),
+                            base::color_from_urgba(36, 41, 46, 1.0).into(),
+                            base::color_from_urgba(3, 102, 214, 0.3).into(),
+                        )
+                    } else {
+                        (
+                            StyleColor::LinearGradient(Gradient {
+                                start: state.rect.origin,
+                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                                stops: vec![
+                                    (0.0, base::color_from_urgba(250, 251, 252, 1.0)),
+                                    (0.9, base::color_from_urgba(239, 243, 246, 1.0)),
+                                ],
+                            }),
+                            base::color_from_urgba(27, 31, 35, 0.35).into(),
+                            base::color_from_urgba(36, 41, 46, 1.0).into(),
+                            base::color_from_urgba(3, 102, 214, 0.3).into(),
+                        )
+                    }
                 }
-            }
-            state::ControlState::Disabled => base::color_from_urgba(239, 243, 246, 1.0).into(),
-        };
+                state::ControlState::Disabled => (
+                    base::color_from_urgba(239, 243, 246, 1.0).into(),
+                    base::color_from_urgba(27, 31, 35, 0.2).into(),
+                    base::color_from_urgba(36, 41, 46, 0.4).into(),
+                    base::color_from_urgba(3, 102, 214, 0.3).into(),
+                ),
+            },
+            state::ButtonType::Primary => match state.state {
+                state::ControlState::Normal(interaction) => {
+                    interaction_state = interaction;
 
-        let border = match state.state {
-            state::ControlState::Normal(interaction) => {
-                if interaction
-                    .intersects(state::InteractionState::HOVERED | state::InteractionState::PRESSED)
-                {
-                    base::color_from_urgba(27, 31, 35, 0.35)
-                } else {
-                    base::color_from_urgba(27, 31, 35, 0.2)
+                    if interaction.contains(state::InteractionState::PRESSED) {
+                        (
+                            base::color_from_urgba(39, 159, 67, 1.0).into(),
+                            base::color_from_urgba(27, 31, 35, 0.5).into(),
+                            base::color_from_urgba(255, 255, 255, 1.0).into(),
+                            base::color_from_urgba(46, 200, 82, 0.5).into(),
+                        )
+                    } else if interaction.contains(state::InteractionState::HOVERED) {
+                        (
+                            StyleColor::LinearGradient(Gradient {
+                                start: state.rect.origin,
+                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                                stops: vec![
+                                    (0.0, base::color_from_urgba(46, 200, 82, 1.0)),
+                                    (0.9, base::color_from_urgba(38, 159, 66, 1.0)),
+                                ],
+                            }),
+                            base::color_from_urgba(27, 31, 35, 0.5).into(),
+                            base::color_from_urgba(255, 255, 255, 1.0).into(),
+                            base::color_from_urgba(46, 200, 82, 0.5).into(),
+                        )
+                    } else {
+                        (
+                            StyleColor::LinearGradient(Gradient {
+                                start: state.rect.origin,
+                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                                stops: vec![
+                                    (0.0, base::color_from_urgba(52, 208, 88, 1.0)),
+                                    (0.9, base::color_from_urgba(40, 167, 69, 1.0)),
+                                ],
+                            }),
+                            base::color_from_urgba(27, 31, 35, 0.5).into(),
+                            base::color_from_urgba(255, 255, 255, 1.0).into(),
+                            base::color_from_urgba(46, 200, 82, 0.5).into(),
+                        )
+                    }
                 }
-            }
-            state::ControlState::Disabled => base::color_from_urgba(27, 31, 35, 0.2),
+                state::ControlState::Disabled => (
+                    base::color_from_urgba(148, 211, 162, 1.0).into(),
+                    base::color_from_urgba(27, 31, 35, 0.5).into(),
+                    base::color_from_urgba(255, 255, 255, 0.75).into(),
+                    base::color_from_urgba(46, 200, 82, 0.5).into(),
+                ),
+            },
+            _ => unimplemented!(),
         };
 
         // Background
@@ -126,23 +179,16 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
             [3.5; 4],
             GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                 thickness: (2.0 / 3.0),
-                color: border.into(),
+                color: border,
                 ..Default::default()
             }),
             None,
         );
 
         // Text
-        builder.push_text(
-            ButtonPainter::make_text_item(
-                &state,
-                aux,
-                base::color_from_urgba(36, 41, 46, 1.0),
-                true,
-            ),
-            None,
-        );
+        builder.push_text(ButtonPainter::make_text_item(&state, aux, text, true), None);
 
+        // Focus rect
         if interaction_state.contains(state::InteractionState::FOCUSED)
             && !interaction_state.contains(state::InteractionState::PRESSED)
         {
@@ -151,13 +197,14 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
                 [3.5; 4],
                 GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                     thickness: 3.5,
-                    color: base::color_from_urgba(3, 102, 214, 0.3).into(),
+                    color: focus,
                     ..Default::default()
                 }),
                 None,
             );
         }
 
+        // Pressed inset shadow
         if interaction_state.contains(state::InteractionState::PRESSED) {
             builder.push_round_rectangle_clip(base::sharp_align(state.rect), [3.5; 4]);
             builder.push_round_rectangle(
