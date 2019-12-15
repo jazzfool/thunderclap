@@ -92,7 +92,7 @@ impl Showcase {
         let mut button_2 = ui::simple_button("Button 2".to_string(), theme, update_aux, gfx_aux);
         let mut button_3 = ui::simple_button("Button 3".to_string(), theme, update_aux, gfx_aux);
         let mut button_4 = ui::simple_button("VStacks!".to_string(), theme, update_aux, gfx_aux);
-
+        
         let v_stack_data = ui::VStackData {
             top_margin: 10.0,
             bottom_margin: 0.0,

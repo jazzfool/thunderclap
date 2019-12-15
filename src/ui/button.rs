@@ -126,6 +126,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
     fn update(&mut self, _aux: &mut U) {
         let was_focused = self.interaction.contains(state::InteractionState::FOCUSED);
+        let disabled = self.disabled;
 
         let bounds = self.bounds();
         let cmd_group = &mut self.command_group;
@@ -139,7 +140,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                     match event {
                         base::WindowEvent::MousePress(press_event) => {
                             if let Some((pos, _)) = press_event.with(|(pos, button)| {
-                                *button == base::MouseButton::Left && bounds.contains(*pos)
+                                !disabled &&*button == base::MouseButton::Left && bounds.contains(*pos)
                             }) {
                                 interaction.insert(state::InteractionState::PRESSED);
                                 event_queue
@@ -149,7 +150,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                         }
                         base::WindowEvent::MouseRelease(release_event) => {
                             if let Some((pos, _)) = release_event.with(|(_, button)| {
-                                *button == base::MouseButton::Left
+                                !disabled && *button == base::MouseButton::Left
                                     && interaction.contains(state::InteractionState::PRESSED)
                             }) {
                                 interaction.remove(state::InteractionState::PRESSED);
