@@ -4,6 +4,7 @@ use {
     crate::{
         base::{self, Repaintable},
         draw::{self, state},
+        ui::ToggledEvent,
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect, Size},
@@ -14,6 +15,20 @@ use {
     std::marker::PhantomData,
 };
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ButtonEvent {
+    /// Emitted when the button is pressed or released.
+    /// Corresponds to `WindowEvent::MousePress` or `WindowEvent::MouseRelease`.
+    Press(ToggledEvent<Point>),
+
+    /// Emitted when the mouse enters (`true`) or leaves (`false`) the button boundaries.
+    /// Corresponds to `WindowEvent::MouseMove`.
+    MouseHover(ToggledEvent<Point>),
+
+    /// Emitted when focus is gained (`true`) or lost (`false`).
+    Focus(ToggledEvent<()>),
+}
+
 /// Focus-able button widget.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
@@ -22,24 +37,7 @@ where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    /// Emitted when the button is pressed.
-    /// Corresponds to `WindowEvent::MousePress`.
-    pub on_press: RcEventQueue<Point>,
-    /// Emitted when the button is released.
-    /// Corresponds to `WindowEvent::MouseRelease`.
-    pub on_release: RcEventQueue<Point>,
-    /// Emitted when the mouse enters the button boundaries.
-    /// Corresponds to `WindowEvent::MouseMove`.
-    pub on_mouse_enter: RcEventQueue<Point>,
-    /// Emitted when the mouse leaves the button boundaries.
-    /// Corresponds to `WindowEvent::MouseMove`.
-    /// Complements `on_mouse_enter`.
-    pub on_mouse_leave: RcEventQueue<Point>,
-    /// Emitted when focus is gained.
-    pub on_focus: RcEventQueue<()>,
-    /// Emitted when focus is lost.
-    /// Complements `on_focus`.
-    pub on_blur: RcEventQueue<()>,
+    pub event_queue: RcEventQueue<ButtonEvent>,
 
     text: DisplayText,
     text_size: Option<f32>,
@@ -51,6 +49,7 @@ where
     painter: Box<dyn draw::Painter<state::ButtonState>>,
     command_group: CommandGroup,
     window_listener: RcEventListener<base::WindowEvent>,
+    layout: base::WidgetLayoutEvents,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -81,12 +80,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
         };
 
         Self {
-            on_press: RcEventQueue::new(),
-            on_release: RcEventQueue::new(),
-            on_mouse_enter: RcEventQueue::new(),
-            on_mouse_leave: RcEventQueue::new(),
-            on_focus: RcEventQueue::new(),
-            on_blur: RcEventQueue::new(),
+            event_queue: RcEventQueue::new(),
 
             text,
             text_size,
@@ -98,9 +92,24 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
             painter,
             command_group: CommandGroup::new(),
             window_listener: update_aux.window_queue_mut().listen(),
+            layout: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
+        }
+    }
+
+    fn derive_state(&self) -> state::ButtonState {
+        state::ButtonState {
+            rect: self.bounds(),
+            text: self.text.clone(),
+            text_size: self.text_size,
+            state: if self.disabled {
+                state::ControlState::Disabled
+            } else {
+                state::ControlState::Normal(self.interaction)
+            },
+            button_type: self.button_type,
         }
     }
 }
@@ -110,6 +119,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
     type GraphicalAux = G;
     type DisplayObject = DisplayCommand;
 
+    #[inline]
     fn bounds(&self) -> Rect {
         self.rect
     }
@@ -122,10 +132,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
         {
             let interaction = &mut self.interaction;
-            let on_press = &mut self.on_press;
-            let on_release = &mut self.on_release;
-            let on_mouse_enter = &mut self.on_mouse_enter;
-            let on_mouse_leave = &mut self.on_mouse_leave;
+            let event_queue = &mut self.event_queue;
 
             self.window_listener.with(|events| {
                 for event in events {
@@ -135,7 +142,8 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                                 *button == base::MouseButton::Left && bounds.contains(*pos)
                             }) {
                                 interaction.insert(state::InteractionState::PRESSED);
-                                on_press.emit_owned(*pos);
+                                event_queue
+                                    .emit_owned(ButtonEvent::Press(ToggledEvent::new(true, *pos)));
                                 cmd_group.repaint();
                             }
                         }
@@ -146,7 +154,8 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                             }) {
                                 interaction.remove(state::InteractionState::PRESSED);
                                 interaction.insert(state::InteractionState::FOCUSED);
-                                on_release.emit_owned(*pos);
+                                event_queue
+                                    .emit_owned(ButtonEvent::Press(ToggledEvent::new(false, *pos)));
                                 cmd_group.repaint();
                             }
                         }
@@ -154,12 +163,17 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                             if let Some(pos) = move_event.with(|pos| bounds.contains(*pos)) {
                                 if !interaction.contains(state::InteractionState::HOVERED) {
                                     interaction.insert(state::InteractionState::HOVERED);
-                                    on_mouse_enter.emit_owned(pos.clone());
+                                    event_queue.emit_owned(ButtonEvent::MouseHover(
+                                        ToggledEvent::new(true, pos.clone()),
+                                    ));
                                     cmd_group.repaint();
                                 }
                             } else if interaction.contains(state::InteractionState::HOVERED) {
                                 interaction.remove(state::InteractionState::HOVERED);
-                                on_mouse_leave.emit_owned(move_event.get().clone());
+                                event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(
+                                    false,
+                                    move_event.get().clone(),
+                                )));
                                 cmd_group.repaint();
                             }
                         }
@@ -172,59 +186,54 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
         }
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
-            self.command_group.repaint();
-            if was_focused {
-                self.on_blur.emit_owned(());
-            } else {
-                self.on_focus.emit_owned(());
-            }
+            cmd_group.repaint();
+            self.event_queue
+                .emit_owned(ButtonEvent::Focus(ToggledEvent::new(!was_focused, ())));
+        }
+
+        if let Some(rect) = self.layout.receive() {
+            self.rect = rect;
+            cmd_group.repaint();
         }
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
-        let bounds = self.bounds();
-        let text = self.text.clone();
-        let text_size = self.text_size;
-        let disabled = self.disabled;
-        let interaction = self.interaction;
-        let button_type = self.button_type;
+        let button_state = self.derive_state();
         let painter = &mut self.painter;
+        self.command_group
+            .push_with(display, || painter.draw(button_state, aux), None);
+    }
+}
 
-        self.command_group.push_with(
-            display,
-            || {
-                painter.draw(
-                    state::ButtonState {
-                        rect: bounds,
-                        text,
-                        text_size,
-                        state: if disabled {
-                            state::ControlState::Disabled
-                        } else {
-                            state::ControlState::Normal(interaction)
-                        },
-                        button_type,
-                    },
-                    aux,
-                )
-            },
-            None,
-        );
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget for Button<U, G> {
+    #[inline]
+    fn listen_to_layout(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
+        self.layout.update(layout);
+    }
+
+    #[inline]
+    fn layout_id(&self) -> Option<u64> {
+        self.layout.id()
     }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Repaintable for Button<U, G> {
+    #[inline]
     fn repaint(&mut self) {
         self.command_group.repaint();
     }
 }
 
+// FIXME(jazzfool): the blanket `Rectangular` implementation causes `self.layout.notify()` to be called twice.
+
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for Button<U, G> {
     fn set_position(&mut self, position: Point) {
         self.rect.origin = position;
         self.repaint();
+        self.layout.notify(self.rect);
     }
 
+    #[inline]
     fn position(&self) -> Point {
         self.rect.origin
     }
@@ -234,14 +243,17 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for 
     fn set_size(&mut self, size: Size) {
         self.rect.size = size;
         self.repaint();
+        self.layout.notify(self.rect);
     }
 
+    #[inline]
     fn size(&self) -> Size {
         self.rect.size
     }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for Button<U, G> {
+    #[inline]
     fn theme(&mut self) -> &mut dyn draw::Themed {
         &mut self.painter
     }
@@ -249,11 +261,9 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for B
     fn resize_from_theme(&mut self, aux: &dyn base::GraphicalAuxiliary) {
         self.rect.size = self.painter.size_hint(
             state::ButtonState {
-                rect: self.bounds(),
-                text: self.text.clone(),
-                text_size: self.text_size,
                 state: state::ControlState::Normal(state::InteractionState::empty()),
                 button_type: state::ButtonType::Normal,
+                ..self.derive_state()
             },
             aux,
         );

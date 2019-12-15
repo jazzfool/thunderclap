@@ -8,9 +8,8 @@ use {
         prelude::*,
         reclutch::{
             display::{
-                self, Color, CommandGroup, DisplayCommand, DisplayText, FontInfo, GraphicsDisplay,
-                Point, Rect, ResourceData, ResourceDescriptor, ResourceReference, SharedData, Size,
-                Vector,
+                self, Color, CommandGroup, DisplayCommand, FontInfo, GraphicsDisplay, Point, Rect,
+                ResourceData, ResourceDescriptor, ResourceReference, SharedData, Size, Vector,
             },
             event::RcEventQueue,
             prelude::*,
@@ -22,6 +21,9 @@ use {
 
 #[macro_use]
 extern crate reclutch;
+
+#[macro_use]
+extern crate reui;
 
 struct UpdateAux {
     window_queue: RcEventQueue<base::WindowEvent>,
@@ -62,18 +64,13 @@ impl base::GraphicalAuxiliary for GraphicalAux {
 #[widget_children_trait(base::WidgetChildren)]
 struct Showcase {
     #[widget_child]
-    button_1:
-        base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>,
-    // er, this could be a little less ugly probably somehow maybe...
+    button_1: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
-    button_2:
-        base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>,
+    button_2: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
-    button_3:
-        base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>,
+    button_3: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
-    button_4:
-        base::LayedOut<ui::Button<UpdateAux, GraphicalAux>, ui::VStack<UpdateAux, GraphicalAux>>,
+    button_4: ui::Button<UpdateAux, GraphicalAux>,
     #[widget_child]
     v_stack: ui::VStack<UpdateAux, GraphicalAux>,
 
@@ -91,38 +88,25 @@ impl Showcase {
     ) -> Self {
         let mut v_stack =
             ui::VStack::new(Rect::new(Point::new(50.0, 50.0), Size::new(200.0, 200.0)));
+        let mut button_1 = ui::simple_button("Button 1".to_string(), theme, update_aux, gfx_aux);
+        let mut button_2 = ui::simple_button("Button 2".to_string(), theme, update_aux, gfx_aux);
+        let mut button_3 = ui::simple_button("Button 3".to_string(), theme, update_aux, gfx_aux);
+        let mut button_4 = ui::simple_button("VStacks!".to_string(), theme, update_aux, gfx_aux);
 
         let v_stack_data = ui::VStackData {
             top_margin: 10.0,
             bottom_margin: 0.0,
-            alignment: ui::VStackAlignment::Left,
+            alignment: ui::Align::Begin,
         };
 
-        let button_1 = v_stack.push(
-            v_stack_data,
-            ui::simple_button("Button 1".to_string(), theme, update_aux, gfx_aux),
-        );
-        let button_2 = v_stack.push(
-            ui::VStackData {
-                alignment: ui::VStackAlignment::Middle,
-                ..v_stack_data
-            },
-            ui::simple_button("Button 2".to_string(), theme, update_aux, gfx_aux),
-        );
-        let button_3 = v_stack.push(
-            ui::VStackData {
-                alignment: ui::VStackAlignment::Right,
-                ..v_stack_data
-            },
-            ui::simple_button("Button 3".to_string(), theme, update_aux, gfx_aux),
-        );
-        let button_4 = v_stack.push(
-            ui::VStackData {
-                alignment: ui::VStackAlignment::Stretch,
-                ..v_stack_data
-            },
-            ui::simple_button("VStacks!".to_string(), theme, update_aux, gfx_aux),
-        );
+        define_layout! {
+            for v_stack => {
+                v_stack_data => &mut button_1,
+                v_stack_data.align(ui::Align::Middle) => &mut button_2,
+                v_stack_data.align(ui::Align::End) => &mut button_3,
+                v_stack_data.align(ui::Align::Stretch) => &mut button_4
+            }
+        };
 
         Showcase {
             button_1,
@@ -146,13 +130,6 @@ impl Widget for Showcase {
 
     fn update(&mut self, aux: &mut UpdateAux) {
         base::invoke_update(self, aux);
-
-        self.v_stack.update_layout(vec![
-            self.button_1.activate(),
-            self.button_2.activate(),
-            self.button_3.activate(),
-            self.button_4.activate(),
-        ]);
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut GraphicalAux) {
