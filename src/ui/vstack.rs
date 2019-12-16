@@ -53,6 +53,7 @@ where
     rects: IndexMap<u64, ChildData>,
     next_rect_id: u64,
     dirty: bool,
+    visibility: base::Visibility,
 
     themed: draw::PhantomThemed,
     layout: base::WidgetLayoutEvents,
@@ -63,7 +64,7 @@ where
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> VStack<U, G> {
     pub fn new(rect: Rect) -> Self {
-        Self {
+        VStack {
             rect,
             rects: IndexMap::new(),
             next_rect_id: 0,
@@ -71,6 +72,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> VStack<U, G> {
 
             themed: Default::default(),
             layout: Default::default(),
+            visibility: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
@@ -181,6 +183,18 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget 
     #[inline]
     fn layout_id(&self) -> Option<u64> {
         self.layout.id()
+    }
+}
+
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::HasVisibility for VStack<U, G> {
+    #[inline]
+    fn set_visibility(&mut self, visibility: base::Visibility) {
+        self.visibility = visibility
+    }
+
+    #[inline]
+    fn visibility(&self) -> base::Visibility {
+        self.visibility
     }
 }
 

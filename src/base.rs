@@ -19,7 +19,7 @@ use {
 /// #[widget_children_trait(reui::base::WidgetChildren)]
 /// struct MyWidget;
 /// ```
-pub trait WidgetChildren: Widget + draw::HasTheme + Repaintable {
+pub trait WidgetChildren: Widget + draw::HasTheme + Repaintable + HasVisibility {
     /// Returns a list of all the children as a vector of immutable `dyn WidgetChildren`.
     fn children(
         &self,
@@ -100,6 +100,32 @@ where
     fn rect(&self) -> Rect {
         Rect::new(self.position(), self.size())
     }
+}
+
+/// Describes the interactivity/visibility state of a widget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Visibility {
+    /// Is rendered and receives updates.
+    Normal,
+    /// Receives updates but isn't rendered.
+    Invisible,
+    /// Is rendered but doesn't receive updates.
+    Static,
+    /// Is neither rendered nor updated.
+    None,
+}
+
+impl Default for Visibility {
+    #[inline]
+    fn default() -> Self {
+        Visibility::Normal
+    }
+}
+
+/// Implemented by widgets which are capable of tracking visibility.
+pub trait HasVisibility {
+    fn set_visibility(&mut self, visibility: Visibility);
+    fn visibility(&self) -> Visibility;
 }
 
 /// Trait required for any type passed as the `UpdateAux` type (seen as `U` in the widget type parameters)
@@ -274,7 +300,9 @@ pub fn invoke_update<U, G, D>(
 ) {
     // Iterate in reverse because most visually forefront widgets should get events first.
     for child in widget.children_mut().into_iter().rev() {
-        child.update(aux);
+        if child.visibility() != Visibility::Static || child.visibility() != Visibility::None {
+            child.update(aux);
+        }
     }
 }
 
@@ -285,7 +313,9 @@ pub fn invoke_draw<U, G, D>(
     aux: &mut G,
 ) {
     for child in widget.children_mut() {
-        child.draw(display, aux);
+        if child.visibility() != Visibility::Invisible || child.visibility() != Visibility::None {
+            child.draw(display, aux);
+        }
     }
 }
 

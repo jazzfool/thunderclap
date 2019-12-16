@@ -45,6 +45,7 @@ where
     button_type: state::ButtonType,
     disabled: bool,
     interaction: state::InteractionState,
+    visibility: base::Visibility,
 
     painter: Box<dyn draw::Painter<state::ButtonState>>,
     command_group: CommandGroup,
@@ -88,6 +89,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
             button_type,
             disabled,
             interaction: state::InteractionState::empty(),
+            visibility: Default::default(),
 
             painter,
             command_group: CommandGroup::new(),
@@ -140,7 +142,9 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                     match event {
                         base::WindowEvent::MousePress(press_event) => {
                             if let Some((pos, _)) = press_event.with(|(pos, button)| {
-                                !disabled &&*button == base::MouseButton::Left && bounds.contains(*pos)
+                                !disabled
+                                    && *button == base::MouseButton::Left
+                                    && bounds.contains(*pos)
                             }) {
                                 interaction.insert(state::InteractionState::PRESSED);
                                 event_queue
@@ -150,7 +154,8 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
                         }
                         base::WindowEvent::MouseRelease(release_event) => {
                             if let Some((pos, _)) = release_event.with(|(_, button)| {
-                                !disabled && *button == base::MouseButton::Left
+                                !disabled
+                                    && *button == base::MouseButton::Left
                                     && interaction.contains(state::InteractionState::PRESSED)
                             }) {
                                 interaction.remove(state::InteractionState::PRESSED);
@@ -215,6 +220,18 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget 
     #[inline]
     fn layout_id(&self) -> Option<u64> {
         self.layout.id()
+    }
+}
+
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::HasVisibility for Button<U, G> {
+    #[inline]
+    fn set_visibility(&mut self, visibility: base::Visibility) {
+        self.visibility = visibility
+    }
+
+    #[inline]
+    fn visibility(&self) -> base::Visibility {
+        self.visibility
     }
 }
 
