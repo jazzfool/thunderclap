@@ -1,9 +1,10 @@
 //! The main part of Reui; a widget toolkit built atop Reclutch.
 
 pub mod button;
+pub mod container;
 pub mod vstack;
 
-pub use {button::*, vstack::*};
+pub use {button::*, container::*, vstack::*};
 
 use {
     crate::{base, draw},
