@@ -24,10 +24,10 @@ let v_stack_data = VStackData::default().align(Align::Middle);
 
 define_layout! {
     for v_stack => {
-        v_stack_data => button,
+        v_stack_data => &mut button,
         v_stack_data => define_layout! {
             for another_v_stack => {
-                v_stack_data => nested_button
+                v_stack_data => &mut nested_button
             }
         }
     }
@@ -44,6 +44,7 @@ define_layout! {
 ## Widget List (so far)
 - Button
 - Vertical Stack
+- Container
 
 ## License
 
