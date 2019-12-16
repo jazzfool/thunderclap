@@ -92,6 +92,8 @@ impl Default for Align {
 pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     text: String,
     theme: &dyn draw::Theme,
+    button_type: Option<draw::state::ButtonType>,
+    disabled: Option<bool>,
     update_aux: &mut U,
     gfx_aux: &mut G,
 ) -> Button<U, G> {
@@ -99,8 +101,8 @@ pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
         display::DisplayText::Simple(text),
         display::Point::default(),
         None,
-        draw::state::ButtonType::Normal,
-        false,
+        button_type.unwrap_or(draw::state::ButtonType::Normal),
+        disabled.unwrap_or(false),
         theme,
         update_aux,
         gfx_aux,

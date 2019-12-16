@@ -37,10 +37,42 @@ impl Showcase {
     fn new(theme: &dyn draw::Theme, update_aux: &mut app::UAux, gfx_aux: &mut app::GAux) -> Self {
         let mut v_stack =
             ui::VStack::new(Rect::new(Point::new(50.0, 50.0), Size::new(200.0, 200.0)));
-        let mut button_1 = ui::simple_button("Button 1".to_string(), theme, update_aux, gfx_aux);
-        let mut button_2 = ui::simple_button("Button 2".to_string(), theme, update_aux, gfx_aux);
-        let mut button_3 = ui::simple_button("Button 3".to_string(), theme, update_aux, gfx_aux);
-        let mut button_4 = ui::simple_button("VStacks!".to_string(), theme, update_aux, gfx_aux);
+
+        let mut button_1 = ui::simple_button(
+            "Boring Button".to_string(),
+            theme,
+            None,
+            None,
+            update_aux,
+            gfx_aux,
+        );
+
+        let mut button_2 = ui::simple_button(
+            "Important Button".to_string(),
+            theme,
+            Some(draw::state::ButtonType::Primary),
+            None,
+            update_aux,
+            gfx_aux,
+        );
+
+        let mut button_3 = ui::simple_button(
+            "Explode Computer".to_string(),
+            theme,
+            Some(draw::state::ButtonType::Danger),
+            None,
+            update_aux,
+            gfx_aux,
+        );
+
+        let mut button_4 = ui::simple_button(
+            "Outlined Button".to_string(),
+            theme,
+            Some(draw::state::ButtonType::Outline),
+            None,
+            update_aux,
+            gfx_aux,
+        );
 
         let v_stack_data = ui::VStackData {
             top_margin: 10.0,
