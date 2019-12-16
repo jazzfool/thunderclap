@@ -10,13 +10,21 @@ use {
     },
 };
 
+const DEFAULT_TEXT_SIZE: f32 = 12.0;
+
 impl draw::Theme for Primer {
     fn button(&self) -> Box<dyn draw::Painter<state::ButtonState>> {
         Box::new(ButtonPainter)
     }
-}
 
-const DEFAULT_TEXT_SIZE: f32 = 12.0;
+    fn label_color(&self) -> StyleColor {
+        base::color_from_urgba(36, 41, 46, 1.0).into()
+    }
+
+    fn default_text_size(&self) -> f32 {
+        DEFAULT_TEXT_SIZE
+    }
+}
 
 struct ButtonPainter;
 
