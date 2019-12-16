@@ -210,7 +210,42 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
                     base::color_from_urgba(3, 102, 214, 0.3).into(),
                 ),
             },
-            _ => unimplemented!(),
+            state::ButtonType::Outline => match state.state {
+                state::ControlState::Normal(interaction) => {
+                    interaction_state = interaction;
+
+                    if interaction.intersects(
+                        state::InteractionState::PRESSED | state::InteractionState::HOVERED,
+                    ) {
+                        (
+                            base::color_from_urgba(3, 102, 214, 1.0).into(),
+                            base::color_from_urgba(3, 102, 214, 1.0).into(),
+                            base::color_from_urgba(255, 255, 255, 1.0).into(),
+                            base::color_from_urgba(3, 102, 214, 0.5).into(),
+                        )
+                    } else if interaction.contains(state::InteractionState::FOCUSED) {
+                        (
+                            base::color_from_urgba(255, 255, 255, 1.0).into(),
+                            base::color_from_urgba(3, 102, 214, 1.0).into(),
+                            base::color_from_urgba(3, 102, 214, 1.0).into(),
+                            base::color_from_urgba(3, 102, 214, 0.5).into(),
+                        )
+                    } else {
+                        (
+                            base::color_from_urgba(255, 255, 255, 1.0).into(),
+                            base::color_from_urgba(27, 31, 35, 0.35).into(),
+                            base::color_from_urgba(3, 102, 214, 1.0).into(),
+                            base::color_from_urgba(3, 102, 214, 0.5).into(),
+                        )
+                    }
+                }
+                state::ControlState::Disabled => (
+                    base::color_from_urgba(255, 255, 255, 1.0).into(),
+                    base::color_from_urgba(27, 31, 35, 0.35).into(),
+                    base::color_from_urgba(36, 41, 46, 0.4).into(),
+                    base::color_from_urgba(3, 102, 214, 0.5).into(),
+                ),
+            },
         };
 
         // Background
