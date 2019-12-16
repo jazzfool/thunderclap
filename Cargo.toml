@@ -5,14 +5,16 @@ authors = ["jazzfool <saveuselon@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 
+[features]
+app = ["glutin", "reclutch/skia"]
+
 [dependencies]
 bitflags = "1.2"
 indexmap = "1.3"
 reclutch = { git = "https://github.com/jazzfool/reclutch" }
+thiserror = "1.0"
+glutin = { version = "0.22.0-alpha5", optional = true }
 
 [[example]]
 name = "showcase"
-required-features = ["reclutch/skia"]
-
-[dev-dependencies]
-glutin = "0.22.0-alpha5"
+required-features = ["app"]

@@ -6,8 +6,12 @@ pub extern crate reclutch;
 
 pub mod base;
 pub mod draw;
+pub mod error;
 pub mod themes;
 pub mod ui;
+
+#[cfg(feature = "app")]
+pub mod app;
 
 pub mod prelude {
     pub use crate::base::{Layout, Movable, Rectangular, Repaintable, Resizable, WidgetChildren};
