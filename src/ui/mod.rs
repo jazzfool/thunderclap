@@ -2,9 +2,10 @@
 
 pub mod button;
 pub mod container;
+pub mod label;
 pub mod vstack;
 
-pub use {button::*, container::*, vstack::*};
+pub use {button::*, container::*, label::*, vstack::*};
 
 use {
     crate::{base, draw},
@@ -94,8 +95,8 @@ pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     theme: &dyn draw::Theme,
     button_type: Option<draw::state::ButtonType>,
     disabled: Option<bool>,
-    update_aux: &mut U,
-    gfx_aux: &mut G,
+    u_aux: &mut U,
+    g_aux: &mut G,
 ) -> Button<U, G> {
     Button::new(
         display::DisplayText::Simple(text),
@@ -104,7 +105,16 @@ pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
         button_type.unwrap_or(draw::state::ButtonType::Normal),
         disabled.unwrap_or(false),
         theme,
-        update_aux,
-        gfx_aux,
+        u_aux,
+        g_aux,
     )
+}
+
+pub fn simple_label<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
+    text: String,
+    theme: &dyn draw::Theme,
+    rect: display::Rect,
+    g_aux: &mut G,
+) -> Label<U, G> {
+    Label::new(theme, None, None, None, rect, text.into(), g_aux)
 }

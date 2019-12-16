@@ -45,6 +45,7 @@ define_layout! {
 - Button
 - Vertical Stack
 - Container
+- Label
 
 ## License
 

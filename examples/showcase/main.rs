@@ -18,6 +18,8 @@ extern crate reui;
 #[widget_children_trait(base::WidgetChildren)]
 struct Showcase {
     #[widget_child]
+    label: ui::Label<app::UAux, app::GAux>,
+    #[widget_child]
     button_1: ui::Button<app::UAux, app::GAux>,
     #[widget_child]
     button_2: ui::Button<app::UAux, app::GAux>,
@@ -37,6 +39,13 @@ impl Showcase {
     fn new(theme: &dyn draw::Theme, update_aux: &mut app::UAux, gfx_aux: &mut app::GAux) -> Self {
         let mut v_stack =
             ui::VStack::new(Rect::new(Point::new(50.0, 50.0), Size::new(200.0, 200.0)));
+
+        let mut label = ui::simple_label(
+            "GitHub Primer".to_string(),
+            theme,
+            Default::default(),
+            gfx_aux,
+        );
 
         let mut button_1 = ui::simple_button(
             "Boring Button".to_string(),
@@ -82,6 +91,7 @@ impl Showcase {
 
         define_layout! {
             for v_stack => {
+                v_stack_data.align(ui::Align::Stretch) => &mut label,
                 v_stack_data => &mut button_1,
                 v_stack_data.align(ui::Align::Middle) => &mut button_2,
                 v_stack_data.align(ui::Align::End) => &mut button_3,
@@ -90,6 +100,7 @@ impl Showcase {
         };
 
         Showcase {
+            label,
             button_1,
             button_2,
             button_3,
