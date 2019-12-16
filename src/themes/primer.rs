@@ -162,6 +162,54 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
                     base::color_from_urgba(46, 200, 82, 0.5).into(),
                 ),
             },
+            state::ButtonType::Danger => match state.state {
+                state::ControlState::Normal(interaction) => {
+                    interaction_state = interaction;
+
+                    if interaction.contains(state::InteractionState::PRESSED) {
+                        (
+                            base::color_from_urgba(181, 32, 44, 1.0).into(),
+                            base::color_from_urgba(104, 32, 40, 1.0).into(),
+                            base::color_from_urgba(255, 255, 255, 1.0).into(),
+                            base::color_from_urgba(181, 32, 44, 0.4).into(),
+                        )
+                    } else if interaction.contains(state::InteractionState::HOVERED) {
+                        (
+                            StyleColor::LinearGradient(Gradient {
+                                start: state.rect.origin,
+                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                                stops: vec![
+                                    (0.0, base::color_from_urgba(221, 66, 78, 1.0)),
+                                    (0.9, base::color_from_urgba(203, 36, 49, 1.0)),
+                                ],
+                            }),
+                            base::color_from_urgba(104, 32, 40, 1.0).into(),
+                            base::color_from_urgba(255, 255, 255, 1.0).into(),
+                            base::color_from_urgba(181, 32, 44, 0.4).into(),
+                        )
+                    } else {
+                        (
+                            StyleColor::LinearGradient(Gradient {
+                                start: state.rect.origin,
+                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                                stops: vec![
+                                    (0.0, base::color_from_urgba(250, 251, 252, 1.0)),
+                                    (0.9, base::color_from_urgba(239, 243, 246, 1.0)),
+                                ],
+                            }),
+                            base::color_from_urgba(27, 31, 35, 0.35).into(),
+                            base::color_from_urgba(203, 36, 49, 1.0).into(),
+                            base::color_from_urgba(181, 32, 44, 0.4).into(),
+                        )
+                    }
+                }
+                state::ControlState::Disabled => (
+                    base::color_from_urgba(239, 243, 246, 1.0).into(),
+                    base::color_from_urgba(27, 31, 35, 0.2).into(),
+                    base::color_from_urgba(203, 36, 49, 0.4).into(),
+                    base::color_from_urgba(3, 102, 214, 0.3).into(),
+                ),
+            },
             _ => unimplemented!(),
         };
 
@@ -189,8 +237,10 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         builder.push_text(ButtonPainter::make_text_item(&state, aux, text, true), None);
 
         // Focus rect
-        if interaction_state.contains(state::InteractionState::FOCUSED)
-            && !interaction_state.contains(state::InteractionState::PRESSED)
+        if (interaction_state.contains(state::InteractionState::FOCUSED)
+            && !interaction_state.contains(state::InteractionState::PRESSED))
+            || (state.button_type == state::ButtonType::Outline
+                && interaction_state.contains(state::InteractionState::PRESSED))
         {
             builder.push_round_rectangle(
                 base::sharp_align(state.rect).inflate(1.5, 1.5),
@@ -205,7 +255,9 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         }
 
         // Pressed inset shadow
-        if interaction_state.contains(state::InteractionState::PRESSED) {
+        if state.button_type != state::ButtonType::Outline
+            && interaction_state.contains(state::InteractionState::PRESSED)
+        {
             builder.push_round_rectangle_clip(base::sharp_align(state.rect), [3.5; 4]);
             builder.push_round_rectangle(
                 state
