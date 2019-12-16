@@ -225,6 +225,12 @@ where
                         ),
                     });
                 }
+                Event::WindowEvent {
+                    event: WindowEvent::Focused(false),
+                    ..
+                } => {
+                    u_aux.window_queue.emit_owned(base::WindowEvent::ClearFocus);
+                }
                 _ => return,
             }
 
