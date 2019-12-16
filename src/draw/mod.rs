@@ -4,7 +4,7 @@ pub mod state;
 
 use {
     crate::base,
-    reclutch::display::{DisplayCommand, Size},
+    reclutch::display::{DisplayCommand, Size, StyleColor},
 };
 
 /// Implemented by types which are capable of changing themes.
@@ -33,9 +33,11 @@ pub trait Painter<T> {
     fn draw(&mut self, state: T, aux: &dyn base::GraphicalAuxiliary) -> Vec<DisplayCommand>;
 }
 
-/// Factory to create `Painter`s which paint widgets with a specific visual theme.
+/// Factory to create colors or `Painter`s which paint widgets with a specific visual theme.
 pub trait Theme {
     fn button(&self) -> Box<dyn Painter<state::ButtonState>>;
+    fn label_color(&self) -> StyleColor;
+    fn default_text_size(&self) -> f32;
 }
 
 /// Implemented by types which have an inner `Themed` (but usually widgets with
