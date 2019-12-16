@@ -19,6 +19,16 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
         - `ButtonEvent::MouseHover`: The cursor has entered/left the button boundaries.
         - `ButtonEvent::Focus`: The button has gained/lost focus.
 
+### Label - `reui::ui::Label`
+
+*Aligned text wrapped in a rectangle.*
+
+- **`Themed.....`** ❌
+- **`Focusable..`** ❌
+- **`Layable....`** ✔️
+- **Outgoing Event Queues:**
+    - *None*
+
 ## Abstract Widgets
 
 ### Vertical Stack - `reui::ui::VStack`
