@@ -8,7 +8,7 @@ use {
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect, Size},
-        event::{RcEventListener, RcEventQueue},
+        event::{merge::Merge, RcEventListener, RcEventQueue},
         prelude::*,
         widget::Widget,
     },
@@ -20,11 +20,9 @@ pub enum ButtonEvent {
     /// Emitted when the button is pressed or released.
     /// Corresponds to `WindowEvent::MousePress` or `WindowEvent::MouseRelease`.
     Press(ToggledEvent<Point>),
-
     /// Emitted when the mouse enters (`true`) or leaves (`false`) the button boundaries.
     /// Corresponds to `WindowEvent::MouseMove`.
     MouseHover(ToggledEvent<Point>),
-
     /// Emitted when focus is gained (`true`) or lost (`false`).
     Focus(ToggledEvent<()>),
 }
@@ -39,14 +37,15 @@ where
 {
     pub event_queue: RcEventQueue<ButtonEvent>,
 
-    text: DisplayText,
-    text_size: Option<f32>,
+    pub text: base::Observed<DisplayText>,
+    pub text_size: base::Observed<Option<f32>>,
     rect: Rect,
-    button_type: state::ButtonType,
-    disabled: bool,
+    pub button_type: base::Observed<state::ButtonType>,
+    pub disabled: base::Observed<bool>,
     interaction: state::InteractionState,
     visibility: base::Visibility,
 
+    repaint_listeners: Vec<RcEventListener<()>>,
     painter: Box<dyn draw::Painter<state::ButtonState>>,
     command_group: CommandGroup,
     window_listener: RcEventListener<base::WindowEvent>,
@@ -80,6 +79,18 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
             button_type,
         };
 
+        let text = base::Observed::new(text);
+        let text_size = base::Observed::new(text_size);
+        let button_type = base::Observed::new(button_type);
+        let disabled = base::Observed::new(disabled);
+
+        let repaint_listeners = vec![
+            text.on_change.listen(),
+            text_size.on_change.listen(),
+            button_type.on_change.listen(),
+            disabled.on_change.listen(),
+        ];
+
         Self {
             event_queue: RcEventQueue::new(),
 
@@ -91,6 +102,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
             interaction: state::InteractionState::empty(),
             visibility: Default::default(),
 
+            repaint_listeners,
             painter,
             command_group: CommandGroup::new(),
             window_listener: update_aux.window_queue_mut().listen(),
@@ -104,14 +116,14 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
     fn derive_state(&self) -> state::ButtonState {
         state::ButtonState {
             rect: self.bounds(),
-            text: self.text.clone(),
-            text_size: self.text_size,
-            state: if self.disabled {
+            text: self.text.get().clone(),
+            text_size: self.text_size.get().clone(),
+            state: if *self.disabled.get() {
                 state::ControlState::Disabled
             } else {
                 state::ControlState::Normal(self.interaction)
             },
-            button_type: self.button_type,
+            button_type: self.button_type.get().clone(),
         }
     }
 }
@@ -128,10 +140,20 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
 
     fn update(&mut self, _aux: &mut U) {
         let was_focused = self.interaction.contains(state::InteractionState::FOCUSED);
-        let disabled = self.disabled;
+        let disabled = *self.disabled.get();
 
         let bounds = self.bounds();
         let cmd_group = &mut self.command_group;
+
+        {
+            let mut repaint_events = Vec::new();
+            for rl in &mut self.repaint_listeners {
+                rl.extend_other(&mut repaint_events);
+            }
+            if !repaint_events.is_empty() {
+                cmd_group.repaint();
+            }
+        }
 
         {
             let interaction = &mut self.interaction;

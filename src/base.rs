@@ -293,6 +293,42 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
     fn remove(&mut self, child: &mut impl LayableWidget, restore_original: bool);
 }
 
+/// Wrapper which emits an event whenever the inner variable is changed.
+#[derive(Debug)]
+pub struct Observed<T: Sized> {
+    pub on_change: RcEventQueue<()>,
+
+    inner: T,
+}
+
+impl<T: Sized> Observed<T> {
+    pub fn new(val: T) -> Self {
+        Observed {
+            on_change: RcEventQueue::new(),
+            inner: val,
+        }
+    }
+
+    /// Updates the inner variable.
+    /// Emits an event to `on_change` when invoked.
+    pub fn set(&mut self, val: T) {
+        self.inner = val;
+        self.on_change.emit_owned(());
+    }
+
+    /// Returns an immutable reference to the inner variable.
+    pub fn get(&self) -> &T {
+        &self.inner
+    }
+
+    /// Returns a mutable reference to the inner variable.
+    /// Emits an event to `on_change` when invoked.
+    pub fn get_mut(&mut self) -> &mut T {
+        self.on_change.emit_owned(());
+        &mut self.inner
+    }
+}
+
 /// Propagates `update` for the children of a widget.
 pub fn invoke_update<U, G, D>(
     widget: &mut dyn WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
