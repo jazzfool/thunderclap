@@ -259,7 +259,7 @@ impl WidgetLayoutEvents {
         self.0.as_ref().map(|inner| inner.id)
     }
 
-    pub fn update<'a>(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>) {
+    pub fn update(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>) {
         self.0 = layout.into();
     }
 
