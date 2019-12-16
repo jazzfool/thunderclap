@@ -12,6 +12,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 
 - **`Themed.....`** ✔️
 - **`Focusable..`** ✔️
+- **`Layable....`** ✔️
 - **Outgoing Event Queues:**
     - `event_queue`: `ButtonEvent`
         - `ButtonEvent::Press`: The button has been pressed/released.
@@ -26,5 +27,17 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 
 - **`Themed.....`** ❌
 - **`Focusable..`** ❌
+- **`Layable....`** ✔️
+- **Outgoing Event Queues:**
+    - *None*
+
+### Container - `reui::ui::Container`
+
+*Dynamically stores a list of widgets. This is useful if you don't need to access a child past initialization-time; essentially grouping it into a single child to minimize unused fields.*
+*The children will still be rendered and receive updates.*
+
+- **`Themed.....`** ❌
+- **`Focusable..`** ❌
+- **`Layable....`** ❌
 - **Outgoing Event Queues:**
     - *None*
