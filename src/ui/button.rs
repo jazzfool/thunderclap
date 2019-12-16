@@ -8,9 +8,8 @@ use {
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect, Size},
-        event::{merge::Merge, RcEventListener, RcEventQueue},
+        event::{RcEventListener, RcEventQueue},
         prelude::*,
-        widget::Widget,
     },
     std::marker::PhantomData,
 };
@@ -145,13 +144,10 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
         let bounds = self.bounds();
         let cmd_group = &mut self.command_group;
 
-        {
-            let mut repaint_events = Vec::new();
-            for rl in &mut self.repaint_listeners {
-                rl.extend_other(&mut repaint_events);
-            }
-            if !repaint_events.is_empty() {
+        for rl in &mut self.repaint_listeners {
+            if !rl.peek().is_empty() {
                 cmd_group.repaint();
+                break;
             }
         }
 
