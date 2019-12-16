@@ -119,20 +119,20 @@ impl<R> App<R>
 where
     R: base::WidgetChildren<UpdateAux = UAux, GraphicalAux = GAux, DisplayObject = DisplayCommand>,
 {
-    pub fn start<F>(mut self, mut f: F) -> !
+    pub fn start<F>(self, mut f: F) -> !
     where
         F: 'static + FnMut(Event<()>) -> Option<ControlFlow>,
         R: 'static,
     {
         let App {
             mut root,
-            mut background,
+            background,
             mut u_aux,
             mut g_aux,
             mut display,
-            mut context,
+            context,
             mut size,
-            mut event_loop,
+            event_loop,
 
             mut command_group_pre,
             mut command_group_post,
