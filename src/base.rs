@@ -311,18 +311,21 @@ impl<T: Sized> Observed<T> {
 
     /// Updates the inner variable.
     /// Emits an event to `on_change` when invoked.
+    #[inline]
     pub fn set(&mut self, val: T) {
         self.inner = val;
         self.on_change.emit_owned(());
     }
 
     /// Returns an immutable reference to the inner variable.
+    #[inline(always)]
     pub fn get(&self) -> &T {
         &self.inner
     }
 
     /// Returns a mutable reference to the inner variable.
     /// Emits an event to `on_change` when invoked.
+    #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.on_change.emit_owned(());
         &mut self.inner
