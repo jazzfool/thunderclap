@@ -10,7 +10,8 @@ use {
     },
 };
 
-const DEFAULT_TEXT_SIZE: f32 = 12.0;
+const BUTTON_TEXT_SIZE: f32 = 12.0;
+const LABEL_TEXT_SIZE: f32 = 14.0;
 
 impl draw::Theme for Primer {
     fn button(&self) -> Box<dyn draw::Painter<state::ButtonState>> {
@@ -22,7 +23,7 @@ impl draw::Theme for Primer {
     }
 
     fn default_text_size(&self) -> f32 {
-        DEFAULT_TEXT_SIZE
+        LABEL_TEXT_SIZE
     }
 }
 
@@ -41,7 +42,7 @@ impl ButtonPainter {
             text: state.text.clone(),
             font: font.0,
             font_info: font.1,
-            size: state.text_size.unwrap_or(DEFAULT_TEXT_SIZE),
+            size: state.text_size.unwrap_or(BUTTON_TEXT_SIZE),
             bottom_left: Default::default(),
             color: color.into(),
         };
