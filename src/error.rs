@@ -1,3 +1,4 @@
+#[cfg(feature = "app")]
 use {reclutch::error, thiserror::Error};
 
 #[cfg(feature = "app")]
