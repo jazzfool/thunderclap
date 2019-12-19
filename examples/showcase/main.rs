@@ -128,26 +128,10 @@ impl Widget for Showcase {
     }
 }
 
-impl base::HasVisibility for Showcase {
-    fn set_visibility(&mut self, visibility: base::Visibility) {
-        self.visibility = visibility
-    }
-
-    fn visibility(&self) -> base::Visibility {
-        self.visibility
-    }
-}
-
-impl base::Repaintable for Showcase {
-    fn repaint(&mut self) {}
-}
-
-impl draw::HasTheme for Showcase {
-    fn theme(&mut self) -> &mut dyn draw::Themed {
-        &mut self.themed
-    }
-
-    fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+lazy_widget! {
+    Showcase,
+    visibility: visibility,
+    theme: themed
 }
 
 fn main() {

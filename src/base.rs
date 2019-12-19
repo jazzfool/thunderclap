@@ -9,6 +9,72 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+#[macro_export]
+macro_rules! lazy_widget {
+    ($name:ty,visibility:$vis:ident,theme:$thm:ident) => {
+        impl $crate::base::HasVisibility for $name {
+            #[inline(always)]
+            fn set_visibility(&mut self, visibility: $crate::base::Visibility) {
+                self.$vis = visibility
+            }
+
+            #[inline(always)]
+            fn visibility(&self) -> $crate::base::Visibility {
+                self.$vis
+            }
+        }
+
+        impl $crate::base::Repaintable for $name {
+            #[inline(always)]
+            fn repaint(&mut self) {}
+        }
+
+        impl $crate::draw::HasTheme for $name {
+            #[inline(always)]
+            fn theme(&mut self) -> &mut dyn $crate::draw::Themed {
+                &mut self.$thm
+            }
+
+            #[inline(always)]
+            fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+        }
+    };
+    (generic $name:tt,visibility:$vis:ident,theme:$thm:ident) => {
+        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
+            $crate::base::HasVisibility for $name<U, G>
+        {
+            #[inline(always)]
+            fn set_visibility(&mut self, visibility: $crate::base::Visibility) {
+                self.$vis = visibility
+            }
+
+            #[inline(always)]
+            fn visibility(&self) -> $crate::base::Visibility {
+                self.$vis
+            }
+        }
+
+        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
+            $crate::base::Repaintable for $name<U, G>
+        {
+            #[inline(always)]
+            fn repaint(&mut self) {}
+        }
+
+        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
+            $crate::draw::HasTheme for $name<U, G>
+        {
+            #[inline(always)]
+            fn theme(&mut self) -> &mut dyn $crate::draw::Themed {
+                &mut self.$thm
+            }
+
+            #[inline(always)]
+            fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+        }
+    };
+}
+
 /// A custom widget children trait with additional bounds.
 /// This is used as an alternative to `reclutch::widget::WidgetChildren`.
 ///

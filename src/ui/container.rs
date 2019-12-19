@@ -110,31 +110,8 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::WidgetChildren
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::HasVisibility
-    for Container<U, G>
-{
-    #[inline]
-    fn set_visibility(&mut self, visibility: base::Visibility) {
-        self.visibility = visibility
-    }
-
-    #[inline]
-    fn visibility(&self) -> base::Visibility {
-        self.visibility
-    }
-}
-
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Repaintable for Container<U, G> {
-    #[inline]
-    fn repaint(&mut self) {}
-}
-
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for Container<U, G> {
-    #[inline]
-    fn theme(&mut self) -> &mut dyn draw::Themed {
-        &mut self.themed
-    }
-
-    #[inline]
-    fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+lazy_widget! {
+    generic Container,
+    visibility: visibility,
+    theme: themed
 }

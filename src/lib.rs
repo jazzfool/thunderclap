@@ -4,6 +4,7 @@
 #[macro_use]
 pub extern crate reclutch;
 
+#[macro_use]
 pub mod base;
 pub mod draw;
 pub mod error;
