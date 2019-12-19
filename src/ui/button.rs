@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        base::{self, Repaintable},
+        base::{self, Repaintable, Resizable},
         draw::{self, state},
         ui::ToggledEvent,
     },
@@ -54,7 +54,11 @@ where
     phantom_g: PhantomData<G>,
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
+impl<U, G> Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
     pub fn new(
         text: DisplayText,
         position: Point,
@@ -127,14 +131,18 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Button<U, G> {
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U, G> {
+impl<U, G> Widget for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
     type UpdateAux = U;
     type GraphicalAux = G;
     type DisplayObject = DisplayCommand;
 
     #[inline]
     fn bounds(&self) -> Rect {
-        self.rect
+        self.painter.paint_hint(self.rect)
     }
 
     fn update(&mut self, _aux: &mut U) {
@@ -229,7 +237,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Button<U,
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget for Button<U, G> {
+impl<U, G> base::LayableWidget for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
     #[inline]
     fn listen_to_layout(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
         self.layout.update(layout);
@@ -241,7 +253,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget 
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::HasVisibility for Button<U, G> {
+impl<U, G> base::HasVisibility for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
     #[inline]
     fn set_visibility(&mut self, visibility: base::Visibility) {
         self.visibility = visibility
@@ -253,7 +269,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::HasVisibility 
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Repaintable for Button<U, G> {
+impl<U, G> Repaintable for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
     #[inline]
     fn repaint(&mut self) {
         self.command_group.repaint();
@@ -261,8 +281,13 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Repaintable for Butt
 }
 
 // FIXME(jazzfool): the blanket `Rectangular` implementation causes `self.layout.notify()` to be called twice.
+// to be frank, this isn't a big deal since bidir_single overwrites the previous event, but in the old implementation this meant emitting the event twice.
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for Button<U, G> {
+impl<U, G> base::Movable for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
     fn set_position(&mut self, position: Point) {
         self.rect.origin = position;
         self.repaint();
@@ -275,7 +300,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for Bu
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for Button<U, G> {
+impl<U, G> Resizable for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
     fn set_size(&mut self, size: Size) {
         self.rect.size = size;
         self.repaint();
@@ -288,20 +317,24 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for 
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for Button<U, G> {
+impl<U, G> draw::HasTheme for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
     #[inline]
     fn theme(&mut self) -> &mut dyn draw::Themed {
         &mut self.painter
     }
 
     fn resize_from_theme(&mut self, aux: &dyn base::GraphicalAuxiliary) {
-        self.rect.size = self.painter.size_hint(
+        self.set_size(self.painter.size_hint(
             state::ButtonState {
                 state: state::ControlState::Normal(state::InteractionState::empty()),
                 button_type: state::ButtonType::Normal,
                 ..self.derive_state()
             },
             aux,
-        );
+        ));
     }
 }
