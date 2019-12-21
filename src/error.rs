@@ -9,3 +9,12 @@ pub enum AppError {
     #[error("{0}")]
     ResourceError(#[from] error::ResourceError),
 }
+
+#[cfg(feature = "default-themes")]
+#[derive(Error, Debug)]
+pub enum ThemeError {
+    #[error("{0}")]
+    ImageError(#[from] image::ImageError),
+    #[error("{0}")]
+    ResourceError(#[from] error::ResourceError),
+}

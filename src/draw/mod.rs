@@ -4,7 +4,7 @@ pub mod state;
 
 use {
     crate::base,
-    reclutch::display::{DisplayCommand, Size, StyleColor},
+    reclutch::display::{DisplayCommand, Rect, Size, StyleColor},
 };
 
 /// Implemented by types which are capable of changing themes.
@@ -29,6 +29,10 @@ pub trait Painter<T> {
     fn invoke(&self, theme: &dyn Theme) -> Box<dyn Painter<T>>;
     /// Returns a stylistic size based on the state.
     fn size_hint(&self, state: T, aux: &dyn base::GraphicalAuxiliary) -> Size;
+    /// Returns the paint boundaries based on the inner bounds.
+    fn paint_hint(&self, rect: Rect) -> Rect;
+    /// Returns the mouse boundaries based on the inner bounds.
+    fn mouse_hint(&self, rect: Rect) -> Rect;
     /// Returns a list of display commands which visualize `state`.
     fn draw(&mut self, state: T, aux: &dyn base::GraphicalAuxiliary) -> Vec<DisplayCommand>;
 }
@@ -36,6 +40,7 @@ pub trait Painter<T> {
 /// Factory to create colors or `Painter`s which paint widgets with a specific visual theme.
 pub trait Theme {
     fn button(&self) -> Box<dyn Painter<state::ButtonState>>;
+    fn checkbox(&self) -> Box<dyn Painter<state::CheckboxState>>;
     fn label_color(&self) -> StyleColor;
     fn default_text_size(&self) -> f32;
 }

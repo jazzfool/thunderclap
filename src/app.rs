@@ -1,5 +1,5 @@
 use {
-    crate::{base, error::AppError},
+    crate::{base, draw, error::AppError},
     glutin::{
         event::{self, Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
@@ -16,10 +16,12 @@ use {
     },
 };
 
-pub fn create<R, F>(root: F, opts: AppOptions) -> Result<App<R>, AppError>
+pub fn create<R, T, TF, RF>(theme: TF, root: RF, opts: AppOptions) -> Result<App<R>, AppError>
 where
     R: base::WidgetChildren<UpdateAux = UAux, GraphicalAux = GAux, DisplayObject = DisplayCommand>,
-    F: FnOnce(&mut UAux, &mut GAux) -> R,
+    T: draw::Theme,
+    TF: FnOnce(&mut dyn GraphicsDisplay) -> T,
+    RF: FnOnce(&mut UAux, &mut GAux, &T) -> R,
 {
     let event_loop = EventLoop::new();
 
@@ -66,8 +68,11 @@ where
         scale: hidpi_factor as _,
     };
 
+    let theme = theme(&mut display);
+    let root = root(&mut u_aux, &mut g_aux, &theme);
+
     let mut app = App {
-        root: root(&mut u_aux, &mut g_aux),
+        root,
         background: opts.background,
         u_aux,
         g_aux,
@@ -158,11 +163,12 @@ where
                             DisplayCommand::Scale(Vector::new(g_aux.scale, g_aux.scale)),
                         ],
                         false,
+                        None,
                     );
 
                     root.draw(&mut display, &mut g_aux);
 
-                    command_group_post.push(&mut display, &[DisplayCommand::Restore], false);
+                    command_group_post.push(&mut display, &[DisplayCommand::Restore], false, None);
 
                     display.present(None).unwrap();
 
