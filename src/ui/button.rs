@@ -14,6 +14,7 @@ use {
     std::marker::PhantomData,
 };
 
+/// Events emitted by a button.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ButtonEvent {
     /// Emitted when the button is pressed or released.
@@ -59,6 +60,8 @@ where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
+    /// Creates a new button widget with a specified label, position, label size, visual type, disabled state and theme.
+    /// If `None` is passed to `text_size` then the text size will be decided by the theme (`theme`).
     pub fn new(
         text: DisplayText,
         position: Point,

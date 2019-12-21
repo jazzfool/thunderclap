@@ -13,6 +13,36 @@ use {
     reclutch::display,
 };
 
+/// Simply pushes a list of widgets, each with specified layout data, into a layout, then returns a mutable reference to the layout.
+///
+/// # Example
+/// ```ignore
+/// define_layout! {
+///     for layout {
+///         layout_data => &mut widget_1,
+///         layout_data => &mut widget_2
+///     }
+/// }
+/// ```
+/// Where `layout` implements `reui::base::Layout`, `layout_data` is of type `<layout as Layout>::PushData` and `widget_1`/`widget_2` implement `Layable`.
+/// The above is equivalent to:
+/// ```ignore
+/// layout.push(layout_data, &mut widget_1);
+/// layout.push(layout_data, &mut widget_2);
+/// ```
+///
+/// Due to returning a mutable reference to the layout, this macro can be nested so as to nest layouts:
+/// ```ignore
+/// define_layout! {
+///    for parent_layout {
+///        layout_data => define_layout! {
+///            for child_layout { layout_data => child }
+///        }
+///    }
+/// }
+/// ```
+///
+///
 #[macro_export]
 macro_rules! define_layout {
     (for $layout:expr => {$($data:expr => $target:expr),*}) => {
@@ -26,6 +56,7 @@ macro_rules! define_layout {
     }
 }
 
+/// An event which is "toggled". That is to say, `Stop` is always received only after `Start` and `Stop` indicates an exact opposite event to `Start`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ToggledEvent<T> {
     Start(T),
@@ -33,6 +64,7 @@ pub enum ToggledEvent<T> {
 }
 
 impl<T> ToggledEvent<T> {
+    /// Creates a new toggled event with given data, either as start or stop (indicated by `is_start`).
     pub fn new(is_start: bool, data: T) -> Self {
         if is_start {
             ToggledEvent::Start(data)
@@ -41,6 +73,7 @@ impl<T> ToggledEvent<T> {
         }
     }
 
+    /// Returns `true` if the current value is `ToggledEvent::Start`, otherwise `false`.
     #[inline]
     pub fn is_start(&self) -> bool {
         match self {
@@ -49,6 +82,7 @@ impl<T> ToggledEvent<T> {
         }
     }
 
+    /// Returns the inner data immutably.
     #[inline]
     pub fn data(&self) -> &T {
         match self {
@@ -56,6 +90,7 @@ impl<T> ToggledEvent<T> {
         }
     }
 
+    /// Returns the inner data mutably.
     #[inline]
     pub fn data_mut(&mut self) -> &mut T {
         match self {
@@ -63,6 +98,7 @@ impl<T> ToggledEvent<T> {
         }
     }
 
+    /// Consumes self, returning the inner data.
     #[inline]
     pub fn into_data(self) -> T {
         match self {
@@ -91,6 +127,7 @@ impl Default for Align {
     }
 }
 
+/// Button creation helper.
 pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     text: String,
     theme: &dyn draw::Theme,
@@ -111,6 +148,7 @@ pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     )
 }
 
+/// Label creation helper.
 pub fn simple_label<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     text: String,
     theme: &dyn draw::Theme,

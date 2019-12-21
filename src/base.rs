@@ -303,12 +303,14 @@ pub enum MouseButton {
     Right,
 }
 
+/// Information about a parent layout with a queue which receives updated rectangles..
 #[derive(Debug)]
 pub struct WidgetLayoutEventsInner {
     pub id: u64,
     pub evq: reclutch::event::bidir_single::Secondary<Rect, Rect>,
 }
 
+/// Helper layout over `WidgetLayoutEventsInner`; optionally stores information about a parent layout.
 #[derive(Default, Debug)]
 pub struct WidgetLayoutEvents(Option<WidgetLayoutEventsInner>);
 
@@ -317,24 +319,29 @@ impl WidgetLayoutEvents {
         Default::default()
     }
 
+    /// Creates `WidgetLayoutEvents` from the given layout information.
     pub fn from_layout(layout: WidgetLayoutEventsInner) -> Self {
         WidgetLayoutEvents(Some(layout))
     }
 
+    /// Possibly returns the inner associated layout ID.
     pub fn id(&self) -> Option<u64> {
         self.0.as_ref().map(|inner| inner.id)
     }
 
+    /// Possibly updates the layout information.
     pub fn update(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>) {
         self.0 = layout.into();
     }
 
+    /// Notifies the layout that the widget rectangle has been updated from the widget side.
     pub fn notify(&mut self, rect: Rect) {
         if let Some(inner) = &mut self.0 {
             inner.evq.emit_owned(rect);
         }
     }
 
+    /// Returns the most up-to-date widget rectangle from the layout.
     pub fn receive(&mut self) -> Option<Rect> {
         self.0
             .as_mut()

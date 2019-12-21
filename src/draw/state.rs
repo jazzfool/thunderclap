@@ -5,6 +5,7 @@
 
 use reclutch::display::{DisplayText, Rect};
 
+/// Visually relevant states of a [`Button`](../ui/struct.Button.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ButtonState {
     pub rect: Rect,
@@ -22,12 +23,14 @@ bitflags::bitflags! {
     }
 }
 
+/// Either the interaction state (`InteractionState`) or the disabled state (none) of a widget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ControlState {
     Normal(InteractionState),
     Disabled,
 }
 
+/// Visual button type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ButtonType {
     Normal,
@@ -36,6 +39,7 @@ pub enum ButtonType {
     Outline,
 }
 
+/// Visually relevant states of a [`Checkbox`](../ui/struct.Checkbox.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CheckboxState {
     pub rect: Rect,

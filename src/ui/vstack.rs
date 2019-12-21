@@ -10,18 +10,24 @@ use {
     std::marker::PhantomData,
 };
 
+/// Information about how a `VStack` child should be layed out.
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct VStackData {
+    /// The margin given between the above widget (or top of container) and the top of the child.
     pub top_margin: f32,
+    /// The margin given between the below widget and bottom side of the child.
     pub bottom_margin: f32,
+    /// How the child should be horizontally aligned within the `VStack`.
     pub alignment: Align,
 }
 
 impl VStackData {
+    /// Sets the `top_margin` value.
     pub fn top_margin(self, top_margin: f32) -> VStackData {
         VStackData { top_margin, ..self }
     }
 
+    /// Sets the `bottom_margin` value.
     pub fn bottom_margin(self, bottom_margin: f32) -> VStackData {
         VStackData {
             bottom_margin,
@@ -29,6 +35,7 @@ impl VStackData {
         }
     }
 
+    /// Sets the `align` value.
     pub fn align(self, alignment: Align) -> VStackData {
         VStackData { alignment, ..self }
     }
@@ -48,6 +55,7 @@ lazy_widget! {
     theme: themed
 }
 
+/// Abstract layout widget which arranges children in a vertical list, possibly with top/bottom margins and horizontal alignment (see `VStackData`).
 #[derive(WidgetChildren, Debug)]
 #[widget_children_trait(base::WidgetChildren)]
 pub struct VStack<U, G>
@@ -69,6 +77,7 @@ where
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> VStack<U, G> {
+    /// Creates a new vertical stack widget with a given rectangle.
     pub fn new(rect: Rect) -> Self {
         VStack {
             rect,
@@ -89,7 +98,6 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> VStack<U, G> {
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VStack<U, G> {
     type PushData = VStackData;
 
-    /// "Registers" a widget to the layout.
     fn push(&mut self, data: Self::PushData, child: &mut impl base::LayableWidget) {
         self.dirty = true;
 
@@ -116,7 +124,6 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
         );
     }
 
-    /// De-registers a widget from the layout, optionally restoring the original widget rectangle.
     fn remove(&mut self, child: &mut impl base::LayableWidget, restore_original: bool) {
         if let Some(data) = child.layout_id().and_then(|id| self.rects.remove(&id)) {
             child.listen_to_layout(None);

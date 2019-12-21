@@ -15,6 +15,7 @@ use {
     std::marker::PhantomData,
 };
 
+/// Horizontal alignment of text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TextAlign {
     Left,
@@ -22,6 +23,7 @@ pub enum TextAlign {
     Right,
 }
 
+/// Label widget which displays text wrapped and clipped within a rectangle.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
 pub struct Label<U, G>
@@ -49,13 +51,14 @@ where
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
+    /// Creates a new label widget.
     pub fn new(
-        theme: &dyn draw::Theme,
         size: Option<f32>,
         color: Option<StyleColor>,
         align: Option<TextAlign>,
         rect: Rect,
         text: DisplayText,
+        theme: &dyn draw::Theme,
         g_aux: &mut G,
     ) -> Self {
         let text = base::Observed::new(text);

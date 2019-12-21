@@ -13,6 +13,9 @@ lazy_widget! {
     theme: themed
 }
 
+/// Container which dynamically stores widgets.
+/// If you don't need access to children past their creation then you can bundle them up in this.
+/// Those children will still be rendered and receive updates.
 pub struct Container<U, G>
 where
     U: base::UpdateAuxiliary,
@@ -36,6 +39,7 @@ where
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Container<U, G> {
+    /// Creates a new container widget, possibly with an existing list of dynamic children.
     pub fn new(
         children: Vec<
             Box<
@@ -58,6 +62,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Container<U, G> {
         }
     }
 
+    /// Moves a child into the container.
     pub fn push(
         &mut self,
         child: Box<

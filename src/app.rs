@@ -16,6 +16,9 @@ use {
     },
 };
 
+/// Creates an application with a given theme and root widget.
+/// The application uses the Skia OpenGL graphics backend.
+/// Small details of app creation can be controlled with `AppOptions`.
 pub fn create<R, T, TF, RF>(theme: TF, root: RF, opts: AppOptions) -> Result<App<R>, AppError>
 where
     R: base::WidgetChildren<UpdateAux = UAux, GraphicalAux = GAux, DisplayObject = DisplayCommand>,
@@ -93,25 +96,39 @@ where
     Ok(app)
 }
 
+/// Settings on how an app should be created.
 #[derive(Debug, Clone)]
 pub struct AppOptions {
+    /// The name of the application; usually translates to the window title.
     pub name: String,
+    /// The number warmup cycles (i.e. the amount of times `update` and `draw` should be called offscreen).
     pub warmup: u32,
+    /// The background color of the window.
     pub background: Color,
+    /// The regular UI font.
     pub ui_font: FontInfo,
+    /// The semibold UI font.
     pub semibold_font: FontInfo,
+    /// Initial size of the app window.
     pub window_size: Size,
 }
 
+/// Reui/Reclutch based application.
 pub struct App<R>
 where
     R: base::WidgetChildren<UpdateAux = UAux, GraphicalAux = GAux, DisplayObject = DisplayCommand>,
 {
+    /// Root widget.
     pub root: R,
+    /// Background color.
     pub background: Color,
+    /// Update auxiliary.
     pub u_aux: UAux,
+    /// Graphical auxiliary.
     pub g_aux: GAux,
+    /// Graphics display (Skia backend).
     pub display: skia::SkiaGraphicsDisplay,
+    /// OpenGL context/window.
     pub context: WindowedContext<PossiblyCurrent>,
     size: Size,
     event_loop: EventLoop<()>,
@@ -124,6 +141,7 @@ impl<R> App<R>
 where
     R: base::WidgetChildren<UpdateAux = UAux, GraphicalAux = GAux, DisplayObject = DisplayCommand>,
 {
+    /// Starts the event loop.
     pub fn start<F>(self, mut f: F) -> !
     where
         F: 'static + FnMut(Event<()>) -> Option<ControlFlow>,
@@ -250,6 +268,7 @@ where
     }
 }
 
+/// Rudimentary update auxiliary.
 pub struct UAux {
     pub window_queue: RcEventQueue<base::WindowEvent>,
     pub cursor: Point,
@@ -267,6 +286,7 @@ impl base::UpdateAuxiliary for UAux {
     }
 }
 
+/// Rudimentary graphical auxiliary.
 pub struct GAux {
     pub ui_font: (ResourceReference, FontInfo),
     pub semibold_font: (ResourceReference, FontInfo),

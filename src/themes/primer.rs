@@ -17,6 +17,7 @@ const BUTTON_TEXT_SIZE: f32 = 12.0;
 const LABEL_TEXT_SIZE: f32 = 14.0;
 
 impl Primer {
+    /// Creates an instance of the GitHub Primer theme.
     pub fn new(display: &mut dyn GraphicsDisplay) -> Result<Self, error::ThemeError> {
         let mut img: image::RgbaImage =
             image::load_from_memory(include_bytes!("checkmark.png"))?.to_rgba();

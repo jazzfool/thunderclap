@@ -12,14 +12,23 @@ use {
     std::marker::PhantomData,
 };
 
+/// Events emitted by a checkbox.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CheckboxEvent {
+    /// Emitted when the checkbox is pressed or released.
+    /// Corresponds to `WindowEvent::MousePress` or `WindowEvent::MouseRelease`.
     Press(ToggledEvent<Point>),
+    /// Emitted when the button is checked/unchecked.
+    /// Corresponds to `WindowEvent::MouseRelease`.
     Check(ToggledEvent<Point>),
+    /// Emitted when the mouse enters (`true`) or leaves (`false`) the checkbox boundaries.
+    /// Corresponds to `WindowEvent::MouseMove`.
     MouseHover(ToggledEvent<Point>),
+    /// Emitted when focus is gained (`true`) or lost (`false`).
     Focus(ToggledEvent<()>),
 }
 
+/// Checkbox widget; useful for boolean input.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
 pub struct Checkbox<U, G>
@@ -50,11 +59,12 @@ where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
+    /// Creates a new checkbox with a specified checked state, disabled state, position and theme.
     pub fn new(
-        theme: &dyn draw::Theme,
         checked: bool,
         disabled: bool,
         position: Point,
+        theme: &dyn draw::Theme,
         u_aux: &mut U,
         g_aux: &mut G,
     ) -> Self {
