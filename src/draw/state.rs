@@ -35,3 +35,10 @@ pub enum ButtonType {
     Danger,
     Outline,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CheckboxState {
+    pub rect: Rect,
+    pub checked: bool,
+    pub state: ControlState,
+}
