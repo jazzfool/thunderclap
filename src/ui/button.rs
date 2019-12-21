@@ -118,7 +118,7 @@ where
 
     fn derive_state(&self) -> state::ButtonState {
         state::ButtonState {
-            rect: self.bounds(),
+            rect: self.rect,
             text: self.text.get().clone(),
             text_size: self.text_size.get().clone(),
             state: if *self.disabled.get() {
@@ -149,13 +149,12 @@ where
         let was_focused = self.interaction.contains(state::InteractionState::FOCUSED);
         let disabled = *self.disabled.get();
 
-        let bounds = self.bounds();
+        let bounds = self.painter.mouse_hint(self.rect);
         let cmd_group = &mut self.command_group;
 
         for rl in &mut self.repaint_listeners {
             if !rl.peek().is_empty() {
                 cmd_group.repaint();
-                break;
             }
         }
 
@@ -233,7 +232,7 @@ where
         let button_state = self.derive_state();
         let painter = &mut self.painter;
         self.command_group
-            .push_with(display, || painter.draw(button_state, aux), None);
+            .push_with(display, || painter.draw(button_state, aux), None, None);
     }
 }
 

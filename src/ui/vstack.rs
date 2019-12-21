@@ -42,6 +42,12 @@ struct ChildData {
     original_rect: Rect,
 }
 
+lazy_widget! {
+    generic VStack,
+    visibility: visibility,
+    theme: themed
+}
+
 #[derive(WidgetChildren, Debug)]
 #[widget_children_trait(base::WidgetChildren)]
 pub struct VStack<U, G>
@@ -186,23 +192,6 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget 
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::HasVisibility for VStack<U, G> {
-    #[inline]
-    fn set_visibility(&mut self, visibility: base::Visibility) {
-        self.visibility = visibility
-    }
-
-    #[inline]
-    fn visibility(&self) -> base::Visibility {
-        self.visibility
-    }
-}
-
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Repaintable for VStack<U, G> {
-    #[inline]
-    fn repaint(&mut self) {}
-}
-
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for VStack<U, G> {
     #[inline]
     fn set_position(&mut self, position: Point) {
@@ -225,14 +214,4 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for 
     fn size(&self) -> Size {
         self.rect.size
     }
-}
-
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for VStack<U, G> {
-    #[inline]
-    fn theme(&mut self) -> &mut dyn draw::Themed {
-        &mut self.themed
-    }
-
-    #[inline]
-    fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
 }

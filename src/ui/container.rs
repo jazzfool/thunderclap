@@ -7,6 +7,12 @@ use {
     std::marker::PhantomData,
 };
 
+lazy_widget! {
+    generic Container,
+    visibility: visibility,
+    theme: themed
+}
+
 pub struct Container<U, G>
 where
     U: base::UpdateAuxiliary,
@@ -108,10 +114,4 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::WidgetChildren
             .map(|child| child.as_mut() as _)
             .collect()
     }
-}
-
-lazy_widget! {
-    generic Container,
-    visibility: visibility,
-    theme: themed
 }
