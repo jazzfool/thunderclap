@@ -46,6 +46,7 @@ define_layout! {
 - Vertical Stack
 - Container
 - Label
+- Checkbox
 
 ## License
 
