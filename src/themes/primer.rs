@@ -1,21 +1,61 @@
 use {
-    super::Primer,
+    super::{recolor_icon, Primer},
     crate::{
         base,
         draw::{self, state},
+        error,
     },
     reclutch::display::{
-        self, Color, DisplayCommand, DisplayListBuilder, Filter, Gradient, GraphicsDisplayPaint,
-        GraphicsDisplayStroke, Size, StyleColor, TextDisplayItem, Vector,
+        self, Color, DisplayCommand, DisplayListBuilder, Filter, Gradient, GraphicsDisplay,
+        GraphicsDisplayPaint, GraphicsDisplayStroke, ImageData, RasterImageFormat, RasterImageInfo,
+        Rect, ResourceData, ResourceDescriptor, ResourceReference, SharedData, Size, StyleColor,
+        TextDisplayItem, Vector,
     },
 };
 
 const BUTTON_TEXT_SIZE: f32 = 12.0;
 const LABEL_TEXT_SIZE: f32 = 14.0;
 
+impl Primer {
+    pub fn new(display: &mut dyn GraphicsDisplay) -> Result<Self, error::ThemeError> {
+        let mut img: image::RgbaImage =
+            image::load_from_memory(include_bytes!("checkmark.png"))?.to_rgba();
+
+        recolor_icon(
+            &mut img,
+            Color::new(1.0, 1.0, 1.0, 1.0),
+            Color::new(0.0, 0.0, 0.0, 1.0),
+        );
+
+        let checkmark = display.new_resource(ResourceDescriptor::Image(ImageData::Raw(
+            ResourceData::Data(SharedData::RefCount(std::sync::Arc::new(
+                img.clone().into_raw(),
+            ))),
+            RasterImageInfo {
+                size: (128, 128),
+                format: RasterImageFormat::Rgba8,
+            },
+        )))?;
+
+        recolor_icon(
+            &mut img,
+            Color::new(0.0, 0.0, 0.0, 1.0),
+            Color::new(0.0, 0.0, 1.0, 1.0),
+        );
+
+        Ok(Primer { checkmark })
+    }
+}
+
 impl draw::Theme for Primer {
     fn button(&self) -> Box<dyn draw::Painter<state::ButtonState>> {
         Box::new(ButtonPainter)
+    }
+
+    fn checkbox(&self) -> Box<dyn draw::Painter<state::CheckboxState>> {
+        Box::new(CheckboxPainter {
+            checkmark: self.checkmark.clone(),
+        })
     }
 
     fn label_color(&self) -> StyleColor {
@@ -70,13 +110,20 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
             .size
     }
 
+    fn paint_hint(&self, rect: Rect) -> Rect {
+        // account for focus border
+        rect.inflate(3.25, 3.25)
+    }
+
+    fn mouse_hint(&self, rect: Rect) -> Rect {
+        rect
+    }
+
     fn draw(
         &mut self,
         state: state::ButtonState,
         aux: &dyn base::GraphicalAuxiliary,
     ) -> Vec<DisplayCommand> {
-        let mut builder = DisplayListBuilder::new();
-
         let mut interaction_state = state::InteractionState::empty();
 
         let (background, border, text, focus) = match state.button_type {
@@ -257,6 +304,8 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
             },
         };
 
+        let mut builder = DisplayListBuilder::new();
+
         // Background
         builder.push_round_rectangle(
             base::sharp_align(state.rect),
@@ -270,7 +319,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
             base::sharp_align(state.rect),
             [3.5; 4],
             GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
-                thickness: (2.0 / 3.0),
+                thickness: 2.0 / 3.0,
                 color: border,
                 ..Default::default()
             }),
@@ -317,6 +366,122 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
                 Some(Filter::Blur(3.0, 3.0)),
             );
         }
+
+        builder.build()
+    }
+}
+
+struct CheckboxPainter {
+    checkmark: ResourceReference,
+}
+
+impl draw::Painter<state::CheckboxState> for CheckboxPainter {
+    fn invoke(&self, theme: &dyn draw::Theme) -> Box<dyn draw::Painter<state::CheckboxState>> {
+        theme.checkbox()
+    }
+
+    fn size_hint(&self, _state: state::CheckboxState, _aux: &dyn base::GraphicalAuxiliary) -> Size {
+        Size::new(20.0, 20.0)
+    }
+
+    fn paint_hint(&self, rect: Rect) -> Rect {
+        rect.inflate(3.25, 3.25)
+    }
+
+    fn mouse_hint(&self, rect: Rect) -> Rect {
+        Rect::new(rect.origin, Size::new(20.0, 20.0))
+    }
+
+    fn draw(
+        &mut self,
+        mut state: state::CheckboxState,
+        _aux: &dyn base::GraphicalAuxiliary,
+    ) -> Vec<DisplayCommand> {
+        state.rect.size = Size::new(20.0, 20.0);
+
+        let (background, checkmark_alpha, interaction) = match state.state {
+            state::ControlState::Normal(interaction) => {
+                if state.checked {
+                    (
+                        if interaction.contains(state::InteractionState::PRESSED) {
+                            base::color_from_urgba(203, 208, 214, 1.0).into()
+                        } else {
+                            base::color_from_urgba(239, 243, 246, 1.0).into()
+                        },
+                        1.0,
+                        interaction,
+                    )
+                } else if interaction.contains(state::InteractionState::PRESSED) {
+                    (
+                        base::color_from_urgba(203, 208, 214, 1.0).into(),
+                        0.3,
+                        interaction,
+                    )
+                } else if interaction.contains(state::InteractionState::HOVERED) {
+                    (
+                        base::color_from_urgba(239, 243, 246, 1.0).into(),
+                        0.1,
+                        interaction,
+                    )
+                } else {
+                    (
+                        base::color_from_urgba(239, 243, 246, 1.0).into(),
+                        0.0,
+                        interaction,
+                    )
+                }
+            }
+            _ => todo!(),
+        };
+
+        let border: StyleColor = base::color_from_urgba(27, 31, 35, 0.35).into();
+        let focus: StyleColor = base::color_from_urgba(3, 102, 214, 0.3).into();
+
+        let mut builder = DisplayListBuilder::new();
+
+        // Background
+        builder.push_round_rectangle(
+            base::sharp_align(state.rect),
+            [3.5; 4],
+            GraphicsDisplayPaint::Fill(background),
+            None,
+        );
+
+        // Border
+        builder.push_round_rectangle(
+            base::sharp_align(state.rect),
+            [3.5; 4],
+            GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                thickness: 2.0 / 3.0,
+                color: border,
+                ..Default::default()
+            }),
+            None,
+        );
+
+        // Focus rect
+        if interaction.contains(state::InteractionState::FOCUSED) {
+            builder.push_round_rectangle(
+                base::sharp_align(state.rect).inflate(1.5, 1.5),
+                [3.5; 4],
+                GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                    thickness: 3.5,
+                    color: focus,
+                    ..Default::default()
+                }),
+                None,
+            );
+        }
+
+        builder.save_layer(checkmark_alpha);
+
+        // Checkmark
+        builder.push_image(
+            None,
+            base::sharp_align(state.rect).inflate(-2.0, -2.0),
+            self.checkmark.clone(),
+            None,
+        );
 
         builder.build()
     }

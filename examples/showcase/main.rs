@@ -28,6 +28,8 @@ struct Showcase {
     #[widget_child]
     button_4: ui::Button<app::UAux, app::GAux>,
     #[widget_child]
+    checkbox: ui::Checkbox<app::UAux, app::GAux>,
+    #[widget_child]
     v_stack: ui::VStack<app::UAux, app::GAux>,
 
     visibility: base::Visibility,
@@ -83,6 +85,9 @@ impl Showcase {
             gfx_aux,
         );
 
+        let mut checkbox =
+            ui::Checkbox::new(theme, false, false, Default::default(), update_aux, gfx_aux);
+
         let v_stack_data = ui::VStackData {
             top_margin: 10.0,
             bottom_margin: 0.0,
@@ -95,7 +100,8 @@ impl Showcase {
                 v_stack_data => &mut button_1,
                 v_stack_data.align(ui::Align::Middle) => &mut button_2,
                 v_stack_data.align(ui::Align::End) => &mut button_3,
-                v_stack_data.align(ui::Align::Stretch) => &mut button_4
+                v_stack_data.align(ui::Align::Stretch) => &mut button_4,
+                v_stack_data => &mut checkbox
             }
         };
 
@@ -105,6 +111,7 @@ impl Showcase {
             button_2,
             button_3,
             button_4,
+            checkbox,
             v_stack,
 
             visibility: Default::default(),
@@ -147,9 +154,9 @@ fn main() {
     )
     .unwrap();
 
-    let theme = Primer;
     let app = app::create(
-        |u_aux, g_aux| Showcase::new(&theme, u_aux, g_aux),
+        |display| Primer::new(display).unwrap(),
+        |u_aux, g_aux, theme| Showcase::new(theme, u_aux, g_aux),
         app::AppOptions {
             name: "Showcase".to_string(),
             warmup: 5,
