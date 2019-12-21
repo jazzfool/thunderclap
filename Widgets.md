@@ -38,7 +38,8 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Layable....`** ✔️
 - **Outgoing Event Queues:**
     - `event_queue`: `CheckboxEvent`
-        - `CheckboxEvent::Toggle`: The checkbox has been checked/unchecked.
+        - `CheckboxEvent::Press`: The checkbox has been pressed/released.
+        - `CheckboxEvent::Check`: The checkbox has been checked/unchecked.
         - `CheckboxEvent::MouseHover`: The cursor has entered/left the checkbox boundaries.
         - `CheckboxEvent::Focus`: The checkbox has gained/lost focus.
 
