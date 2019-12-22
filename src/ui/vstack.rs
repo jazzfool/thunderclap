@@ -45,7 +45,7 @@ impl VStackData {
 struct ChildData {
     data: VStackData,
     evq: BidirSingleEventQueue<Rect, Rect>,
-    drop_listener: RcEventListener<()>,
+    drop_listener: RcEventListener<base::DropEvent>,
     rect: Rect,
     original_rect: Rect,
     id: u64,
@@ -74,7 +74,7 @@ where
 
     themed: draw::PhantomThemed,
     layout: base::WidgetLayoutEvents,
-    drop_event: RcEventQueue<()>,
+    drop_event: RcEventQueue<base::DropEvent>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,

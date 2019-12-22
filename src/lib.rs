@@ -8,6 +8,8 @@ pub extern crate reclutch;
 pub mod base;
 pub mod draw;
 pub mod error;
+#[macro_use]
+pub mod pipe;
 pub mod themes;
 pub mod ui;
 

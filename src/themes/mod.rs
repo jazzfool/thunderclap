@@ -1,9 +1,9 @@
 //! A collection of various themes to quickly get up and running with Reui.
 
-use {
-    image::Pixel,
-    reclutch::display::{Color, ResourceReference},
-};
+use {image::Pixel, reclutch::display::Color};
+
+#[cfg(feature = "default-themes")]
+use reclutch::display::ResourceReference;
 
 /// Replaces a specific color in an image while preserving alpha.
 /// Useful to recolor a solid icon.

@@ -35,7 +35,7 @@ where
 
     themed: draw::PhantomThemed,
     visibility: base::Visibility,
-    drop_event: RcEventQueue<()>,
+    drop_event: RcEventQueue<base::DropEvent>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,

@@ -15,9 +15,12 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Layable....`** ✔️
 - **Outgoing Event Queues:**
     - `event_queue`: `ButtonEvent`
-        - `ButtonEvent::Press`: The button has been pressed/released.
-        - `ButtonEvent::MouseHover`: The cursor has entered/left the button boundaries.
-        - `ButtonEvent::Focus`: The button has gained/lost focus.
+        - `press`: The button has been pressed.
+        - `release`: The button has been released.
+        - `begin_hover`: The cursor has entered the button boundaries.
+        - `end_hover`: The cursor has left the button boundaries.
+        - `focus`: The button has gained focus.
+        - `blur`: The button has lost focus.
 
 ### Label - `reui::ui::Label`
 
@@ -38,10 +41,14 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Layable....`** ✔️
 - **Outgoing Event Queues:**
     - `event_queue`: `CheckboxEvent`
-        - `CheckboxEvent::Press`: The checkbox has been pressed/released.
-        - `CheckboxEvent::Check`: The checkbox has been checked/unchecked.
-        - `CheckboxEvent::MouseHover`: The cursor has entered/left the checkbox boundaries.
-        - `CheckboxEvent::Focus`: The checkbox has gained/lost focus.
+        - `press`: The checkbox has been pressed.
+        - `release`: The checkbox has been released.
+        - `check`: The checkbox has been checked.
+        - `uncheck`: The checkbox has been unchecked.
+        - `begin_hover`: The cursor has entered the checkbox boundaries.
+        - `end_hover`: The cursor has left the checkbox boundaries.
+        - `focus`: The checkbox has gained focus.
+        - `blur`: The checkbox has lost focus.
 
 ## Abstract Widgets
 

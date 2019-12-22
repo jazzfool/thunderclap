@@ -2,6 +2,7 @@ use {
     crate::{
         base::{self, Repaintable, Resizable},
         draw::{self, state},
+        pipe,
         ui::ToggledEvent,
     },
     reclutch::{
@@ -28,13 +29,28 @@ pub enum CheckboxEvent {
     Focus(ToggledEvent<()>),
 }
 
+impl pipe::Event for CheckboxEvent {
+    fn get_key(&self) -> &'static str {
+        match self {
+            CheckboxEvent::Press(ToggledEvent::Start(_)) => "press",
+            CheckboxEvent::Press(ToggledEvent::Stop(_)) => "release",
+            CheckboxEvent::Check(ToggledEvent::Start(_)) => "check",
+            CheckboxEvent::Check(ToggledEvent::Stop(_)) => "uncheck",
+            CheckboxEvent::MouseHover(ToggledEvent::Start(_)) => "begin_hover",
+            CheckboxEvent::MouseHover(ToggledEvent::Stop(_)) => "end_hover",
+            CheckboxEvent::Focus(ToggledEvent::Start(_)) => "focus",
+            CheckboxEvent::Focus(ToggledEvent::Stop(_)) => "blur",
+        }
+    }
+}
+
 /// Checkbox widget; useful for boolean input.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
 pub struct Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     pub event_queue: RcEventQueue<CheckboxEvent>,
 
@@ -46,10 +62,9 @@ where
     painter: Box<dyn draw::Painter<state::CheckboxState>>,
     layout: base::WidgetLayoutEvents,
     visibility: base::Visibility,
-    repaint_listeners: Vec<RcEventListener<()>>,
     interaction: state::InteractionState,
-    window_listener: RcEventListener<base::WindowEvent>,
-    drop_event: RcEventQueue<()>,
+    drop_event: RcEventQueue<base::DropEvent>,
+    pipe: Option<pipe::Pipeline<Self, U>>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -57,8 +72,8 @@ where
 
 impl<U, G> Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     /// Creates a new checkbox with a specified checked state, disabled state, position and theme.
     pub fn new(
@@ -81,7 +96,74 @@ where
         let checked = base::Observed::new(checked);
         let disabled = base::Observed::new(disabled);
 
-        let repaint_listeners = vec![checked.on_change.listen(), disabled.on_change.listen()];
+        let pipe = pipeline! {
+            Self as obj,
+            U as _aux,
+            _ev in &checked.on_change => { change { obj.command_group.repaint(); } }
+            _ev in &disabled.on_change => { change { obj.command_group.repaint(); } }
+            event in u_aux.window_queue() => {
+                mouse_press {
+                    force_event!(event, base::WindowEvent::MousePress);
+
+                    if let Some((pos, _)) = event.with(|(pos, button)| {
+                        !*obj.disabled.get()
+                            && *button == base::MouseButton::Left
+                            && obj.bounds().contains(*pos)
+                    }) {
+                        obj.interaction.insert(state::InteractionState::PRESSED);
+                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
+                            true, *pos,
+                        )));
+                        obj.command_group.repaint();
+                    }
+                }
+                mouse_release {
+                    force_event!(event, base::WindowEvent::MouseRelease);
+
+                    if let Some((pos, _)) = event.with(|(_, button)| {
+                        !*obj.disabled.get()
+                            && *button == base::MouseButton::Left
+                            && obj.interaction.contains(state::InteractionState::PRESSED)
+                    }) {
+                        obj.interaction.remove(state::InteractionState::PRESSED);
+                        obj.interaction.insert(state::InteractionState::FOCUSED);
+                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
+                            false, *pos,
+                        )));
+
+                        obj.checked.set(!*obj.checked.get());
+                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
+                            *obj.checked.get(),
+                            *pos,
+                        )));
+
+                        obj.command_group.repaint();
+                    }
+                }
+                mouse_move {
+                    force_event!(event, base::WindowEvent::MouseMove);
+
+                    if let Some(pos) = event.with(|pos| obj.bounds().contains(*pos)) {
+                        if !obj.interaction.contains(state::InteractionState::HOVERED) {
+                            obj.interaction.insert(state::InteractionState::HOVERED);
+                            obj.event_queue.emit_owned(CheckboxEvent::MouseHover(
+                                ToggledEvent::new(true, pos.clone()),
+                            ));
+                            obj.command_group.repaint();
+                        }
+                    } else if obj.interaction.contains(state::InteractionState::HOVERED) {
+                        obj.interaction.remove(state::InteractionState::HOVERED);
+                        obj.event_queue.emit_owned(CheckboxEvent::MouseHover(
+                            ToggledEvent::new(false, event.get().clone()),
+                        ));
+                        obj.command_group.repaint();
+                    }
+                }
+                clear_focus {
+                    obj.interaction.remove(state::InteractionState::FOCUSED);
+                }
+            }
+        };
 
         Checkbox {
             event_queue: Default::default(),
@@ -94,10 +176,9 @@ where
             painter,
             layout: Default::default(),
             visibility: Default::default(),
-            repaint_listeners,
             interaction: state::InteractionState::empty(),
-            window_listener: u_aux.window_queue().listen(),
             drop_event: Default::default(),
+            pipe: pipe.into(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
@@ -119,8 +200,8 @@ where
 
 impl<U, G> Widget for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     type UpdateAux = U;
     type GraphicalAux = G;
@@ -130,94 +211,22 @@ where
         self.painter.paint_hint(self.rect)
     }
 
-    fn update(&mut self, _aux: &mut U) {
+    fn update(&mut self, aux: &mut U) {
         let was_focused = self.interaction.contains(state::InteractionState::FOCUSED);
-        let bounds = self.painter.mouse_hint(self.rect);
-        let cmd_group = &mut self.command_group;
-        let disabled = *self.disabled.get();
 
-        for rl in &mut self.repaint_listeners {
-            if !rl.peek().is_empty() {
-                cmd_group.repaint();
-            }
-        }
-
-        {
-            let interaction = &mut self.interaction;
-            let event_queue = &mut self.event_queue;
-            let checked = &mut self.checked;
-
-            self.window_listener.with(|events| {
-                for event in events {
-                    match event {
-                        base::WindowEvent::MousePress(press_event) => {
-                            if let Some((pos, _)) = press_event.with(|(pos, button)| {
-                                !disabled
-                                    && *button == base::MouseButton::Left
-                                    && bounds.contains(*pos)
-                            }) {
-                                interaction.insert(state::InteractionState::PRESSED);
-                                event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                                    true, *pos,
-                                )));
-                                cmd_group.repaint();
-                            }
-                        }
-                        base::WindowEvent::MouseRelease(release_event) => {
-                            if let Some((pos, _)) = release_event.with(|(_, button)| {
-                                !disabled
-                                    && *button == base::MouseButton::Left
-                                    && interaction.contains(state::InteractionState::PRESSED)
-                            }) {
-                                interaction.remove(state::InteractionState::PRESSED);
-                                interaction.insert(state::InteractionState::FOCUSED);
-                                event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                                    false, *pos,
-                                )));
-
-                                checked.set(!*checked.get());
-                                event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                                    *checked.get(),
-                                    *pos,
-                                )));
-
-                                cmd_group.repaint();
-                            }
-                        }
-                        base::WindowEvent::MouseMove(move_event) => {
-                            if let Some(pos) = move_event.with(|pos| bounds.contains(*pos)) {
-                                if !interaction.contains(state::InteractionState::HOVERED) {
-                                    interaction.insert(state::InteractionState::HOVERED);
-                                    event_queue.emit_owned(CheckboxEvent::MouseHover(
-                                        ToggledEvent::new(true, pos.clone()),
-                                    ));
-                                    cmd_group.repaint();
-                                }
-                            } else if interaction.contains(state::InteractionState::HOVERED) {
-                                interaction.remove(state::InteractionState::HOVERED);
-                                event_queue.emit_owned(CheckboxEvent::MouseHover(
-                                    ToggledEvent::new(false, move_event.get().clone()),
-                                ));
-                                cmd_group.repaint();
-                            }
-                        }
-                        base::WindowEvent::ClearFocus => {
-                            interaction.remove(state::InteractionState::FOCUSED);
-                        }
-                    }
-                }
-            });
-        }
+        let mut pipe = self.pipe.take().unwrap();
+        pipe.update(self, aux);
+        self.pipe = Some(pipe);
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
-            cmd_group.repaint();
+            self.command_group.repaint();
             self.event_queue
                 .emit_owned(CheckboxEvent::Focus(ToggledEvent::new(!was_focused, ())));
         }
 
         if let Some(rect) = self.layout.receive() {
             self.rect = rect;
-            cmd_group.repaint();
+            self.command_group.repaint();
         }
     }
 
@@ -231,8 +240,8 @@ where
 
 impl<U, G> base::LayableWidget for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline]
     fn listen_to_layout(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
@@ -247,8 +256,8 @@ where
 
 impl<U, G> base::HasVisibility for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline]
     fn set_visibility(&mut self, visibility: base::Visibility) {
@@ -263,8 +272,8 @@ where
 
 impl<U, G> Repaintable for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline]
     fn repaint(&mut self) {
@@ -274,8 +283,8 @@ where
 
 impl<U, G> base::Movable for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     fn set_position(&mut self, position: Point) {
         self.rect.origin = position;
@@ -291,8 +300,8 @@ where
 
 impl<U, G> Resizable for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     fn set_size(&mut self, size: Size) {
         self.rect.size = size;
@@ -308,8 +317,8 @@ where
 
 impl<U, G> draw::HasTheme for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline]
     fn theme(&mut self) -> &mut dyn draw::Themed {
@@ -321,23 +330,23 @@ where
     }
 }
 
-impl<U, G> base::DropEvent for Checkbox<U, G>
+impl<U, G> base::DropNotifier for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline(always)]
-    fn drop_event(&self) -> &RcEventQueue<()> {
+    fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
         &self.drop_event
     }
 }
 
 impl<U, G> Drop for Checkbox<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     fn drop(&mut self) {
-        self.drop_event.emit_owned(());
+        self.drop_event.emit_owned(base::DropEvent);
     }
 }

@@ -1,5 +1,5 @@
 use {
-    crate::draw,
+    crate::{draw, pipe},
     reclutch::{
         display::{Color, FontInfo, GraphicsDisplay, Point, Rect, ResourceReference, Size},
         event::RcEventQueue,
@@ -9,6 +9,38 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+/// Naively implements `HasVisibility`, `Repaintable`, `HasTheme` and `DropEvent` (and hence `Drop`) for a widget.
+///
+/// # Example
+/// ```ignore
+/// struct LazyWidget {
+///     visibility: Visibility,
+///     themed: PhantomThemed,
+///     drop_event: RcEventQueue<()>,
+/// }
+///
+/// lazy_widget! {
+///     LazyWidget,
+///     visibility: visibility,
+///     theme: themed,
+///     drop_event: drop_event
+/// }
+/// ```
+///
+/// This macro can also implement for generic widgets. Generic widgets within Reui follow a strict pattern:
+/// ```ignore
+/// // The name of the generics (U and G) are important.
+/// struct GenericWidget<U: UpdateAuxiliary, G: GraphicalAuxiliary> { /* ... */ }
+/// ```
+/// Which then can be plugged into this macro like so:
+/// ```ignore
+/// lazy_widget! {
+///     generic GenericWidget,
+///     visibility: visibility,
+///     theme: themed,
+///     drop_event: drop_event
+/// }
+/// ```
 #[macro_export]
 macro_rules! lazy_widget {
     ($name:ty,visibility:$vis:ident,theme:$thm:ident,drop_event:$de:ident) => {
@@ -39,9 +71,9 @@ macro_rules! lazy_widget {
             fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
         }
 
-        impl $crate::base::DropEvent for $name {
+        impl $crate::base::DropNotifier for $name {
             #[inline(always)]
-            fn drop_event(&self) -> &RcEventQueue<()> {
+            fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
                 &self.$de
             }
         }
@@ -49,7 +81,7 @@ macro_rules! lazy_widget {
         impl Drop for $name {
             #[inline]
             fn drop(&mut self) {
-                self.$de.emit_owned(());
+                self.$de.emit_owned($crate::base::DropEvent);
             }
         }
     };
@@ -88,10 +120,10 @@ macro_rules! lazy_widget {
         }
 
         impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
-            $crate::base::DropEvent for $name<U, G>
+            $crate::base::DropNotifier for $name<U, G>
         {
             #[inline(always)]
-            fn drop_event(&self) -> &RcEventQueue<()> {
+            fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
                 &self.$de
             }
         }
@@ -101,7 +133,61 @@ macro_rules! lazy_widget {
         {
             #[inline]
             fn drop(&mut self) {
-                self.$de.emit_owned(());
+                self.$de.emit_owned($crate::base::DropEvent);
+            }
+        }
+    };
+}
+
+/// Most straight-forward implementation of `Widget`: `update` and `draw` are propagated to children.
+///
+/// # Example
+/// ```ignore
+/// struct MyWidget;
+/// lazy_propagate! {
+///     MyWidget,
+///     update_aux: MyUpdateAux,
+///     graphical_aux: MyGraphicalAux
+/// }
+/// ```
+/// Rules for generic widgets are the same as the ones described in `lazy_widget!`:
+/// ```ignore
+/// lazy_propagate! {
+///     generic MyGenericWidget
+///     // notice we don't supply the aux types; that's the point of generic widgets.
+/// }
+/// ```
+#[macro_export]
+macro_rules! lazy_propagate {
+    ($name:ty,update_aux:$ua:ty,graphical_aux:$ga:ty) => {
+        impl $crate::reclutch::Widget for $name {
+            type UpdateAux = $ua;
+            type GraphicalAux = $ga;
+            type DisplayObject = $crate::reclutch::display::DisplayCommand;
+
+            fn update(&mut self, aux: &mut $ua) {
+                $crate::base::invoke_update(self, aux);
+            }
+
+            fn draw(&mut self, display: $crate::reclutch::display::GraphicsDisplay, aux: &mut $ga) {
+                $crate::base::invoke_draw(self, display, aux);
+            }
+        }
+    };
+    (generic $name:ty) => {
+        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
+            $crate::reclutch::Widget for $name<U, G>
+        {
+            type UpdateAux = U;
+            type GraphicalAux = G;
+            type DisplayObject = $crate::reclutch::display::DisplayCommand;
+
+            fn update(&mut self, aux: &mut U) {
+                $crate::base::invoke_update(self, aux);
+            }
+
+            fn draw(&mut self, display: $crate::reclutch::display::GraphicsDisplay, aux: &mut G) {
+                $crate::base::invoke_draw(self, display, aux);
             }
         }
     };
@@ -327,6 +413,17 @@ pub enum WindowEvent {
     ClearFocus,
 }
 
+impl pipe::Event for WindowEvent {
+    fn get_key(&self) -> &'static str {
+        match self {
+            WindowEvent::MousePress(_) => "mouse_press",
+            WindowEvent::MouseRelease(_) => "mouse_release",
+            WindowEvent::MouseMove(_) => "mouse_move",
+            WindowEvent::ClearFocus => "clear_focus",
+        }
+    }
+}
+
 /// Button on a mouse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MouseButton {
@@ -382,7 +479,7 @@ impl WidgetLayoutEvents {
 }
 
 /// Widget that is capable of listening to layout events.
-pub trait LayableWidget: WidgetChildren + Rectangular + DropEvent {
+pub trait LayableWidget: WidgetChildren + Rectangular + DropNotifier {
     fn listen_to_layout(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>);
     fn layout_id(&self) -> Option<u64>;
 }
@@ -398,15 +495,35 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
     fn remove(&mut self, child: &mut impl LayableWidget, restore_original: bool);
 }
 
+/// Empty event indicating `Observed` data has changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DropEvent;
+
+impl pipe::Event for DropEvent {
+    fn get_key(&self) -> &'static str {
+        "drop"
+    }
+}
+
 /// Widget which has an event queue where a single event is emitted when the widget is dropped.
-pub trait DropEvent: Widget {
-    fn drop_event(&self) -> &RcEventQueue<()>;
+pub trait DropNotifier: Widget {
+    fn drop_event(&self) -> &RcEventQueue<DropEvent>;
+}
+
+/// Empty event indicating `Observed` data has changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ObservedEvent;
+
+impl pipe::Event for ObservedEvent {
+    fn get_key(&self) -> &'static str {
+        "change"
+    }
 }
 
 /// Wrapper which emits an event whenever the inner variable is changed.
 #[derive(Debug)]
 pub struct Observed<T: Sized> {
-    pub on_change: RcEventQueue<()>,
+    pub on_change: RcEventQueue<ObservedEvent>,
 
     inner: T,
 }
@@ -424,7 +541,7 @@ impl<T: Sized> Observed<T> {
     #[inline]
     pub fn set(&mut self, val: T) {
         self.inner = val;
-        self.on_change.emit_owned(());
+        self.on_change.emit_owned(ObservedEvent);
     }
 
     /// Returns an immutable reference to the inner variable.
@@ -437,7 +554,7 @@ impl<T: Sized> Observed<T> {
     /// Emits an event to `on_change` when invoked.
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
-        self.on_change.emit_owned(());
+        self.on_change.emit_owned(ObservedEvent);
         &mut self.inner
     }
 }

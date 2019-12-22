@@ -4,11 +4,12 @@ use {
     crate::{
         base::{self, Repaintable, Resizable},
         draw::{self, state},
+        pipe,
         ui::ToggledEvent,
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect, Size},
-        event::{RcEventListener, RcEventQueue},
+        event::RcEventQueue,
         prelude::*,
     },
     std::marker::PhantomData,
@@ -27,39 +28,50 @@ pub enum ButtonEvent {
     Focus(ToggledEvent<()>),
 }
 
+impl pipe::Event for ButtonEvent {
+    fn get_key(&self) -> &'static str {
+        match self {
+            ButtonEvent::Press(ToggledEvent::Start(_)) => "press",
+            ButtonEvent::Press(ToggledEvent::Stop(_)) => "release",
+            ButtonEvent::MouseHover(ToggledEvent::Start(_)) => "begin_hover",
+            ButtonEvent::MouseHover(ToggledEvent::Stop(_)) => "end_hover",
+            ButtonEvent::Focus(ToggledEvent::Start(_)) => "focus",
+            ButtonEvent::Focus(ToggledEvent::Stop(_)) => "blur",
+        }
+    }
+}
+
 /// Focus-able button widget.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
 pub struct Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     pub event_queue: RcEventQueue<ButtonEvent>,
 
     pub text: base::Observed<DisplayText>,
     pub text_size: base::Observed<Option<f32>>,
-    rect: Rect,
     pub button_type: base::Observed<state::ButtonType>,
     pub disabled: base::Observed<bool>,
+    rect: Rect,
+
     interaction: state::InteractionState,
     visibility: base::Visibility,
-
-    repaint_listeners: Vec<RcEventListener<()>>,
     painter: Box<dyn draw::Painter<state::ButtonState>>,
     command_group: CommandGroup,
-    window_listener: RcEventListener<base::WindowEvent>,
     layout: base::WidgetLayoutEvents,
-    drop_event: RcEventQueue<()>,
+    drop_event: RcEventQueue<base::DropEvent>,
+    pipe: Option<pipe::Pipeline<Self, U>>,
 
-    phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
 }
 
 impl<U, G> Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     /// Creates a new button widget with a specified label, position, label size, visual type, disabled state and theme.
     /// If `None` is passed to `text_size` then the text size will be decided by the theme (`theme`).
@@ -91,32 +103,86 @@ where
         let button_type = base::Observed::new(button_type);
         let disabled = base::Observed::new(disabled);
 
-        let repaint_listeners = vec![
-            text.on_change.listen(),
-            text_size.on_change.listen(),
-            button_type.on_change.listen(),
-            disabled.on_change.listen(),
-        ];
+        let pipe = pipeline! {
+            Self as obj,
+            U as _aux,
+            _ev in &text.on_change => { change { obj.command_group.repaint(); } }
+            _ev in &text_size.on_change => { change { obj.command_group.repaint(); } }
+            _ev in &button_type.on_change => { change { obj.command_group.repaint(); } }
+            _ev in &disabled.on_change => { change { obj.command_group.repaint(); } }
+            event in update_aux.window_queue() => {
+                mouse_press {
+                    let event = if let base::WindowEvent::MousePress(x) = event { x } else { panic!() };
+
+                    if let Some((pos, _)) = event.with(|(pos, button)| {
+                        !*obj.disabled.get()
+                            && *button == base::MouseButton::Left
+                            && obj.bounds().contains(*pos)
+                    }) {
+                        obj.interaction.insert(state::InteractionState::PRESSED);
+                        obj.event_queue
+                            .emit_owned(ButtonEvent::Press(ToggledEvent::new(true, *pos)));
+                        obj.command_group.repaint();
+                    }
+                }
+                mouse_release {
+                    let event = if let base::WindowEvent::MouseRelease(x) = event { x } else { panic!() };
+
+                    if let Some((pos, _)) = event.with(|(_, button)| {
+                        !*obj.disabled.get()
+                            && *button == base::MouseButton::Left
+                            && obj.interaction.contains(state::InteractionState::PRESSED)
+                    }) {
+                        obj.interaction.remove(state::InteractionState::PRESSED);
+                        obj.interaction.insert(state::InteractionState::FOCUSED);
+                        obj.event_queue
+                            .emit_owned(ButtonEvent::Press(ToggledEvent::new(false, *pos)));
+                        obj.command_group.repaint();
+                    }
+                }
+                mouse_move {
+                    let event = if let base::WindowEvent::MouseMove(x) = event { x } else { panic!() };
+
+                    if let Some(pos) = event.with(|pos| obj.bounds().contains(*pos)) {
+                        if !obj.interaction.contains(state::InteractionState::HOVERED) {
+                            obj.interaction.insert(state::InteractionState::HOVERED);
+                            obj.event_queue.emit_owned(ButtonEvent::MouseHover(
+                                ToggledEvent::new(true, pos.clone()),
+                            ));
+                            obj.command_group.repaint();
+                        }
+                    } else if obj.interaction.contains(state::InteractionState::HOVERED) {
+                        obj.interaction.remove(state::InteractionState::HOVERED);
+                        obj.event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(
+                            false,
+                            event.get().clone(),
+                        )));
+                        obj.command_group.repaint();
+                    }
+                }
+                clear_focus {
+                    obj.interaction.remove(state::InteractionState::FOCUSED);
+                }
+            }
+        };
 
         Self {
             event_queue: RcEventQueue::new(),
 
             text,
             text_size,
-            rect: Rect::new(position, painter.size_hint(temp_state, gfx_aux)),
             button_type,
             disabled,
+            rect: Rect::new(position, painter.size_hint(temp_state, gfx_aux)),
+
             interaction: state::InteractionState::empty(),
             visibility: Default::default(),
-
-            repaint_listeners,
             painter,
             command_group: CommandGroup::new(),
-            window_listener: update_aux.window_queue_mut().listen(),
             layout: Default::default(),
             drop_event: Default::default(),
+            pipe: pipe.into(),
 
-            phantom_u: Default::default(),
             phantom_g: Default::default(),
         }
     }
@@ -138,8 +204,8 @@ where
 
 impl<U, G> Widget for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     type UpdateAux = U;
     type GraphicalAux = G;
@@ -150,86 +216,22 @@ where
         self.painter.paint_hint(self.rect)
     }
 
-    fn update(&mut self, _aux: &mut U) {
+    fn update(&mut self, aux: &mut U) {
         let was_focused = self.interaction.contains(state::InteractionState::FOCUSED);
-        let disabled = *self.disabled.get();
 
-        let bounds = self.painter.mouse_hint(self.rect);
-        let cmd_group = &mut self.command_group;
-
-        for rl in &mut self.repaint_listeners {
-            if !rl.peek().is_empty() {
-                cmd_group.repaint();
-            }
-        }
-
-        {
-            let interaction = &mut self.interaction;
-            let event_queue = &mut self.event_queue;
-
-            self.window_listener.with(|events| {
-                for event in events {
-                    match event {
-                        base::WindowEvent::MousePress(press_event) => {
-                            if let Some((pos, _)) = press_event.with(|(pos, button)| {
-                                !disabled
-                                    && *button == base::MouseButton::Left
-                                    && bounds.contains(*pos)
-                            }) {
-                                interaction.insert(state::InteractionState::PRESSED);
-                                event_queue
-                                    .emit_owned(ButtonEvent::Press(ToggledEvent::new(true, *pos)));
-                                cmd_group.repaint();
-                            }
-                        }
-                        base::WindowEvent::MouseRelease(release_event) => {
-                            if let Some((pos, _)) = release_event.with(|(_, button)| {
-                                !disabled
-                                    && *button == base::MouseButton::Left
-                                    && interaction.contains(state::InteractionState::PRESSED)
-                            }) {
-                                interaction.remove(state::InteractionState::PRESSED);
-                                interaction.insert(state::InteractionState::FOCUSED);
-                                event_queue
-                                    .emit_owned(ButtonEvent::Press(ToggledEvent::new(false, *pos)));
-                                cmd_group.repaint();
-                            }
-                        }
-                        base::WindowEvent::MouseMove(move_event) => {
-                            if let Some(pos) = move_event.with(|pos| bounds.contains(*pos)) {
-                                if !interaction.contains(state::InteractionState::HOVERED) {
-                                    interaction.insert(state::InteractionState::HOVERED);
-                                    event_queue.emit_owned(ButtonEvent::MouseHover(
-                                        ToggledEvent::new(true, pos.clone()),
-                                    ));
-                                    cmd_group.repaint();
-                                }
-                            } else if interaction.contains(state::InteractionState::HOVERED) {
-                                interaction.remove(state::InteractionState::HOVERED);
-                                event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(
-                                    false,
-                                    move_event.get().clone(),
-                                )));
-                                cmd_group.repaint();
-                            }
-                        }
-                        base::WindowEvent::ClearFocus => {
-                            interaction.remove(state::InteractionState::FOCUSED);
-                        }
-                    }
-                }
-            });
-        }
+        let mut pipe = self.pipe.take().unwrap();
+        pipe.update(self, aux);
+        self.pipe = Some(pipe);
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
-            cmd_group.repaint();
+            self.command_group.repaint();
             self.event_queue
                 .emit_owned(ButtonEvent::Focus(ToggledEvent::new(!was_focused, ())));
         }
 
         if let Some(rect) = self.layout.receive() {
             self.rect = rect;
-            cmd_group.repaint();
+            self.command_group.repaint();
         }
     }
 
@@ -243,8 +245,8 @@ where
 
 impl<U, G> base::LayableWidget for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline]
     fn listen_to_layout(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
@@ -259,8 +261,8 @@ where
 
 impl<U, G> base::HasVisibility for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline]
     fn set_visibility(&mut self, visibility: base::Visibility) {
@@ -275,8 +277,8 @@ where
 
 impl<U, G> Repaintable for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline]
     fn repaint(&mut self) {
@@ -289,8 +291,8 @@ where
 
 impl<U, G> base::Movable for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     fn set_position(&mut self, position: Point) {
         self.rect.origin = position;
@@ -306,8 +308,8 @@ where
 
 impl<U, G> Resizable for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     fn set_size(&mut self, size: Size) {
         self.rect.size = size;
@@ -323,8 +325,8 @@ where
 
 impl<U, G> draw::HasTheme for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline]
     fn theme(&mut self) -> &mut dyn draw::Themed {
@@ -343,23 +345,23 @@ where
     }
 }
 
-impl<U, G> base::DropEvent for Button<U, G>
+impl<U, G> base::DropNotifier for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     #[inline(always)]
-    fn drop_event(&self) -> &RcEventQueue<()> {
+    fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
         &self.drop_event
     }
 }
 
 impl<U, G> Drop for Button<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     fn drop(&mut self) {
-        self.drop_event.emit_owned(());
+        self.drop_event.emit_owned(base::DropEvent);
     }
 }

@@ -38,13 +38,13 @@ where
     pub align: base::Observed<TextAlign>,
     rect: base::Observed<Rect>,
 
-    repaint_listeners: Vec<RcEventListener<()>>,
-    recolor_listener: RcEventListener<()>,
+    repaint_listeners: Vec<RcEventListener<base::ObservedEvent>>,
+    recolor_listener: RcEventListener<base::ObservedEvent>,
     command_group: CommandGroup,
     text_items: Vec<TextDisplayItem>,
     layout: base::WidgetLayoutEvents,
     visibility: base::Visibility,
-    drop_event: RcEventQueue<()>,
+    drop_event: RcEventQueue<base::DropEvent>,
 
     themed: draw::PhantomThemed,
     phantom_u: PhantomData<U>,
@@ -286,15 +286,15 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for L
     fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::DropEvent for Label<U, G> {
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::DropNotifier for Label<U, G> {
     #[inline(always)]
-    fn drop_event(&self) -> &RcEventQueue<()> {
+    fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
         &self.drop_event
     }
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Drop for Label<U, G> {
     fn drop(&mut self) {
-        self.drop_event.emit_owned(());
+        self.drop_event.emit_owned(base::DropEvent);
     }
 }

@@ -34,7 +34,7 @@ struct Showcase {
     v_stack: ui::VStack<app::UAux, app::GAux>,
 
     visibility: base::Visibility,
-    drop_event: RcEventQueue<()>,
+    drop_event: RcEventQueue<base::DropEvent>,
 
     themed: draw::PhantomThemed,
 }
