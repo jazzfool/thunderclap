@@ -86,7 +86,7 @@ impl Showcase {
         );
 
         let mut checkbox =
-            ui::Checkbox::new(theme, false, false, Default::default(), update_aux, gfx_aux);
+            ui::Checkbox::new(false, false, Default::default(), theme, update_aux, gfx_aux);
 
         let v_stack_data = ui::VStackData {
             top_margin: 10.0,

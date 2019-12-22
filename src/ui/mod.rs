@@ -155,5 +155,5 @@ pub fn simple_label<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     rect: display::Rect,
     g_aux: &mut G,
 ) -> Label<U, G> {
-    Label::new(theme, None, None, None, rect, text.into(), g_aux)
+    Label::new(None, None, None, rect, text.into(), theme, g_aux)
 }
