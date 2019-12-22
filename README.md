@@ -72,7 +72,7 @@ impl Widget for Counter {
 }
 ```
 
-That's it! This is much a nicer solution than manually matching events, and best of all we can now separate the logic into a single variable (pipelines), or even modularize parts of it (terminals)! Further, this is a *layer* on event queues, which means you can still get more granular control over the queue/listeners if you want to.
+That's it! This is a much nicer solution than manually matching events, and best of all we can now separate the logic into a single variable (pipelines), or even modularize parts of it (terminals)! Further, this is a *layer* on event queues, which means you can still get more granular control over the queue/listeners if you want to.
 
 The `pipeline!` macro roughly (it doesn't chain methods directly) translates to the following:
 ```rust

@@ -1,13 +1,8 @@
-//! More traditional closure-based event handler on top `RcEventQueue`.
-
-// TODO(jazzfool): support more event queues.
+//! More traditional closure-based event handler.
 
 use {
-    reclutch::{
-        event::{RcEventListener, RcEventQueue},
-        prelude::*,
-    },
-    std::collections::HashMap,
+    reclutch::prelude::*,
+    std::{collections::HashMap, ops::Deref, rc::Rc, sync::Mutex},
 };
 
 /// Event which returns a string corresponding to the current event variant.
@@ -15,16 +10,55 @@ pub trait Event: Clone {
     fn get_key(&self) -> &'static str;
 }
 
-/// Stores a list of event handlers and a single event listener.
-/// Events (`Event`) with `get_key` matching to a handler's "name" will invoke the corresponding handler.
-pub struct Terminal<T, A, E: Event> {
-    handlers: HashMap<&'static str, Box<dyn FnMut(&mut T, &mut A, E)>>,
-    listener: RcEventListener<E>,
+/// Stores a list of event handlers, not bound to any listener.
+/// This can be used to modularize parts of a pipeline.
+#[derive(Clone)]
+pub struct UnboundTerminal<T, A, E: Event> {
+    handlers: HashMap<&'static str, Rc<Mutex<dyn FnMut(&mut T, &mut A, E)>>>,
 }
 
-impl<T, A, E: Event> Terminal<T, A, E> {
+impl<T, A, E: Event> UnboundTerminal<T, A, E> {
+    /// Creates an empty, unbound terminal.
+    pub fn new() -> Self {
+        UnboundTerminal {
+            handlers: HashMap::new(),
+        }
+    }
+
+    /// Binds an event key to a handler.
+    pub fn on(
+        mut self,
+        ev: &'static str,
+        handler: impl FnMut(&mut T, &mut A, E) + 'static,
+    ) -> Self {
+        self.handlers.insert(ev, Rc::new(Mutex::new(handler)));
+        self
+    }
+
+    /// Binds the handlers to an event queue, hence returning a `Terminal`.
+    pub fn bind<D: QueueInterfaceListable<Item = E, Listener = L>, L: EventListen<Item = E>>(
+        self,
+        queue: &impl Deref<Target = D>,
+    ) -> Terminal<T, A, E, L> {
+        Terminal {
+            handlers: self.handlers,
+            listener: queue.listen(),
+        }
+    }
+}
+
+/// Stores a list of event handlers and a single event listener.
+/// Events (`Event`) with `get_key` matching to a handler's "name" will invoke the corresponding handler.
+pub struct Terminal<T, A, E: Event, L: EventListen<Item = E>> {
+    handlers: HashMap<&'static str, Rc<Mutex<dyn FnMut(&mut T, &mut A, E)>>>,
+    listener: L,
+}
+
+impl<T, A, E: Event, L: EventListen<Item = E>> Terminal<T, A, E, L> {
     /// Creates a new terminal, connected to an event.
-    pub fn new(queue: &RcEventQueue<E>) -> Self {
+    pub fn new<D: QueueInterfaceListable<Item = E, Listener = L>>(
+        queue: &impl Deref<Target = D>,
+    ) -> Self {
         Terminal {
             handlers: HashMap::new(),
             listener: queue.listen(),
@@ -37,22 +71,24 @@ impl<T, A, E: Event> Terminal<T, A, E> {
         ev: &'static str,
         handler: impl FnMut(&mut T, &mut A, E) + 'static,
     ) -> Self {
-        self.handlers.insert(ev, Box::new(handler));
+        self.handlers.insert(ev, Rc::new(Mutex::new(handler)));
         self
     }
 }
 
-/// Implemented by all terminals.
+/// Implemented by all bound terminals.
 trait DynTerminal<T, A> {
     /// Invokes the underlying closure with the given callbacks.
     fn update(&mut self, obj: &mut T, additional: &mut A);
 }
 
-impl<T, A, E: Event> DynTerminal<T, A> for Terminal<T, A, E> {
+impl<T, A, E: Event, L: EventListen<Item = E>> DynTerminal<T, A> for Terminal<T, A, E, L> {
     fn update(&mut self, obj: &mut T, additional: &mut A) {
         for event in self.listener.peek() {
             if let Some(handler) = self.handlers.get_mut(event.get_key()) {
-                (**handler)(obj, additional, event.clone());
+                use std::ops::DerefMut;
+                let mut handler = handler.lock().unwrap();
+                handler.deref_mut()(obj, additional, event.clone());
             }
         }
     }
@@ -72,7 +108,10 @@ impl<T: 'static, A: 'static> Pipeline<T, A> {
     }
 
     /// Adds a terminal to the pipeline.
-    pub fn add<E: Event + 'static>(mut self, terminal: Terminal<T, A, E>) -> Self {
+    pub fn add<E: Event + 'static, L: EventListen<Item = E> + 'static>(
+        mut self,
+        terminal: Terminal<T, A, E, L>,
+    ) -> Self {
         self.terminals.push(Box::new(terminal));
         self
     }
