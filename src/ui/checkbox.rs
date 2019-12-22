@@ -7,7 +7,7 @@ use {
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect, Size},
-        event::{RcEventListener, RcEventQueue},
+        event::RcEventQueue,
         prelude::*,
     },
     std::marker::PhantomData,

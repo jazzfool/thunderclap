@@ -20,7 +20,6 @@ pub trait Event: Clone {
 pub struct Terminal<T, A, E: Event> {
     handlers: HashMap<&'static str, Box<dyn FnMut(&mut T, &mut A, E)>>,
     listener: RcEventListener<E>,
-    phantom: std::marker::PhantomData<T>,
 }
 
 impl<T, A, E: Event> Terminal<T, A, E> {
@@ -29,7 +28,6 @@ impl<T, A, E: Event> Terminal<T, A, E> {
         Terminal {
             handlers: HashMap::new(),
             listener: queue.listen(),
-            phantom: Default::default(),
         }
     }
 
