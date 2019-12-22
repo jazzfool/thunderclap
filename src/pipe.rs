@@ -183,6 +183,8 @@ mod tests {
 
     #[test]
     fn test_pipelines() {
+        use reclutch::event::RcEventQueue;
+
         #[derive(Clone)]
         enum TestEvent {
             CountUp,
