@@ -11,7 +11,7 @@ use {
 
 #[macro_export]
 macro_rules! lazy_widget {
-    ($name:ty,visibility:$vis:ident,theme:$thm:ident) => {
+    ($name:ty,visibility:$vis:ident,theme:$thm:ident,drop_event:$de:ident) => {
         impl $crate::base::HasVisibility for $name {
             #[inline(always)]
             fn set_visibility(&mut self, visibility: $crate::base::Visibility) {
@@ -38,8 +38,22 @@ macro_rules! lazy_widget {
             #[inline(always)]
             fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
         }
+
+        impl $crate::base::DropEvent for $name {
+            #[inline(always)]
+            fn drop_event(&self) -> &RcEventQueue<()> {
+                &self.$de
+            }
+        }
+
+        impl Drop for $name {
+            #[inline]
+            fn drop(&mut self) {
+                self.$de.emit_owned(());
+            }
+        }
     };
-    (generic $name:tt,visibility:$vis:ident,theme:$thm:ident) => {
+    (generic $name:tt,visibility:$vis:ident,theme:$thm:ident,drop_event:$de:ident) => {
         impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
             $crate::base::HasVisibility for $name<U, G>
         {
@@ -71,6 +85,24 @@ macro_rules! lazy_widget {
 
             #[inline(always)]
             fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+        }
+
+        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
+            $crate::base::DropEvent for $name<U, G>
+        {
+            #[inline(always)]
+            fn drop_event(&self) -> &RcEventQueue<()> {
+                &self.$de
+            }
+        }
+
+        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary> Drop
+            for $name<U, G>
+        {
+            #[inline]
+            fn drop(&mut self) {
+                self.$de.emit_owned(());
+            }
         }
     };
 }
@@ -350,7 +382,7 @@ impl WidgetLayoutEvents {
 }
 
 /// Widget that is capable of listening to layout events.
-pub trait LayableWidget: WidgetChildren + Rectangular {
+pub trait LayableWidget: WidgetChildren + Rectangular + DropEvent {
     fn listen_to_layout(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>);
     fn layout_id(&self) -> Option<u64>;
 }
@@ -364,6 +396,11 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
 
     /// De-registers a widget from the layout, optionally restoring the original widget rectangle.
     fn remove(&mut self, child: &mut impl LayableWidget, restore_original: bool);
+}
+
+/// Widget which has an event queue where a single event is emitted when the widget is dropped.
+pub trait DropEvent: Widget {
+    fn drop_event(&self) -> &RcEventQueue<()>;
 }
 
 /// Wrapper which emits an event whenever the inner variable is changed.

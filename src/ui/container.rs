@@ -2,6 +2,7 @@ use {
     crate::{base, draw},
     reclutch::{
         display::{DisplayCommand, GraphicsDisplay},
+        event::RcEventQueue,
         prelude::*,
     },
     std::marker::PhantomData,
@@ -10,7 +11,8 @@ use {
 lazy_widget! {
     generic Container,
     visibility: visibility,
-    theme: themed
+    theme: themed,
+    drop_event: drop_event
 }
 
 /// Container which dynamically stores widgets.
@@ -33,6 +35,7 @@ where
 
     themed: draw::PhantomThemed,
     visibility: base::Visibility,
+    drop_event: RcEventQueue<()>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -56,6 +59,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Container<U, G> {
 
             themed: Default::default(),
             visibility: Default::default(),
+            drop_event: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),

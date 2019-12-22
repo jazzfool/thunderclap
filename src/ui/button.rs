@@ -50,6 +50,7 @@ where
     command_group: CommandGroup,
     window_listener: RcEventListener<base::WindowEvent>,
     layout: base::WidgetLayoutEvents,
+    drop_event: RcEventQueue<()>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -113,6 +114,7 @@ where
             command_group: CommandGroup::new(),
             window_listener: update_aux.window_queue_mut().listen(),
             layout: Default::default(),
+            drop_event: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
@@ -338,5 +340,26 @@ where
             },
             aux,
         ));
+    }
+}
+
+impl<U, G> base::DropEvent for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    #[inline(always)]
+    fn drop_event(&self) -> &RcEventQueue<()> {
+        &self.drop_event
+    }
+}
+
+impl<U, G> Drop for Button<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn drop(&mut self) {
+        self.drop_event.emit_owned(());
     }
 }

@@ -2,6 +2,7 @@ use reui::{
     app, base, draw,
     reclutch::{
         display::{DisplayCommand, FontInfo, GraphicsDisplay, Point, Rect, Size},
+        event::RcEventQueue,
         prelude::*,
     },
     themes::Primer,
@@ -33,6 +34,7 @@ struct Showcase {
     v_stack: ui::VStack<app::UAux, app::GAux>,
 
     visibility: base::Visibility,
+    drop_event: RcEventQueue<()>,
 
     themed: draw::PhantomThemed,
 }
@@ -115,6 +117,7 @@ impl Showcase {
             v_stack,
 
             visibility: Default::default(),
+            drop_event: Default::default(),
 
             themed: draw::PhantomThemed,
         }
@@ -138,7 +141,8 @@ impl Widget for Showcase {
 lazy_widget! {
     Showcase,
     visibility: visibility,
-    theme: themed
+    theme: themed,
+    drop_event: drop_event
 }
 
 fn main() {

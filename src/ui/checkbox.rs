@@ -49,6 +49,7 @@ where
     repaint_listeners: Vec<RcEventListener<()>>,
     interaction: state::InteractionState,
     window_listener: RcEventListener<base::WindowEvent>,
+    drop_event: RcEventQueue<()>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -96,6 +97,7 @@ where
             repaint_listeners,
             interaction: state::InteractionState::empty(),
             window_listener: u_aux.window_queue().listen(),
+            drop_event: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
@@ -316,5 +318,26 @@ where
 
     fn resize_from_theme(&mut self, aux: &dyn base::GraphicalAuxiliary) {
         self.set_size(self.painter.size_hint(self.derive_state(), aux));
+    }
+}
+
+impl<U, G> base::DropEvent for Checkbox<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    #[inline(always)]
+    fn drop_event(&self) -> &RcEventQueue<()> {
+        &self.drop_event
+    }
+}
+
+impl<U, G> Drop for Checkbox<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn drop(&mut self) {
+        self.drop_event.emit_owned(());
     }
 }

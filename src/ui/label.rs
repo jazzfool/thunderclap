@@ -9,7 +9,7 @@ use {
             FontInfo, GraphicsDisplay, Point, Rect, ResourceReference, Size, StyleColor,
             TextDisplayItem,
         },
-        event::RcEventListener,
+        event::{RcEventListener, RcEventQueue},
         prelude::*,
     },
     std::marker::PhantomData,
@@ -44,6 +44,7 @@ where
     text_items: Vec<TextDisplayItem>,
     layout: base::WidgetLayoutEvents,
     visibility: base::Visibility,
+    drop_event: RcEventQueue<()>,
 
     themed: draw::PhantomThemed,
     phantom_u: PhantomData<U>,
@@ -103,6 +104,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
             text_items,
             layout: Default::default(),
             visibility: Default::default(),
+            drop_event: Default::default(),
 
             themed: Default::default(),
             phantom_u: Default::default(),
@@ -282,4 +284,17 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for L
     }
 
     fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+}
+
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::DropEvent for Label<U, G> {
+    #[inline(always)]
+    fn drop_event(&self) -> &RcEventQueue<()> {
+        &self.drop_event
+    }
+}
+
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Drop for Label<U, G> {
+    fn drop(&mut self) {
+        self.drop_event.emit_owned(());
+    }
 }

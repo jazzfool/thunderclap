@@ -4,7 +4,7 @@ use {
     indexmap::IndexMap,
     reclutch::{
         display::{self, DisplayCommand, Point, Rect, Size},
-        event::bidir_single::Queue as BidirSingleEventQueue,
+        event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
         prelude::*,
     },
     std::marker::PhantomData,
@@ -45,14 +45,17 @@ impl VStackData {
 struct ChildData {
     data: VStackData,
     evq: BidirSingleEventQueue<Rect, Rect>,
+    drop_listener: RcEventListener<()>,
     rect: Rect,
     original_rect: Rect,
+    id: u64,
 }
 
 lazy_widget! {
     generic VStack,
     visibility: visibility,
-    theme: themed
+    theme: themed,
+    drop_event: drop_event
 }
 
 /// Abstract layout widget which arranges children in a vertical list, possibly with top/bottom margins and horizontal alignment (see `VStackData`).
@@ -71,6 +74,7 @@ where
 
     themed: draw::PhantomThemed,
     layout: base::WidgetLayoutEvents,
+    drop_event: RcEventQueue<()>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -88,6 +92,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> VStack<U, G> {
             themed: Default::default(),
             layout: Default::default(),
             visibility: Default::default(),
+            drop_event: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
@@ -118,8 +123,10 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
             ChildData {
                 data,
                 evq,
+                drop_listener: child.drop_event().listen(),
                 rect,
                 original_rect: rect,
+                id,
             },
         );
     }
@@ -150,12 +157,22 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for VStack<U,
         }
 
         {
+            let mut removals = Vec::new();
             let dirty = &mut self.dirty;
             for (_, data) in &mut self.rects {
+                if !data.drop_listener.peek().is_empty() {
+                    removals.push(data.id);
+                    *dirty = true;
+                    continue;
+                }
+
                 if let Some(new_ev) = data.evq.retrieve_newest() {
                     *dirty = true;
                     data.rect = new_ev;
                 }
+            }
+            for removal in removals {
+                self.rects.remove(&removal);
             }
         }
 
