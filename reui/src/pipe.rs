@@ -168,19 +168,12 @@ macro_rules! pipeline {
         $(
             let mut terminal = $crate::pipe::Terminal::new($eq);
             $(
-                terminal = terminal.on(std::stringify!($ev), |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo| $body);
+                terminal = terminal.on(std::stringify!($ev), |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo| { #[allow(unused_variables)] let $eo = $eo.clone().$ev().unwrap(); $body });
             )*
             pipe = pipe.add(terminal);
         )*
         pipe
     }};
-}
-
-#[macro_export]
-macro_rules! force_event {
-    ($ev:ident,$evt:path) => {
-        let $ev = if let $evt(x) = $ev { x } else { panic!() };
-    };
 }
 
 #[cfg(test)]
@@ -191,19 +184,13 @@ mod tests {
     fn test_pipelines() {
         use reclutch::event::RcEventQueue;
 
-        #[derive(Clone)]
+        #[derive(PipelineEvent, Clone)]
+        #[reui_crate(crate)]
         enum TestEvent {
+            #[event_key(count_up)]
             CountUp,
+            #[event_key(count_down)]
             CountDown,
-        }
-
-        impl Event for TestEvent {
-            fn get_key(&self) -> &'static str {
-                match self {
-                    TestEvent::CountUp => "count_up",
-                    TestEvent::CountDown => "count_down",
-                }
-            }
         }
 
         let event_queue: RcEventQueue<TestEvent> = Default::default();

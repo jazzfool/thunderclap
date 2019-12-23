@@ -1,0 +1,17 @@
+[package]
+name = "reui_derive"
+version = "0.0.0"
+authors = ["jazzfool <saveuselon@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+description = "Derive functionality for Reui"
+homepage = "https://github.com/jazzfool/reui/tree/master/derive"
+repository = "https://github.com/jazzfool/reui"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "1.0"
+quote = "1.0"
+proc-macro2 = "1.0"

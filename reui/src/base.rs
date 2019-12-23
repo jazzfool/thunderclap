@@ -1,5 +1,5 @@
 use {
-    crate::{draw, pipe},
+    crate::draw,
     reclutch::{
         display::{Color, FontInfo, GraphicsDisplay, Point, Rect, ResourceReference, Size},
         event::RcEventQueue,
@@ -397,31 +397,25 @@ impl<T> Clone for ConsumableEvent<T> {
 }
 
 /// An event related to the window, e.g. input.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(PipelineEvent, Debug, Clone, PartialEq)]
+#[reui_crate(crate)]
 pub enum WindowEvent {
     /// The user pressed a mouse button.
+    #[event_key(mouse_press)]
     MousePress(ConsumableEvent<(Point, MouseButton)>),
     /// The user released a mouse button.
     /// This event complements `MousePress`, which means it realistically can only
     /// be emitted after `MousePress` has been emitted.
+    #[event_key(mouse_release)]
     MouseRelease(ConsumableEvent<(Point, MouseButton)>),
     /// The user moved the cursor.
+    #[event_key(mouse_move)]
     MouseMove(ConsumableEvent<Point>),
     /// Emitted immediately before an event which is capable of changing focus.
     /// If implementing a focus-able widget, to handle this event, simply clear
     /// the local "focused" flag (which should ideally be stored as `draw::state::InteractionState`).
+    #[event_key(clear_focus)]
     ClearFocus,
-}
-
-impl pipe::Event for WindowEvent {
-    fn get_key(&self) -> &'static str {
-        match self {
-            WindowEvent::MousePress(_) => "mouse_press",
-            WindowEvent::MouseRelease(_) => "mouse_release",
-            WindowEvent::MouseMove(_) => "mouse_move",
-            WindowEvent::ClearFocus => "clear_focus",
-        }
-    }
 }
 
 /// Button on a mouse.
@@ -496,14 +490,10 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
 }
 
 /// Empty event indicating `Observed` data has changed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(PipelineEvent, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[reui_crate(crate)]
+#[event_key(drop)]
 pub struct DropEvent;
-
-impl pipe::Event for DropEvent {
-    fn get_key(&self) -> &'static str {
-        "drop"
-    }
-}
 
 /// Widget which has an event queue where a single event is emitted when the widget is dropped.
 pub trait DropNotifier: Widget {
@@ -511,14 +501,10 @@ pub trait DropNotifier: Widget {
 }
 
 /// Empty event indicating `Observed` data has changed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(PipelineEvent, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[reui_crate(crate)]
+#[event_key(change)]
 pub struct ObservedEvent;
-
-impl pipe::Event for ObservedEvent {
-    fn get_key(&self) -> &'static str {
-        "change"
-    }
-}
 
 /// Wrapper which emits an event whenever the inner variable is changed.
 #[derive(Debug)]

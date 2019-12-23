@@ -43,7 +43,7 @@ Then, each terminal has a list of handlers (callbacks) which use a static string
 This key is used to cherry-pick events from an event queue.
 
 All event data types must implement `reui::update::Event`. This trait has a method which enables event
-cherry-picking.
+cherry-picking. These events must, for each key, implement a method which extracts the inner info.
 
 Example of a pipeline for a simple counter:
 ```rust
@@ -51,6 +51,7 @@ let pipe = pipeline! {
     Counter as obj,
     UpdateAux as _aux,
     _event in &count_up.event_queue => { // first terminal
+        // note that the event is converted, so we can access the relevant event info quickly.
         press { obj.count += 1; } // handler
     }
     _event in &count_down.event_queue => { // second terminal
@@ -89,6 +90,49 @@ Pipeline::new()
             obj.count -= 1;
         },
     ));
+```
+
+To simplify the creation of the events you can use the derive;
+```rust
+#[derive(PipelineEvent, Clone, Copy, PartialEq)]
+enum MyEvent {
+    #[event_key(stop)]
+    Stop,
+    #[event_key(play)]
+    Play(f32),
+    #[event_key(rewind)]
+    Rewind {
+        seconds: u32,
+        play: bool,
+    },
+}
+```
+
+Which resolves down to:
+```rust
+impl reui::pipe::Event for MyEvent {
+    fn get_key(&self) -> &'static str {
+        match self {
+            MyEvent::Stop => "stop",
+            MyEvent::Play(..) => "play",
+            MyEvent::Rewind{..} => "rewind",
+        }
+    }
+}
+
+impl MyEvent { // These are automatically called by `pipeline!` to "cast" the event.
+    pub fn stop(self) -> Option<()> {
+        if let MyEvent::Stop = self { Some(()) } else { None }
+    }
+
+    pub fn play(self) -> Option<(f32)> {
+        if let MyEvent::Play(x0) = self { Some(x0) } else { None }
+    }
+
+    pub fn rewind(self) -> Option<(u32, bool)> {
+        if let MyEvent::Rewind{seconds, play} = self { Some((seconds, play)) } else { None }
+    }
+}
 ```
 
 ---

@@ -4,6 +4,12 @@
 #[macro_use]
 pub extern crate reclutch;
 
+#[allow(unused_imports)]
+#[macro_use]
+extern crate reui_derive;
+
+pub use reui_derive::PipelineEvent;
+
 #[macro_use]
 pub mod base;
 pub mod draw;

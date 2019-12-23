@@ -1,3 +1,5 @@
+//! Button control widget.
+
 use {
     crate::{
         base::{self, Repaintable, Resizable},
@@ -6,120 +8,122 @@ use {
         ui::ToggledEvent,
     },
     reclutch::{
-        display::{CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect, Size},
+        display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect, Size},
         event::RcEventQueue,
         prelude::*,
     },
     std::marker::PhantomData,
 };
 
-/// Events emitted by a checkbox.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CheckboxEvent {
-    /// Emitted when the checkbox is pressed or released.
+/// Events emitted by a button.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ButtonEvent {
+    /// Emitted when the button is pressed or released.
     /// Corresponds to `WindowEvent::MousePress` or `WindowEvent::MouseRelease`.
     Press(ToggledEvent<Point>),
-    /// Emitted when the button is checked/unchecked.
-    /// Corresponds to `WindowEvent::MouseRelease`.
-    Check(ToggledEvent<Point>),
-    /// Emitted when the mouse enters (`true`) or leaves (`false`) the checkbox boundaries.
+    /// Emitted when the mouse enters (`true`) or leaves (`false`) the button boundaries.
     /// Corresponds to `WindowEvent::MouseMove`.
     MouseHover(ToggledEvent<Point>),
     /// Emitted when focus is gained (`true`) or lost (`false`).
     Focus(ToggledEvent<()>),
 }
 
-impl pipe::Event for CheckboxEvent {
+impl pipe::Event for ButtonEvent {
     fn get_key(&self) -> &'static str {
         match self {
-            CheckboxEvent::Press(ToggledEvent::Start(_)) => "press",
-            CheckboxEvent::Press(ToggledEvent::Stop(_)) => "release",
-            CheckboxEvent::Check(ToggledEvent::Start(_)) => "check",
-            CheckboxEvent::Check(ToggledEvent::Stop(_)) => "uncheck",
-            CheckboxEvent::MouseHover(ToggledEvent::Start(_)) => "begin_hover",
-            CheckboxEvent::MouseHover(ToggledEvent::Stop(_)) => "end_hover",
-            CheckboxEvent::Focus(ToggledEvent::Start(_)) => "focus",
-            CheckboxEvent::Focus(ToggledEvent::Stop(_)) => "blur",
+            ButtonEvent::Press(ToggledEvent::Start(_)) => "press",
+            ButtonEvent::Press(ToggledEvent::Stop(_)) => "release",
+            ButtonEvent::MouseHover(ToggledEvent::Start(_)) => "begin_hover",
+            ButtonEvent::MouseHover(ToggledEvent::Stop(_)) => "end_hover",
+            ButtonEvent::Focus(ToggledEvent::Start(_)) => "focus",
+            ButtonEvent::Focus(ToggledEvent::Stop(_)) => "blur",
         }
     }
 }
 
-/// Checkbox widget; useful for boolean input.
+/// Focus-able button widget.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
-pub struct Checkbox<U, G>
+pub struct Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
-    pub event_queue: RcEventQueue<CheckboxEvent>,
+    pub event_queue: RcEventQueue<ButtonEvent>,
 
-    pub checked: base::Observed<bool>,
+    pub text: base::Observed<DisplayText>,
+    pub text_size: base::Observed<Option<f32>>,
+    pub button_type: base::Observed<state::ButtonType>,
     pub disabled: base::Observed<bool>,
     rect: Rect,
 
-    command_group: CommandGroup,
-    painter: Box<dyn draw::Painter<state::CheckboxState>>,
-    layout: base::WidgetLayoutEvents,
-    visibility: base::Visibility,
     interaction: state::InteractionState,
+    visibility: base::Visibility,
+    painter: Box<dyn draw::Painter<state::ButtonState>>,
+    command_group: CommandGroup,
+    layout: base::WidgetLayoutEvents,
     drop_event: RcEventQueue<base::DropEvent>,
     pipe: Option<pipe::Pipeline<Self, U>>,
 
-    phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
 }
 
-impl<U, G> Checkbox<U, G>
+impl<U, G> Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
-    /// Creates a new checkbox with a specified checked state, disabled state, position and theme.
+    /// Creates a new button widget with a specified label, position, label size, visual type, disabled state and theme.
+    /// If `None` is passed to `text_size` then the text size will be decided by the theme (`theme`).
     pub fn new(
-        checked: bool,
-        disabled: bool,
+        text: DisplayText,
         position: Point,
+        text_size: Option<f32>,
+        button_type: state::ButtonType,
+        disabled: bool,
         theme: &dyn draw::Theme,
-        u_aux: &mut U,
-        g_aux: &mut G,
+        update_aux: &mut U,
+        gfx_aux: &mut G,
     ) -> Self {
-        let temp_state = state::CheckboxState {
-            rect: Default::default(),
-            checked,
-            state: state::ControlState::Normal(state::InteractionState::empty()),
+        let painter = theme.button();
+        let temp_state = state::ButtonState {
+            rect: Rect::default(),
+            text: text.clone(),
+            text_size,
+            state: if disabled {
+                state::ControlState::Disabled
+            } else {
+                state::ControlState::Normal(state::InteractionState::empty())
+            },
+            button_type,
         };
 
-        let painter = theme.checkbox();
-        let rect = Rect::new(position, painter.size_hint(temp_state, g_aux));
-
-        let checked = base::Observed::new(checked);
+        let text = base::Observed::new(text);
+        let text_size = base::Observed::new(text_size);
+        let button_type = base::Observed::new(button_type);
         let disabled = base::Observed::new(disabled);
 
         let pipe = pipeline! {
             Self as obj,
             U as _aux,
-            _ev in &checked.on_change => { change { obj.command_group.repaint(); } }
+            _ev in &text.on_change => { change { obj.command_group.repaint(); } }
+            _ev in &text_size.on_change => { change { obj.command_group.repaint(); } }
+            _ev in &button_type.on_change => { change { obj.command_group.repaint(); } }
             _ev in &disabled.on_change => { change { obj.command_group.repaint(); } }
-            event in u_aux.window_queue() => {
+            event in update_aux.window_queue() => {
                 mouse_press {
-                    force_event!(event, base::WindowEvent::MousePress);
-
                     if let Some((pos, _)) = event.with(|(pos, button)| {
                         !*obj.disabled.get()
                             && *button == base::MouseButton::Left
                             && obj.bounds().contains(*pos)
                     }) {
                         obj.interaction.insert(state::InteractionState::PRESSED);
-                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                            true, *pos,
-                        )));
+                        obj.event_queue
+                            .emit_owned(ButtonEvent::Press(ToggledEvent::new(true, *pos)));
                         obj.command_group.repaint();
                     }
                 }
                 mouse_release {
-                    force_event!(event, base::WindowEvent::MouseRelease);
-
                     if let Some((pos, _)) = event.with(|(_, button)| {
                         !*obj.disabled.get()
                             && *button == base::MouseButton::Left
@@ -127,35 +131,26 @@ where
                     }) {
                         obj.interaction.remove(state::InteractionState::PRESSED);
                         obj.interaction.insert(state::InteractionState::FOCUSED);
-                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                            false, *pos,
-                        )));
-
-                        obj.checked.set(!*obj.checked.get());
-                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                            *obj.checked.get(),
-                            *pos,
-                        )));
-
+                        obj.event_queue
+                            .emit_owned(ButtonEvent::Press(ToggledEvent::new(false, *pos)));
                         obj.command_group.repaint();
                     }
                 }
                 mouse_move {
-                    force_event!(event, base::WindowEvent::MouseMove);
-
                     if let Some(pos) = event.with(|pos| obj.bounds().contains(*pos)) {
                         if !obj.interaction.contains(state::InteractionState::HOVERED) {
                             obj.interaction.insert(state::InteractionState::HOVERED);
-                            obj.event_queue.emit_owned(CheckboxEvent::MouseHover(
+                            obj.event_queue.emit_owned(ButtonEvent::MouseHover(
                                 ToggledEvent::new(true, pos.clone()),
                             ));
                             obj.command_group.repaint();
                         }
                     } else if obj.interaction.contains(state::InteractionState::HOVERED) {
                         obj.interaction.remove(state::InteractionState::HOVERED);
-                        obj.event_queue.emit_owned(CheckboxEvent::MouseHover(
-                            ToggledEvent::new(false, event.get().clone()),
-                        ));
+                        obj.event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(
+                            false,
+                            event.get().clone(),
+                        )));
                         obj.command_group.repaint();
                     }
                 }
@@ -165,40 +160,43 @@ where
             }
         };
 
-        Checkbox {
-            event_queue: Default::default(),
+        Self {
+            event_queue: RcEventQueue::new(),
 
-            checked,
+            text,
+            text_size,
+            button_type,
             disabled,
-            rect,
+            rect: Rect::new(position, painter.size_hint(temp_state, gfx_aux)),
 
-            command_group: Default::default(),
-            painter,
-            layout: Default::default(),
-            visibility: Default::default(),
             interaction: state::InteractionState::empty(),
+            visibility: Default::default(),
+            painter,
+            command_group: CommandGroup::new(),
+            layout: Default::default(),
             drop_event: Default::default(),
             pipe: pipe.into(),
 
-            phantom_u: Default::default(),
             phantom_g: Default::default(),
         }
     }
 
-    fn derive_state(&self) -> state::CheckboxState {
-        state::CheckboxState {
+    fn derive_state(&self) -> state::ButtonState {
+        state::ButtonState {
             rect: self.rect,
-            checked: *self.checked.get(),
+            text: self.text.get().clone(),
+            text_size: self.text_size.get().clone(),
             state: if *self.disabled.get() {
                 state::ControlState::Disabled
             } else {
                 state::ControlState::Normal(self.interaction)
             },
+            button_type: self.button_type.get().clone(),
         }
     }
 }
 
-impl<U, G> Widget for Checkbox<U, G>
+impl<U, G> Widget for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -207,6 +205,7 @@ where
     type GraphicalAux = G;
     type DisplayObject = DisplayCommand;
 
+    #[inline]
     fn bounds(&self) -> Rect {
         self.painter.paint_hint(self.rect)
     }
@@ -221,7 +220,7 @@ where
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
             self.command_group.repaint();
             self.event_queue
-                .emit_owned(CheckboxEvent::Focus(ToggledEvent::new(!was_focused, ())));
+                .emit_owned(ButtonEvent::Focus(ToggledEvent::new(!was_focused, ())));
         }
 
         if let Some(rect) = self.layout.receive() {
@@ -231,14 +230,14 @@ where
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
-        let state = self.derive_state();
+        let button_state = self.derive_state();
         let painter = &mut self.painter;
         self.command_group
-            .push_with(display, || painter.draw(state, aux), None, None);
+            .push_with(display, || painter.draw(button_state, aux), None, None);
     }
 }
 
-impl<U, G> base::LayableWidget for Checkbox<U, G>
+impl<U, G> base::LayableWidget for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -254,7 +253,7 @@ where
     }
 }
 
-impl<U, G> base::HasVisibility for Checkbox<U, G>
+impl<U, G> base::HasVisibility for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -270,7 +269,7 @@ where
     }
 }
 
-impl<U, G> Repaintable for Checkbox<U, G>
+impl<U, G> Repaintable for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -281,7 +280,10 @@ where
     }
 }
 
-impl<U, G> base::Movable for Checkbox<U, G>
+// FIXME(jazzfool): the blanket `Rectangular` implementation causes `self.layout.notify()` to be called twice.
+// to be frank, this isn't a big deal since bidir_single overwrites the previous event, but in the old implementation this meant emitting the event twice.
+
+impl<U, G> base::Movable for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -298,7 +300,7 @@ where
     }
 }
 
-impl<U, G> Resizable for Checkbox<U, G>
+impl<U, G> Resizable for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -315,7 +317,7 @@ where
     }
 }
 
-impl<U, G> draw::HasTheme for Checkbox<U, G>
+impl<U, G> draw::HasTheme for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -326,11 +328,18 @@ where
     }
 
     fn resize_from_theme(&mut self, aux: &dyn base::GraphicalAuxiliary) {
-        self.set_size(self.painter.size_hint(self.derive_state(), aux));
+        self.set_size(self.painter.size_hint(
+            state::ButtonState {
+                state: state::ControlState::Normal(state::InteractionState::empty()),
+                button_type: state::ButtonType::Normal,
+                ..self.derive_state()
+            },
+            aux,
+        ));
     }
 }
 
-impl<U, G> base::DropNotifier for Checkbox<U, G>
+impl<U, G> base::DropNotifier for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -341,7 +350,7 @@ where
     }
 }
 
-impl<U, G> Drop for Checkbox<U, G>
+impl<U, G> Drop for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
