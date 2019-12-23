@@ -110,7 +110,7 @@ where
             event in update_aux.window_queue() => {
                 mouse_press {
                     if let Some((pos, _)) = event.with(|(pos, button)| {
-                        !*obj.disabled.get() && *button == base::MouseButton::Left && obj.bounds().contains(*pos)
+                        !*obj.disabled.get() && *button == base::MouseButton::Left && obj.mouse_bounds().contains(*pos)
                     }) {
                         obj.interaction.insert(state::InteractionState::PRESSED);
                         obj.event_queue.emit_owned(ButtonEvent::Press(*pos));
@@ -130,7 +130,7 @@ where
                     }
                 }
                 mouse_move {
-                    if let Some(pos) = event.with(|pos| obj.bounds().contains(*pos)) {
+                    if let Some(pos) = event.with(|pos| obj.mouse_bounds().contains(*pos)) {
                         if !obj.interaction.contains(state::InteractionState::HOVERED) {
                             obj.interaction.insert(state::InteractionState::HOVERED);
                             obj.event_queue
@@ -169,6 +169,11 @@ where
 
             phantom_g: Default::default(),
         }
+    }
+
+    #[inline]
+    fn mouse_bounds(&self) -> Rect {
+        self.painter.mouse_hint(self.rect)
     }
 
     fn derive_state(&self) -> state::ButtonState {
