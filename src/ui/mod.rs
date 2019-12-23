@@ -3,10 +3,11 @@
 pub mod button;
 pub mod checkbox;
 pub mod container;
+pub mod hstack;
 pub mod label;
 pub mod vstack;
 
-pub use {button::*, checkbox::*, container::*, label::*, vstack::*};
+pub use {button::*, checkbox::*, container::*, hstack::*, label::*, vstack::*};
 
 use {
     crate::{base, draw},

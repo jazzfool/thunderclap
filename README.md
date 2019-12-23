@@ -104,6 +104,7 @@ Pipeline::new()
 - Container
 - Label
 - Checkbox
+- Horizontal Stack
 
 ## License
 

@@ -62,6 +62,16 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **Outgoing Event Queues:**
     - *None*
 
+### Horizontal Stack - `reui::ui::HStack`
+
+*Layout widget which arranges widget horizontally.*
+
+- **`Themed.....`** ❌
+- **`Focusable..`** ❌
+- **`Layable....`** ✔️
+- **Outgoing Event Queues:**
+    - *None*
+
 ### Container - `reui::ui::Container`
 
 *Dynamically stores a list of widgets. This is useful if you don't need to access a child past initialization-time; essentially grouping it into a single child to minimize unused fields.*
