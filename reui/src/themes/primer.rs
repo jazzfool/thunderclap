@@ -22,27 +22,14 @@ impl Primer {
         let mut img: image::RgbaImage =
             image::load_from_memory(include_bytes!("checkmark.png"))?.to_rgba();
 
-        recolor_icon(
-            &mut img,
-            Color::new(1.0, 1.0, 1.0, 1.0),
-            Color::new(0.0, 0.0, 0.0, 1.0),
-        );
+        recolor_icon(&mut img, Color::new(1.0, 1.0, 1.0, 1.0), Color::new(0.0, 0.0, 0.0, 1.0));
 
         let checkmark = display.new_resource(ResourceDescriptor::Image(ImageData::Raw(
-            ResourceData::Data(SharedData::RefCount(std::sync::Arc::new(
-                img.clone().into_raw(),
-            ))),
-            RasterImageInfo {
-                size: (128, 128),
-                format: RasterImageFormat::Rgba8,
-            },
+            ResourceData::Data(SharedData::RefCount(std::sync::Arc::new(img.clone().into_raw()))),
+            RasterImageInfo { size: (128, 128), format: RasterImageFormat::Rgba8 },
         )))?;
 
-        recolor_icon(
-            &mut img,
-            Color::new(0.0, 0.0, 0.0, 1.0),
-            Color::new(0.0, 0.0, 1.0, 1.0),
-        );
+        recolor_icon(&mut img, Color::new(0.0, 0.0, 0.0, 1.0), Color::new(0.0, 0.0, 1.0, 1.0));
 
         Ok(Primer { checkmark })
     }
@@ -54,9 +41,7 @@ impl draw::Theme for Primer {
     }
 
     fn checkbox(&self) -> Box<dyn draw::Painter<state::CheckboxState>> {
-        Box::new(CheckboxPainter {
-            checkmark: self.checkmark.clone(),
-        })
+        Box::new(CheckboxPainter { checkmark: self.checkmark.clone() })
     }
 
     fn label_color(&self) -> StyleColor {
@@ -354,10 +339,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         {
             builder.push_round_rectangle_clip(base::sharp_align(state.rect), [3.5; 4]);
             builder.push_round_rectangle(
-                state
-                    .rect
-                    .inflate(10.0, 10.0)
-                    .translate(Vector::new(0.0, 7.0)),
+                state.rect.inflate(10.0, 10.0).translate(Vector::new(0.0, 7.0)),
                 [10.0; 4],
                 GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                     thickness: 10.0,
@@ -413,23 +395,11 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
                         interaction,
                     )
                 } else if interaction.contains(state::InteractionState::PRESSED) {
-                    (
-                        base::color_from_urgba(203, 208, 214, 1.0).into(),
-                        0.3,
-                        interaction,
-                    )
+                    (base::color_from_urgba(203, 208, 214, 1.0).into(), 0.3, interaction)
                 } else if interaction.contains(state::InteractionState::HOVERED) {
-                    (
-                        base::color_from_urgba(239, 243, 246, 1.0).into(),
-                        0.1,
-                        interaction,
-                    )
+                    (base::color_from_urgba(239, 243, 246, 1.0).into(), 0.1, interaction)
                 } else {
-                    (
-                        base::color_from_urgba(239, 243, 246, 1.0).into(),
-                        0.0,
-                        interaction,
-                    )
+                    (base::color_from_urgba(239, 243, 246, 1.0).into(), 0.0, interaction)
                 }
             }
             _ => todo!(),

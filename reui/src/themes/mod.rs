@@ -11,11 +11,7 @@ pub fn recolor_icon(icon: &mut image::RgbaImage, from: Color, to: Color) {
     for pixel in icon.pixels_mut() {
         let (r, g, b, a) = pixel.channels4();
         if (r, g, b)
-            == (
-                (from.red * 255.0) as u8,
-                (from.green * 255.0) as u8,
-                (from.blue * 255.0) as u8,
-            )
+            == ((from.red * 255.0) as u8, (from.green * 255.0) as u8, (from.blue * 255.0) as u8)
         {
             *pixel = image::Rgba::<u8>::from_channels(
                 (to.red * 255.0) as u8,

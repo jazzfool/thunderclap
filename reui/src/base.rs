@@ -358,10 +358,7 @@ pub struct ConsumableEvent<T>(Rc<ConsumableEventInner<T>>);
 impl<T> ConsumableEvent<T> {
     /// Creates a unconsumed event, initialized with `val`.
     pub fn new(val: T) -> Self {
-        ConsumableEvent(Rc::new(ConsumableEventInner {
-            marker: RefCell::new(true),
-            data: val,
-        }))
+        ConsumableEvent(Rc::new(ConsumableEventInner { marker: RefCell::new(true), data: val }))
     }
 
     /// Returns the event data as long as **both** the following conditions are satisfied:
@@ -466,9 +463,7 @@ impl WidgetLayoutEvents {
 
     /// Returns the most up-to-date widget rectangle from the layout.
     pub fn receive(&mut self) -> Option<Rect> {
-        self.0
-            .as_mut()
-            .and_then(|inner| inner.evq.retrieve_newest())
+        self.0.as_mut().and_then(|inner| inner.evq.retrieve_newest())
     }
 }
 
@@ -516,10 +511,7 @@ pub struct Observed<T: Sized> {
 
 impl<T: Sized> Observed<T> {
     pub fn new(val: T) -> Self {
-        Observed {
-            on_change: RcEventQueue::new(),
-            inner: val,
-        }
+        Observed { on_change: RcEventQueue::new(), inner: val }
     }
 
     /// Updates the inner variable.

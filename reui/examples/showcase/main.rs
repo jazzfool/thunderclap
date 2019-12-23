@@ -44,21 +44,11 @@ impl Showcase {
         let mut v_stack =
             ui::VStack::new(Rect::new(Point::new(50.0, 50.0), Size::new(200.0, 200.0)));
 
-        let mut label = ui::simple_label(
-            "GitHub Primer".to_string(),
-            theme,
-            Default::default(),
-            gfx_aux,
-        );
+        let mut label =
+            ui::simple_label("GitHub Primer".to_string(), theme, Default::default(), gfx_aux);
 
-        let mut button_1 = ui::simple_button(
-            "Boring Button".to_string(),
-            theme,
-            None,
-            None,
-            update_aux,
-            gfx_aux,
-        );
+        let mut button_1 =
+            ui::simple_button("Boring Button".to_string(), theme, None, None, update_aux, gfx_aux);
 
         let mut button_2 = ui::simple_button(
             "Important Button".to_string(),
@@ -90,11 +80,8 @@ impl Showcase {
         let mut checkbox =
             ui::Checkbox::new(false, false, Default::default(), theme, update_aux, gfx_aux);
 
-        let v_stack_data = ui::VStackData {
-            top_margin: 10.0,
-            bottom_margin: 0.0,
-            alignment: ui::Align::Begin,
-        };
+        let v_stack_data =
+            ui::VStackData { top_margin: 10.0, bottom_margin: 0.0, alignment: ui::Align::Begin };
 
         define_layout! {
             for v_stack => {

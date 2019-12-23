@@ -35,10 +35,7 @@ where
             .to_logical(hidpi_factor),
     );
 
-    let context = ContextBuilder::new()
-        .with_vsync(true)
-        .build_windowed(wb, &event_loop)
-        .unwrap();
+    let context = ContextBuilder::new().with_vsync(true).build_windowed(wb, &event_loop).unwrap();
 
     let context = unsafe { context.make_current().unwrap() };
 
@@ -48,10 +45,7 @@ where
             size: (opts.window_size.width as _, opts.window_size.height as _),
         })?;
 
-    let mut u_aux = UAux {
-        window_queue: RcEventQueue::new(),
-        cursor: Default::default(),
-    };
+    let mut u_aux = UAux { window_queue: RcEventQueue::new(), cursor: Default::default() };
 
     let mut g_aux = GAux {
         ui_font: {
@@ -165,10 +159,7 @@ where
             *control_flow = ControlFlow::Wait;
 
             match event {
-                Event::WindowEvent {
-                    event: WindowEvent::RedrawRequested,
-                    ..
-                } => {
+                Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
                     if display.size().0 != size.width as _ || display.size().1 != size.height as _ {
                         display.resize((size.width as _, size.height as _)).unwrap();
                     }
@@ -192,15 +183,11 @@ where
 
                     context.swap_buffers().unwrap();
                 }
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    ..
-                } => {
+                Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                     *control_flow = ControlFlow::Exit;
                 }
                 Event::WindowEvent {
-                    event: WindowEvent::HiDpiFactorChanged(hidpi_factor),
-                    ..
+                    event: WindowEvent::HiDpiFactorChanged(hidpi_factor), ..
                 } => {
                     g_aux.scale = hidpi_factor as _;
                     let window_size = context.window().inner_size().to_physical(hidpi_factor);
@@ -208,17 +195,11 @@ where
 
                     command_group_pre.repaint();
                 }
-                Event::WindowEvent {
-                    event: WindowEvent::Resized(window_size),
-                    ..
-                } => {
+                Event::WindowEvent { event: WindowEvent::Resized(window_size), .. } => {
                     let window_size = window_size.to_physical(g_aux.scale as _);
                     size = Size::new(window_size.width as _, window_size.height as _);
                 }
-                Event::WindowEvent {
-                    event: WindowEvent::CursorMoved { position, .. },
-                    ..
-                } => {
+                Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
                     let position = Point::new(position.x as _, position.y as _);
 
                     u_aux.cursor = position;
@@ -228,8 +209,7 @@ where
                     ));
                 }
                 Event::WindowEvent {
-                    event: WindowEvent::MouseInput { state, button, .. },
-                    ..
+                    event: WindowEvent::MouseInput { state, button, .. }, ..
                 } => {
                     let mouse_button = match button {
                         event::MouseButton::Left => base::MouseButton::Left,
@@ -249,10 +229,7 @@ where
                         ),
                     });
                 }
-                Event::WindowEvent {
-                    event: WindowEvent::Focused(false),
-                    ..
-                } => {
+                Event::WindowEvent { event: WindowEvent::Focused(false), .. } => {
                     u_aux.window_queue.emit_owned(base::WindowEvent::ClearFocus);
                 }
                 _ => return,

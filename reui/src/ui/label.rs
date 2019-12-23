@@ -215,8 +215,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Label<U, 
             builder.push_text(text_item.clone(), None);
         }
 
-        self.command_group
-            .push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), None, None);
     }
 }
 

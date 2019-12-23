@@ -29,10 +29,7 @@ impl VStackData {
 
     /// Sets the `bottom_margin` value.
     pub fn bottom_margin(self, bottom_margin: f32) -> VStackData {
-        VStackData {
-            bottom_margin,
-            ..self
-        }
+        VStackData { bottom_margin, ..self }
     }
 
     /// Sets the `align` value.
@@ -111,10 +108,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for VSt
 
         let evq = BidirSingleEventQueue::new();
 
-        child.listen_to_layout(base::WidgetLayoutEventsInner {
-            id,
-            evq: evq.secondary(),
-        });
+        child.listen_to_layout(base::WidgetLayoutEventsInner { id, evq: evq.secondary() });
 
         let rect = child.rect();
 

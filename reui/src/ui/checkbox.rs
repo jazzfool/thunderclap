@@ -220,8 +220,7 @@ where
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
         let state = self.derive_state();
         let painter = &mut self.painter;
-        self.command_group
-            .push_with(display, || painter.draw(state, aux), None, None);
+        self.command_group.push_with(display, || painter.draw(state, aux), None, None);
     }
 }
 

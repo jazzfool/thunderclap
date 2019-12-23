@@ -225,8 +225,7 @@ where
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
         let button_state = self.derive_state();
         let painter = &mut self.painter;
-        self.command_group
-            .push_with(display, || painter.draw(button_state, aux), None, None);
+        self.command_group.push_with(display, || painter.draw(button_state, aux), None, None);
     }
 }
 

@@ -20,9 +20,7 @@ pub struct UnboundTerminal<T, A, E: Event> {
 impl<T, A, E: Event> UnboundTerminal<T, A, E> {
     /// Creates an empty, unbound terminal.
     pub fn new() -> Self {
-        UnboundTerminal {
-            handlers: HashMap::new(),
-        }
+        UnboundTerminal { handlers: HashMap::new() }
     }
 
     /// Binds an event key to a handler.
@@ -40,10 +38,7 @@ impl<T, A, E: Event> UnboundTerminal<T, A, E> {
         self,
         queue: &impl Deref<Target = D>,
     ) -> Terminal<T, A, E, L> {
-        Terminal {
-            handlers: self.handlers,
-            listener: queue.listen(),
-        }
+        Terminal { handlers: self.handlers, listener: queue.listen() }
     }
 }
 
@@ -59,10 +54,7 @@ impl<T, A, E: Event, L: EventListen<Item = E>> Terminal<T, A, E, L> {
     pub fn new<D: QueueInterfaceListable<Item = E, Listener = L>>(
         queue: &impl Deref<Target = D>,
     ) -> Self {
-        Terminal {
-            handlers: HashMap::new(),
-            listener: queue.listen(),
-        }
+        Terminal { handlers: HashMap::new(), listener: queue.listen() }
     }
 
     /// Binds an event key to a handler.
@@ -101,9 +93,7 @@ pub struct Pipeline<T: 'static, A: 'static> {
 
 impl<T: 'static, A: 'static> Default for Pipeline<T, A> {
     fn default() -> Self {
-        Pipeline {
-            terminals: Default::default(),
-        }
+        Pipeline { terminals: Default::default() }
     }
 }
 

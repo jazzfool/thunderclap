@@ -103,10 +103,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::WidgetChildren
     ) -> Vec<
         &dyn base::WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = DisplayCommand>,
     > {
-        self.children
-            .iter()
-            .map(|child| child.as_ref() as _)
-            .collect()
+        self.children.iter().map(|child| child.as_ref() as _).collect()
     }
 
     fn children_mut(
@@ -118,9 +115,6 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::WidgetChildren
             DisplayObject = DisplayCommand,
         >,
     > {
-        self.children
-            .iter_mut()
-            .map(|child| child.as_mut() as _)
-            .collect()
+        self.children.iter_mut().map(|child| child.as_mut() as _).collect()
     }
 }
