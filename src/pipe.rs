@@ -99,12 +99,18 @@ pub struct Pipeline<T: 'static, A: 'static> {
     terminals: Vec<Box<dyn DynTerminal<T, A>>>,
 }
 
+impl<T: 'static, A: 'static> Default for Pipeline<T, A> {
+    fn default() -> Self {
+        Pipeline {
+            terminals: Default::default(),
+        }
+    }
+}
+
 impl<T: 'static, A: 'static> Pipeline<T, A> {
     /// Creates a pipeline with no terminals.
     pub fn new() -> Self {
-        Pipeline {
-            terminals: Vec::new(),
-        }
+        Default::default()
     }
 
     /// Adds a terminal to the pipeline.
