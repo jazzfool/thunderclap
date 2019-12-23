@@ -258,5 +258,5 @@ fn find_event_key(attrs: &[syn::Attribute]) -> syn::Ident {
             }
         }
     }
-    panic!()
+    panic!("Variant missing an event_key")
 }

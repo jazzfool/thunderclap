@@ -5,7 +5,6 @@ use {
         base::{self, Repaintable, Resizable},
         draw::{self, state},
         pipe,
-        ui::ToggledEvent,
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect, Size},
@@ -16,29 +15,27 @@ use {
 };
 
 /// Events emitted by a button.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(PipelineEvent, Debug, Clone, Copy, PartialEq)]
+#[reui_crate(crate)]
 pub enum ButtonEvent {
-    /// Emitted when the button is pressed or released.
-    /// Corresponds to `WindowEvent::MousePress` or `WindowEvent::MouseRelease`.
-    Press(ToggledEvent<Point>),
-    /// Emitted when the mouse enters (`true`) or leaves (`false`) the button boundaries.
-    /// Corresponds to `WindowEvent::MouseMove`.
-    MouseHover(ToggledEvent<Point>),
-    /// Emitted when focus is gained (`true`) or lost (`false`).
-    Focus(ToggledEvent<()>),
-}
-
-impl pipe::Event for ButtonEvent {
-    fn get_key(&self) -> &'static str {
-        match self {
-            ButtonEvent::Press(ToggledEvent::Start(_)) => "press",
-            ButtonEvent::Press(ToggledEvent::Stop(_)) => "release",
-            ButtonEvent::MouseHover(ToggledEvent::Start(_)) => "begin_hover",
-            ButtonEvent::MouseHover(ToggledEvent::Stop(_)) => "end_hover",
-            ButtonEvent::Focus(ToggledEvent::Start(_)) => "focus",
-            ButtonEvent::Focus(ToggledEvent::Stop(_)) => "blur",
-        }
-    }
+    /// Emitted when the checkbox is pressed.
+    #[event_key(press)]
+    Press(Point),
+    /// Emitted when the checkbox is released.
+    #[event_key(release)]
+    Release(Point),
+    /// Emitted when the mouse enters the checkbox boundaries.
+    #[event_key(begin_hover)]
+    BeginHover(Point),
+    /// Emitted when the mouse leaves the checkbox boundaries.
+    #[event_key(end_hover)]
+    EndHover(Point),
+    /// Emitted when focus is gained.
+    #[event_key(focus)]
+    Focus,
+    /// Emitted when focus is lost.
+    #[event_key(blur)]
+    Blur,
 }
 
 /// Focus-able button widget.
@@ -113,13 +110,10 @@ where
             event in update_aux.window_queue() => {
                 mouse_press {
                     if let Some((pos, _)) = event.with(|(pos, button)| {
-                        !*obj.disabled.get()
-                            && *button == base::MouseButton::Left
-                            && obj.bounds().contains(*pos)
+                        !*obj.disabled.get() && *button == base::MouseButton::Left && obj.bounds().contains(*pos)
                     }) {
                         obj.interaction.insert(state::InteractionState::PRESSED);
-                        obj.event_queue
-                            .emit_owned(ButtonEvent::Press(ToggledEvent::new(true, *pos)));
+                        obj.event_queue.emit_owned(ButtonEvent::Press(*pos));
                         obj.command_group.repaint();
                     }
                 }
@@ -131,8 +125,7 @@ where
                     }) {
                         obj.interaction.remove(state::InteractionState::PRESSED);
                         obj.interaction.insert(state::InteractionState::FOCUSED);
-                        obj.event_queue
-                            .emit_owned(ButtonEvent::Press(ToggledEvent::new(false, *pos)));
+                        obj.event_queue.emit_owned(ButtonEvent::Release(*pos));
                         obj.command_group.repaint();
                     }
                 }
@@ -140,17 +133,14 @@ where
                     if let Some(pos) = event.with(|pos| obj.bounds().contains(*pos)) {
                         if !obj.interaction.contains(state::InteractionState::HOVERED) {
                             obj.interaction.insert(state::InteractionState::HOVERED);
-                            obj.event_queue.emit_owned(ButtonEvent::MouseHover(
-                                ToggledEvent::new(true, pos.clone()),
-                            ));
+                            obj.event_queue
+                                .emit_owned(ButtonEvent::BeginHover(pos.clone()));
                             obj.command_group.repaint();
                         }
                     } else if obj.interaction.contains(state::InteractionState::HOVERED) {
                         obj.interaction.remove(state::InteractionState::HOVERED);
-                        obj.event_queue.emit_owned(ButtonEvent::MouseHover(ToggledEvent::new(
-                            false,
-                            event.get().clone(),
-                        )));
+                        obj.event_queue
+                            .emit_owned(ButtonEvent::EndHover(event.get().clone()));
                         obj.command_group.repaint();
                     }
                 }
@@ -219,8 +209,11 @@ where
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
             self.command_group.repaint();
-            self.event_queue
-                .emit_owned(ButtonEvent::Focus(ToggledEvent::new(!was_focused, ())));
+            self.event_queue.emit_owned(if !was_focused {
+                ButtonEvent::Focus
+            } else {
+                ButtonEvent::Blur
+            });
         }
 
         if let Some(rect) = self.layout.receive() {

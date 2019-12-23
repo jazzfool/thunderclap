@@ -3,7 +3,6 @@ use {
         base::{self, Repaintable, Resizable},
         draw::{self, state},
         pipe,
-        ui::ToggledEvent,
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect, Size},
@@ -14,34 +13,33 @@ use {
 };
 
 /// Events emitted by a checkbox.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(PipelineEvent, Debug, Clone, Copy, PartialEq)]
+#[reui_crate(crate)]
 pub enum CheckboxEvent {
-    /// Emitted when the checkbox is pressed or released.
-    /// Corresponds to `WindowEvent::MousePress` or `WindowEvent::MouseRelease`.
-    Press(ToggledEvent<Point>),
-    /// Emitted when the button is checked/unchecked.
-    /// Corresponds to `WindowEvent::MouseRelease`.
-    Check(ToggledEvent<Point>),
-    /// Emitted when the mouse enters (`true`) or leaves (`false`) the checkbox boundaries.
-    /// Corresponds to `WindowEvent::MouseMove`.
-    MouseHover(ToggledEvent<Point>),
-    /// Emitted when focus is gained (`true`) or lost (`false`).
-    Focus(ToggledEvent<()>),
-}
-
-impl pipe::Event for CheckboxEvent {
-    fn get_key(&self) -> &'static str {
-        match self {
-            CheckboxEvent::Press(ToggledEvent::Start(_)) => "press",
-            CheckboxEvent::Press(ToggledEvent::Stop(_)) => "release",
-            CheckboxEvent::Check(ToggledEvent::Start(_)) => "check",
-            CheckboxEvent::Check(ToggledEvent::Stop(_)) => "uncheck",
-            CheckboxEvent::MouseHover(ToggledEvent::Start(_)) => "begin_hover",
-            CheckboxEvent::MouseHover(ToggledEvent::Stop(_)) => "end_hover",
-            CheckboxEvent::Focus(ToggledEvent::Start(_)) => "focus",
-            CheckboxEvent::Focus(ToggledEvent::Stop(_)) => "blur",
-        }
-    }
+    /// Emitted when the checkbox is pressed.
+    #[event_key(press)]
+    Press(Point),
+    /// Emitted when the checkbox is released.
+    #[event_key(release)]
+    Release(Point),
+    /// Emitted when the button is checked.
+    #[event_key(check)]
+    Check(Point),
+    /// Emitted when the button is checked.
+    #[event_key(uncheck)]
+    Uncheck(Point),
+    /// Emitted when the mouse enters the checkbox boundaries.
+    #[event_key(begin_hover)]
+    BeginHover(Point),
+    /// Emitted when the mouse leaves the checkbox boundaries.
+    #[event_key(end_hover)]
+    EndHover(Point),
+    /// Emitted when focus is gained.
+    #[event_key(focus)]
+    Focus,
+    /// Emitted when focus is lost.
+    #[event_key(blur)]
+    Blur,
 }
 
 /// Checkbox widget; useful for boolean input.
@@ -104,14 +102,10 @@ where
             event in u_aux.window_queue() => {
                 mouse_press {
                     if let Some((pos, _)) = event.with(|(pos, button)| {
-                        !*obj.disabled.get()
-                            && *button == base::MouseButton::Left
-                            && obj.bounds().contains(*pos)
+                        !*obj.disabled.get() && *button == base::MouseButton::Left && obj.bounds().contains(*pos)
                     }) {
                         obj.interaction.insert(state::InteractionState::PRESSED);
-                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                            true, *pos,
-                        )));
+                        obj.event_queue.emit_owned(CheckboxEvent::Press(*pos));
                         obj.command_group.repaint();
                     }
                 }
@@ -123,15 +117,14 @@ where
                     }) {
                         obj.interaction.remove(state::InteractionState::PRESSED);
                         obj.interaction.insert(state::InteractionState::FOCUSED);
-                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                            false, *pos,
-                        )));
+                        obj.event_queue.emit_owned(CheckboxEvent::Release(*pos));
 
                         obj.checked.set(!*obj.checked.get());
-                        obj.event_queue.emit_owned(CheckboxEvent::Press(ToggledEvent::new(
-                            *obj.checked.get(),
-                            *pos,
-                        )));
+                        obj.event_queue.emit_owned(if *obj.checked.get() {
+                            CheckboxEvent::Press(*pos)
+                        } else {
+                            CheckboxEvent::Release(*pos)
+                        });
 
                         obj.command_group.repaint();
                     }
@@ -140,16 +133,13 @@ where
                     if let Some(pos) = event.with(|pos| obj.bounds().contains(*pos)) {
                         if !obj.interaction.contains(state::InteractionState::HOVERED) {
                             obj.interaction.insert(state::InteractionState::HOVERED);
-                            obj.event_queue.emit_owned(CheckboxEvent::MouseHover(
-                                ToggledEvent::new(true, pos.clone()),
-                            ));
+                            obj.event_queue.emit_owned(CheckboxEvent::BeginHover(*pos));
                             obj.command_group.repaint();
                         }
                     } else if obj.interaction.contains(state::InteractionState::HOVERED) {
                         obj.interaction.remove(state::InteractionState::HOVERED);
-                        obj.event_queue.emit_owned(CheckboxEvent::MouseHover(
-                            ToggledEvent::new(false, event.get().clone()),
-                        ));
+                        obj.event_queue
+                            .emit_owned(CheckboxEvent::EndHover(*event.get()));
                         obj.command_group.repaint();
                     }
                 }
@@ -214,8 +204,11 @@ where
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
             self.command_group.repaint();
-            self.event_queue
-                .emit_owned(CheckboxEvent::Focus(ToggledEvent::new(!was_focused, ())));
+            self.event_queue.emit_owned(if !was_focused {
+                CheckboxEvent::Focus
+            } else {
+                CheckboxEvent::Blur
+            });
         }
 
         if let Some(rect) = self.layout.receive() {
