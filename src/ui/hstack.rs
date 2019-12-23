@@ -61,7 +61,7 @@ lazy_widget! {
     drop_event: drop_event
 }
 
-/// Abstract layout widget which arranges children in a vertical list, possibly with top/bottom margins and horizontal alignment (see `VStackData`).
+/// Abstract layout widget which arranges children in a horizontal list, possibly with left/right margins and vertical alignment (see `HStackData`).
 #[derive(WidgetChildren, Debug)]
 #[widget_children_trait(base::WidgetChildren)]
 pub struct HStack<U, G>
@@ -84,7 +84,7 @@ where
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> HStack<U, G> {
-    /// Creates a new vertical stack widget with a given rectangle.
+    /// Creates a new horizontal stack widget with a given rectangle.
     pub fn new(rect: Rect) -> Self {
         HStack {
             rect,
