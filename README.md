@@ -81,13 +81,15 @@ Pipeline::new()
     .add(Terminal::new(&count_up.event_queue).on(
         "press",
         |obj: &mut Counter, _aux: &mut UpdateAux, _event| {
-            obj.count += 1;
+            let _event = _event.unwrap_as_press().unwrap();
+            { obj.count += 1; }
         },
     ))
     .add(Terminal::new(&count_down.event_queue).on(
         "press",
         |obj: &mut Counter, _aux: &mut UpdateAux, _event| {
-            obj.count -= 1;
+            let _event = _event.unwrap_as_press().unwrap();
+            { obj.count -= 1; }
         },
     ));
 ```
@@ -121,15 +123,15 @@ impl reui::pipe::Event for MyEvent {
 }
 
 impl MyEvent { // These are automatically called by `pipeline!` to "cast" the event.
-    pub fn stop(self) -> Option<()> {
+    pub fn unwrap_as_stop(self) -> Option<()> {
         if let MyEvent::Stop = self { Some(()) } else { None }
     }
 
-    pub fn play(self) -> Option<(f32)> {
+    pub fn unwrap_as_play(self) -> Option<(f32)> {
         if let MyEvent::Play(x0) = self { Some(x0) } else { None }
     }
 
-    pub fn rewind(self) -> Option<(u32, bool)> {
+    pub fn unwrap_as_rewind(self) -> Option<(u32, bool)> {
         if let MyEvent::Rewind{seconds, play} = self { Some((seconds, play)) } else { None }
     }
 }

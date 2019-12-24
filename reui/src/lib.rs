@@ -10,6 +10,8 @@ extern crate reui_derive;
 
 pub use reui_derive::PipelineEvent;
 
+pub use paste;
+
 #[macro_use]
 pub mod base;
 pub mod draw;

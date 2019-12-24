@@ -141,13 +141,15 @@ impl<T: 'static, A: 'static> Pipeline<T, A> {
 /// .add(Terminal::new(&count_up.event_queue).on(
 ///     "click",
 ///     |obj: &mut Counter, _aux: &mut UpdateAux, _event| {
-///         obj.count += 1;
+///         let _event = _event.unwrap_as_click().unwrap();
+///         { obj.count += 1; }
 ///     },
 /// ))
 /// .add(Terminal::new(&count_down.event_queue).on(
 ///     "click",
 ///     |obj: &mut Counter, _aux: &mut UpdateAux, _event| {
-///         obj.count -= 1;
+///         let _event = _event.unwrap_as_click().unwrap();
+///         { obj.count -= 1; }
 ///     },
 /// ));
 /// ```
@@ -158,7 +160,15 @@ macro_rules! pipeline {
         $(
             let mut terminal = $crate::pipe::Terminal::new($eq);
             $(
-                terminal = terminal.on(std::stringify!($ev), |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo| { #[allow(unused_variables)] let $eo = $eo.clone().$ev().unwrap(); $body });
+                terminal = terminal.on(
+                    std::stringify!($ev),
+                    |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo| {
+                        #[allow(unused_variables)]
+                        $crate::paste::expr!{
+                            let $eo = $eo.clone().[<unwrap_as_ $ev>]().unwrap();
+                            $body
+                        }
+                    });
             )*
             pipe = pipe.add(terminal);
         )*

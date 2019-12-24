@@ -23,7 +23,8 @@ fn impl_pipeline_event_macro(ast: syn::DeriveInput) -> TokenStream {
             for variant in enum_data.variants {
                 let key = find_event_key(&variant.attrs);
                 let um: proc_macro2::TokenStream = get_unmatched_variant(&variant).into();
-                
+                let func = quote::format_ident!("unwrap_as_{}", key);
+
                 let (match_ext, ty, ret) = get_variant_matched_tuples(&variant);
                 let (match_ext, ty, ret): (
                     proc_macro2::TokenStream,
@@ -41,7 +42,7 @@ fn impl_pipeline_event_macro(ast: syn::DeriveInput) -> TokenStream {
                 cast_fns.push(
                     {
                         quote! {
-                            pub fn #key(self) -> Option<#ty> {
+                            pub fn #func(self) -> Option<#ty> {
                                 if let #name::#match_ext = self {
                                     Some(#ret)
                                 } else {
@@ -77,6 +78,7 @@ fn impl_pipeline_event_macro(ast: syn::DeriveInput) -> TokenStream {
             let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
             let name = ast.ident;
             let key = find_event_key(&ast.attrs);
+            let func = quote::format_ident!("unwrap_as_{}", key);
 
             {
                 quote! {
@@ -87,7 +89,7 @@ fn impl_pipeline_event_macro(ast: syn::DeriveInput) -> TokenStream {
                     }
 
                     impl #impl_generics #name #ty_generics #where_clause {
-                        pub fn #key(self) -> Option<Self> {
+                        pub fn #func(self) -> Option<Self> {
                             Some(self)
                         }
                     }
