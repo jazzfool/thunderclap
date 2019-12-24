@@ -3,7 +3,7 @@
 use {
     crate::{
         base::{self, Repaintable, Resizable},
-        draw::{self, state},
+        draw::{self, state, HasTheme},
         pipe,
     },
     reclutch::{
@@ -38,6 +38,78 @@ pub enum ButtonEvent {
     Blur,
 }
 
+/// Creates an unbound terminal which handles window events for a logical button.
+pub fn button_terminal<B, U>() -> pipe::UnboundTerminal<B, U, base::WindowEvent>
+where
+    B: LogicalButton,
+    U: base::UpdateAuxiliary + 'static,
+{
+    unbound_terminal! {
+        B as obj,
+        U as _aux,
+        base::WindowEvent as event,
+
+        mouse_press {
+            if let Some((pos, _)) = event.with(|(pos, button)| {
+                !obj.disabled()
+                    && *button == base::MouseButton::Left
+                    && obj.mouse_bounds().contains(*pos)
+            }) {
+                obj.interaction().insert(state::InteractionState::PRESSED);
+                obj.event_queue().emit_owned(ButtonEvent::Press(*pos));
+                obj.command_group().repaint();
+            }
+        }
+
+        mouse_release {
+            if let Some((pos, _)) = event.with(|(_, button)| {
+                !obj.disabled()
+                    && *button == base::MouseButton::Left
+                    && obj.interaction().contains(state::InteractionState::PRESSED)
+            }) {
+                obj.interaction().remove(state::InteractionState::PRESSED);
+                obj.interaction().insert(state::InteractionState::FOCUSED);
+                obj.event_queue().emit_owned(ButtonEvent::Release(*pos));
+                obj.command_group().repaint();
+            }
+        }
+
+        mouse_move {
+            if let Some(pos) = event.with(|pos| obj.mouse_bounds().contains(*pos)) {
+                if !obj.interaction().contains(state::InteractionState::HOVERED) {
+                    obj.interaction().insert(state::InteractionState::HOVERED);
+                    obj.event_queue()
+                        .emit_owned(ButtonEvent::BeginHover(pos.clone()));
+                    obj.command_group().repaint();
+                }
+            } else if obj.interaction().contains(state::InteractionState::HOVERED) {
+                obj.interaction().remove(state::InteractionState::HOVERED);
+                obj.event_queue()
+                    .emit_owned(ButtonEvent::EndHover(event.get().clone()));
+                obj.command_group().repaint();
+            }
+        }
+
+        clear_focus {
+            obj.interaction().remove(state::InteractionState::FOCUSED);
+        }
+    }
+}
+
+/// Getters required for a button window event handler.
+pub trait LogicalButton {
+    /// Returns a mutable reference to the user interaction state.
+    fn interaction(&mut self) -> &mut state::InteractionState;
+    /// Returns a mutable reference to the output `ButtonEvent` event queue.
+    fn event_queue(&mut self) -> &mut RcEventQueue<ButtonEvent>;
+    /// Returns a mutable reference to the command group.
+    fn command_group(&mut self) -> &mut CommandGroup;
+    /// Returns the rectangle which captures mouse events.
+    fn mouse_bounds(&self) -> Rect;
+    /// Returns the disabled state.
+    fn disabled(&self) -> bool;
+}
+
 /// Focus-able button widget.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
@@ -65,6 +137,37 @@ where
     phantom_g: PhantomData<G>,
 }
 
+impl<U, G> LogicalButton for Button<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    #[inline(always)]
+    fn interaction(&mut self) -> &mut state::InteractionState {
+        &mut self.interaction
+    }
+
+    #[inline(always)]
+    fn event_queue(&mut self) -> &mut RcEventQueue<ButtonEvent> {
+        &mut self.event_queue
+    }
+
+    #[inline(always)]
+    fn command_group(&mut self) -> &mut CommandGroup {
+        &mut self.command_group
+    }
+
+    #[inline]
+    fn mouse_bounds(&self) -> Rect {
+        self.painter.mouse_hint(self.rect)
+    }
+
+    #[inline(always)]
+    fn disabled(&self) -> bool {
+        *self.disabled.get()
+    }
+}
+
 impl<U, G> Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -79,8 +182,7 @@ where
         button_type: state::ButtonType,
         disabled: bool,
         theme: &dyn draw::Theme,
-        update_aux: &mut U,
-        gfx_aux: &mut G,
+        u_aux: &mut U,
     ) -> Self {
         let painter = theme.button();
         let temp_state = state::ButtonState {
@@ -100,55 +202,24 @@ where
         let button_type = base::Observed::new(button_type);
         let disabled = base::Observed::new(disabled);
 
-        let pipe = pipeline! {
+        let mut pipe = pipeline! {
             Self as obj,
             U as _aux,
-            _ev in &text.on_change => { change { obj.command_group.repaint(); } }
-            _ev in &text_size.on_change => { change { obj.command_group.repaint(); } }
-            _ev in &button_type.on_change => { change { obj.command_group.repaint(); } }
-            _ev in &disabled.on_change => { change { obj.command_group.repaint(); } }
-            event in update_aux.window_queue() => {
-                mouse_press {
-                    if let Some((pos, _)) = event.with(|(pos, button)| {
-                        !*obj.disabled.get() && *button == base::MouseButton::Left && obj.mouse_bounds().contains(*pos)
-                    }) {
-                        obj.interaction.insert(state::InteractionState::PRESSED);
-                        obj.event_queue.emit_owned(ButtonEvent::Press(*pos));
-                        obj.command_group.repaint();
-                    }
-                }
-                mouse_release {
-                    if let Some((pos, _)) = event.with(|(_, button)| {
-                        !*obj.disabled.get()
-                            && *button == base::MouseButton::Left
-                            && obj.interaction.contains(state::InteractionState::PRESSED)
-                    }) {
-                        obj.interaction.remove(state::InteractionState::PRESSED);
-                        obj.interaction.insert(state::InteractionState::FOCUSED);
-                        obj.event_queue.emit_owned(ButtonEvent::Release(*pos));
-                        obj.command_group.repaint();
-                    }
-                }
-                mouse_move {
-                    if let Some(pos) = event.with(|pos| obj.mouse_bounds().contains(*pos)) {
-                        if !obj.interaction.contains(state::InteractionState::HOVERED) {
-                            obj.interaction.insert(state::InteractionState::HOVERED);
-                            obj.event_queue
-                                .emit_owned(ButtonEvent::BeginHover(pos.clone()));
-                            obj.command_group.repaint();
-                        }
-                    } else if obj.interaction.contains(state::InteractionState::HOVERED) {
-                        obj.interaction.remove(state::InteractionState::HOVERED);
-                        obj.event_queue
-                            .emit_owned(ButtonEvent::EndHover(event.get().clone()));
-                        obj.command_group.repaint();
-                    }
-                }
-                clear_focus {
-                    obj.interaction.remove(state::InteractionState::FOCUSED);
-                }
+            _ev in &text.on_change => {
+                change { obj.resize_from_theme(); obj.command_group.repaint(); }
+            }
+            _ev in &text_size.on_change => {
+                change { obj.resize_from_theme(); obj.command_group.repaint(); }
+            }
+            _ev in &button_type.on_change => {
+                change { obj.resize_from_theme(); obj.command_group.repaint(); }
+            }
+            _ev in &disabled.on_change => {
+                change { obj.command_group.repaint(); }
             }
         };
+
+        pipe = pipe.add(button_terminal::<Self, U>().bind(u_aux.window_queue()));
 
         Self {
             event_queue: RcEventQueue::new(),
@@ -157,7 +228,7 @@ where
             text_size,
             button_type,
             disabled,
-            rect: Rect::new(position, painter.size_hint(temp_state, gfx_aux)),
+            rect: Rect::new(position, painter.size_hint(temp_state)),
 
             interaction: state::InteractionState::empty(),
             visibility: Default::default(),
@@ -169,11 +240,6 @@ where
 
             phantom_g: Default::default(),
         }
-    }
-
-    #[inline]
-    fn mouse_bounds(&self) -> Rect {
-        self.painter.mouse_hint(self.rect)
     }
 
     fn derive_state(&self) -> state::ButtonState {
@@ -227,10 +293,10 @@ where
         }
     }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
         let button_state = self.derive_state();
         let painter = &mut self.painter;
-        self.command_group.push_with(display, || painter.draw(button_state, aux), None, None);
+        self.command_group.push_with(display, || painter.draw(button_state), None, None);
     }
 }
 
@@ -314,7 +380,7 @@ where
     }
 }
 
-impl<U, G> draw::HasTheme for Button<U, G>
+impl<U, G> HasTheme for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -324,15 +390,12 @@ where
         &mut self.painter
     }
 
-    fn resize_from_theme(&mut self, aux: &dyn base::GraphicalAuxiliary) {
-        self.set_size(self.painter.size_hint(
-            state::ButtonState {
-                state: state::ControlState::Normal(state::InteractionState::empty()),
-                button_type: state::ButtonType::Normal,
-                ..self.derive_state()
-            },
-            aux,
-        ));
+    fn resize_from_theme(&mut self) {
+        self.set_size(self.painter.size_hint(state::ButtonState {
+            state: state::ControlState::Normal(state::InteractionState::empty()),
+            button_type: state::ButtonType::Normal,
+            ..self.derive_state()
+        }));
     }
 }
 

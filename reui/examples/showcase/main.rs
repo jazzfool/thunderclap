@@ -48,7 +48,7 @@ impl Showcase {
             ui::simple_label("GitHub Primer".to_string(), theme, Default::default(), gfx_aux);
 
         let mut button_1 =
-            ui::simple_button("Boring Button".to_string(), theme, None, None, update_aux, gfx_aux);
+            ui::simple_button("Boring Button".to_string(), theme, None, None, update_aux);
 
         let mut button_2 = ui::simple_button(
             "Important Button".to_string(),
@@ -56,7 +56,6 @@ impl Showcase {
             Some(draw::state::ButtonType::Primary),
             None,
             update_aux,
-            gfx_aux,
         );
 
         let mut button_3 = ui::simple_button(
@@ -65,7 +64,6 @@ impl Showcase {
             Some(draw::state::ButtonType::Danger),
             None,
             update_aux,
-            gfx_aux,
         );
 
         let mut button_4 = ui::simple_button(
@@ -74,11 +72,10 @@ impl Showcase {
             Some(draw::state::ButtonType::Outline),
             None,
             update_aux,
-            gfx_aux,
         );
 
         let mut checkbox =
-            ui::Checkbox::new(false, false, Default::default(), theme, update_aux, gfx_aux);
+            ui::Checkbox::new(false, false, Default::default(), theme, update_aux);
 
         let v_stack_data =
             ui::VStackData { top_margin: 10.0, bottom_margin: 0.0, alignment: ui::Align::Begin };
@@ -146,7 +143,7 @@ fn main() {
     .unwrap();
 
     let app = app::create(
-        |display| Primer::new(display).unwrap(),
+        |g_aux, display| Primer::new(g_aux, display).unwrap(),
         |u_aux, g_aux, theme| Showcase::new(theme, u_aux, g_aux),
         app::AppOptions {
             name: "Showcase".to_string(),

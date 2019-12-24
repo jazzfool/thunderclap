@@ -28,13 +28,13 @@ pub trait Painter<T> {
     /// `Painter` which `self` was built from previously.
     fn invoke(&self, theme: &dyn Theme) -> Box<dyn Painter<T>>;
     /// Returns a stylistic size based on the state.
-    fn size_hint(&self, state: T, aux: &dyn base::GraphicalAuxiliary) -> Size;
+    fn size_hint(&self, state: T) -> Size;
     /// Returns the paint boundaries based on the inner bounds.
     fn paint_hint(&self, rect: Rect) -> Rect;
     /// Returns the mouse boundaries based on the inner bounds.
     fn mouse_hint(&self, rect: Rect) -> Rect;
     /// Returns a list of display commands which visualize `state`.
-    fn draw(&mut self, state: T, aux: &dyn base::GraphicalAuxiliary) -> Vec<DisplayCommand>;
+    fn draw(&mut self, state: T) -> Vec<DisplayCommand>;
 }
 
 /// Factory to create colors or `Painter`s which paint widgets with a specific visual theme.
@@ -51,7 +51,7 @@ pub trait HasTheme {
     /// Returns the inner `Themed`.
     fn theme(&mut self) -> &mut dyn Themed;
     /// *Possibly* invokes `size_hint` on the inner `Painter` and applies it.
-    fn resize_from_theme(&mut self, aux: &dyn base::GraphicalAuxiliary);
+    fn resize_from_theme(&mut self);
 }
 
 impl<T> Themed for Box<dyn Painter<T>> {
@@ -66,6 +66,6 @@ where
 {
     fn load_theme(&mut self, theme: &dyn Theme, aux: &dyn base::GraphicalAuxiliary) {
         self.theme().load_theme(theme, aux);
-        self.resize_from_theme(aux);
+        self.resize_from_theme();
     }
 }

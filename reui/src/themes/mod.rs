@@ -3,7 +3,7 @@
 use {image::Pixel, reclutch::display::Color};
 
 #[cfg(feature = "default-themes")]
-use reclutch::display::ResourceReference;
+use reclutch::display::{FontInfo, ResourceReference};
 
 /// Replaces a specific color in an image while preserving alpha.
 /// Useful to recolor a solid icon.
@@ -29,5 +29,6 @@ mod primer;
 /// GitHub's "Primer" theme, based off the CSS widgets.
 #[cfg(feature = "default-themes")]
 pub struct Primer {
+    semibold_font: (ResourceReference, FontInfo),
     checkmark: ResourceReference,
 }

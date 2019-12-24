@@ -42,6 +42,87 @@ pub enum CheckboxEvent {
     Blur,
 }
 
+pub fn checkbox_terminal<C, U>() -> pipe::UnboundTerminal<C, U, base::WindowEvent>
+where
+    C: LogicalCheckbox,
+    U: base::UpdateAuxiliary + 'static,
+{
+    unbound_terminal! {
+        C as obj,
+        U as _aux,
+        base::WindowEvent as event,
+
+        mouse_press {
+            if let Some((pos, _)) = event.with(|(pos, button)| {
+                !obj.disabled() && *button == base::MouseButton::Left && obj.mouse_bounds().contains(*pos)
+            }) {
+                obj.interaction().insert(state::InteractionState::PRESSED);
+                obj.event_queue().emit_owned(CheckboxEvent::Press(*pos));
+                obj.command_group().repaint();
+            }
+        }
+
+        mouse_release {
+            if let Some((pos, _)) = event.with(|(_, button)| {
+                !obj.disabled()
+                    && *button == base::MouseButton::Left
+                    && obj.interaction().contains(state::InteractionState::PRESSED)
+            }) {
+                obj.interaction().remove(state::InteractionState::PRESSED);
+                obj.interaction().insert(state::InteractionState::FOCUSED);
+                obj.event_queue().emit_owned(CheckboxEvent::Release(*pos));
+
+                obj.toggle_checked();
+                let checked = obj.checked();
+                obj.event_queue().emit_owned(if checked {
+                    CheckboxEvent::Press(*pos)
+                } else {
+                    CheckboxEvent::Release(*pos)
+                });
+
+                obj.command_group().repaint();
+            }
+        }
+
+        mouse_move {
+            if let Some(pos) = event.with(|pos| obj.mouse_bounds().contains(*pos)) {
+                if !obj.interaction().contains(state::InteractionState::HOVERED) {
+                    obj.interaction().insert(state::InteractionState::HOVERED);
+                    obj.event_queue().emit_owned(CheckboxEvent::BeginHover(*pos));
+                    obj.command_group().repaint();
+                }
+            } else if obj.interaction().contains(state::InteractionState::HOVERED) {
+                obj.interaction().remove(state::InteractionState::HOVERED);
+                obj.event_queue()
+                    .emit_owned(CheckboxEvent::EndHover(*event.get()));
+                obj.command_group().repaint();
+            }
+        }
+
+        clear_focus {
+            obj.interaction().remove(state::InteractionState::FOCUSED);
+        }
+    }
+}
+
+/// Getters required for a checkbox window event handler.
+pub trait LogicalCheckbox {
+    /// Returns a mutable reference to the user interaction state.
+    fn interaction(&mut self) -> &mut state::InteractionState;
+    /// Returns a mutable reference to the output `CheckboxEvent` event queue.
+    fn event_queue(&mut self) -> &mut RcEventQueue<CheckboxEvent>;
+    /// Returns a mutable reference to the command group.
+    fn command_group(&mut self) -> &mut CommandGroup;
+    /// Returns the rectangle which captures mouse events.
+    fn mouse_bounds(&self) -> Rect;
+    /// Returns the disabled state.
+    fn disabled(&self) -> bool;
+    /// Toggles the checked state.
+    fn toggle_checked(&mut self);
+    /// Returns the checked state.
+    fn checked(&self) -> bool;
+}
+
 /// Checkbox widget; useful for boolean input.
 #[derive(WidgetChildren)]
 #[widget_children_trait(base::WidgetChildren)]
@@ -68,6 +149,47 @@ where
     phantom_g: PhantomData<G>,
 }
 
+impl<U, G> LogicalCheckbox for Checkbox<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    #[inline(always)]
+    fn interaction(&mut self) -> &mut state::InteractionState {
+        &mut self.interaction
+    }
+
+    #[inline(always)]
+    fn event_queue(&mut self) -> &mut RcEventQueue<CheckboxEvent> {
+        &mut self.event_queue
+    }
+
+    #[inline(always)]
+    fn command_group(&mut self) -> &mut CommandGroup {
+        &mut self.command_group
+    }
+
+    #[inline]
+    fn mouse_bounds(&self) -> Rect {
+        self.painter.mouse_hint(self.rect)
+    }
+
+    #[inline(always)]
+    fn disabled(&self) -> bool {
+        *self.disabled.get()
+    }
+
+    #[inline]
+    fn toggle_checked(&mut self) {
+        self.checked.set(!*self.checked.get());
+    }
+
+    #[inline]
+    fn checked(&self) -> bool {
+        *self.checked.get()
+    }
+}
+
 impl<U, G> Checkbox<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -80,7 +202,6 @@ where
         position: Point,
         theme: &dyn draw::Theme,
         u_aux: &mut U,
-        g_aux: &mut G,
     ) -> Self {
         let temp_state = state::CheckboxState {
             rect: Default::default(),
@@ -89,65 +210,19 @@ where
         };
 
         let painter = theme.checkbox();
-        let rect = Rect::new(position, painter.size_hint(temp_state, g_aux));
+        let rect = Rect::new(position, painter.size_hint(temp_state));
 
         let checked = base::Observed::new(checked);
         let disabled = base::Observed::new(disabled);
 
-        let pipe = pipeline! {
+        let mut pipe = pipeline! {
             Self as obj,
             U as _aux,
             _ev in &checked.on_change => { change { obj.command_group.repaint(); } }
             _ev in &disabled.on_change => { change { obj.command_group.repaint(); } }
-            event in u_aux.window_queue() => {
-                mouse_press {
-                    if let Some((pos, _)) = event.with(|(pos, button)| {
-                        !*obj.disabled.get() && *button == base::MouseButton::Left && obj.mouse_bounds().contains(*pos)
-                    }) {
-                        obj.interaction.insert(state::InteractionState::PRESSED);
-                        obj.event_queue.emit_owned(CheckboxEvent::Press(*pos));
-                        obj.command_group.repaint();
-                    }
-                }
-                mouse_release {
-                    if let Some((pos, _)) = event.with(|(_, button)| {
-                        !*obj.disabled.get()
-                            && *button == base::MouseButton::Left
-                            && obj.interaction.contains(state::InteractionState::PRESSED)
-                    }) {
-                        obj.interaction.remove(state::InteractionState::PRESSED);
-                        obj.interaction.insert(state::InteractionState::FOCUSED);
-                        obj.event_queue.emit_owned(CheckboxEvent::Release(*pos));
-
-                        obj.checked.set(!*obj.checked.get());
-                        obj.event_queue.emit_owned(if *obj.checked.get() {
-                            CheckboxEvent::Press(*pos)
-                        } else {
-                            CheckboxEvent::Release(*pos)
-                        });
-
-                        obj.command_group.repaint();
-                    }
-                }
-                mouse_move {
-                    if let Some(pos) = event.with(|pos| obj.mouse_bounds().contains(*pos)) {
-                        if !obj.interaction.contains(state::InteractionState::HOVERED) {
-                            obj.interaction.insert(state::InteractionState::HOVERED);
-                            obj.event_queue.emit_owned(CheckboxEvent::BeginHover(*pos));
-                            obj.command_group.repaint();
-                        }
-                    } else if obj.interaction.contains(state::InteractionState::HOVERED) {
-                        obj.interaction.remove(state::InteractionState::HOVERED);
-                        obj.event_queue
-                            .emit_owned(CheckboxEvent::EndHover(*event.get()));
-                        obj.command_group.repaint();
-                    }
-                }
-                clear_focus {
-                    obj.interaction.remove(state::InteractionState::FOCUSED);
-                }
-            }
         };
+
+        pipe = pipe.add(checkbox_terminal::<Self, U>().bind(u_aux.window_queue()));
 
         Checkbox {
             event_queue: Default::default(),
@@ -167,11 +242,6 @@ where
             phantom_u: Default::default(),
             phantom_g: Default::default(),
         }
-    }
-
-    #[inline]
-    fn mouse_bounds(&self) -> Rect {
-        self.painter.mouse_hint(self.rect)
     }
 
     fn derive_state(&self) -> state::CheckboxState {
@@ -222,10 +292,10 @@ where
         }
     }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
         let state = self.derive_state();
         let painter = &mut self.painter;
-        self.command_group.push_with(display, || painter.draw(state, aux), None, None);
+        self.command_group.push_with(display, || painter.draw(state), None, None);
     }
 }
 
@@ -316,8 +386,8 @@ where
         &mut self.painter
     }
 
-    fn resize_from_theme(&mut self, aux: &dyn base::GraphicalAuxiliary) {
-        self.set_size(self.painter.size_hint(self.derive_state(), aux));
+    fn resize_from_theme(&mut self) {
+        self.set_size(self.painter.size_hint(self.derive_state()));
     }
 }
 

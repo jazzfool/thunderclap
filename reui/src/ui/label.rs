@@ -282,7 +282,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> draw::HasTheme for L
         &mut self.themed
     }
 
-    fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+    fn resize_from_theme(&mut self) {}
 }
 
 impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::DropNotifier for Label<U, G> {

@@ -165,7 +165,7 @@ macro_rules! pipeline {
                     |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo| {
                         #[allow(unused_variables)]
                         $crate::paste::expr!{
-                            let $eo = $eo.clone().[<unwrap_as_ $ev>]().unwrap();
+                            let $eo = $eo.[<unwrap_as_ $ev>]().unwrap();
                             $body
                         }
                     });
@@ -174,6 +174,25 @@ macro_rules! pipeline {
         )*
         pipe
     }};
+}
+
+#[macro_export]
+macro_rules! unbound_terminal {
+    ($ot:ty as $obj:ident,$at:ty as $add:ident,$et:ty as $eo:ident,$($ev:tt $body:block)*) => {{
+        let mut terminal = $crate::pipe::UnboundTerminal::new();
+        $(
+            terminal = terminal.on(
+                std::stringify!($ev),
+                |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo: $et| {
+                    #[allow(unused_variables)]
+                    $crate::paste::expr!{
+                        let $eo = $eo.[<unwrap_as_ $ev>]().unwrap();
+                        $body
+                    }
+                });
+        )*
+        terminal
+    }}
 }
 
 #[cfg(test)]

@@ -68,7 +68,7 @@ macro_rules! lazy_widget {
             }
 
             #[inline(always)]
-            fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+            fn resize_from_theme(&mut self) {}
         }
 
         impl $crate::base::DropNotifier for $name {
@@ -116,7 +116,7 @@ macro_rules! lazy_widget {
             }
 
             #[inline(always)]
-            fn resize_from_theme(&mut self, _aux: &dyn base::GraphicalAuxiliary) {}
+            fn resize_from_theme(&mut self) {}
         }
 
         impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>

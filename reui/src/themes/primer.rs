@@ -6,10 +6,10 @@ use {
         error,
     },
     reclutch::display::{
-        self, Color, DisplayCommand, DisplayListBuilder, Filter, Gradient, GraphicsDisplay,
-        GraphicsDisplayPaint, GraphicsDisplayStroke, ImageData, RasterImageFormat, RasterImageInfo,
-        Rect, ResourceData, ResourceDescriptor, ResourceReference, SharedData, Size, StyleColor,
-        TextDisplayItem, Vector,
+        self, Color, DisplayCommand, DisplayListBuilder, Filter, FontInfo, Gradient,
+        GraphicsDisplay, GraphicsDisplayPaint, GraphicsDisplayStroke, ImageData, RasterImageFormat,
+        RasterImageInfo, Rect, ResourceData, ResourceDescriptor, ResourceReference, SharedData,
+        Size, StyleColor, TextDisplayItem, Vector,
     },
 };
 
@@ -18,7 +18,10 @@ const LABEL_TEXT_SIZE: f32 = 14.0;
 
 impl Primer {
     /// Creates an instance of the GitHub Primer theme.
-    pub fn new(display: &mut dyn GraphicsDisplay) -> Result<Self, error::ThemeError> {
+    pub fn new<G: base::GraphicalAuxiliary>(
+        g_aux: &mut G,
+        display: &mut dyn GraphicsDisplay,
+    ) -> Result<Self, error::ThemeError> {
         let mut img: image::RgbaImage =
             image::load_from_memory(include_bytes!("checkmark.png"))?.to_rgba();
 
@@ -31,13 +34,13 @@ impl Primer {
 
         recolor_icon(&mut img, Color::new(0.0, 0.0, 0.0, 1.0), Color::new(0.0, 0.0, 1.0, 1.0));
 
-        Ok(Primer { checkmark })
+        Ok(Primer { semibold_font: g_aux.semibold_ui_font(), checkmark })
     }
 }
 
 impl draw::Theme for Primer {
     fn button(&self) -> Box<dyn draw::Painter<state::ButtonState>> {
-        Box::new(ButtonPainter)
+        Box::new(ButtonPainter { font: self.semibold_font.clone() })
     }
 
     fn checkbox(&self) -> Box<dyn draw::Painter<state::CheckboxState>> {
@@ -53,21 +56,21 @@ impl draw::Theme for Primer {
     }
 }
 
-struct ButtonPainter;
+struct ButtonPainter {
+    font: (ResourceReference, FontInfo),
+}
 
 impl ButtonPainter {
     fn make_text_item(
+        &self,
         state: &state::ButtonState,
-        aux: &dyn base::GraphicalAuxiliary,
         color: Color,
         centered: bool,
     ) -> TextDisplayItem {
-        let font = aux.semibold_ui_font();
-
         let mut text = TextDisplayItem {
             text: state.text.clone(),
-            font: font.0,
-            font_info: font.1,
+            font: self.font.0.clone(),
+            font_info: self.font.1.clone(),
             size: state.text_size.unwrap_or(BUTTON_TEXT_SIZE),
             bottom_left: Default::default(),
             color: color.into(),
@@ -88,8 +91,8 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         theme.button()
     }
 
-    fn size_hint(&self, state: state::ButtonState, aux: &dyn base::GraphicalAuxiliary) -> Size {
-        ButtonPainter::make_text_item(&state, aux, Color::default(), false)
+    fn size_hint(&self, state: state::ButtonState) -> Size {
+        self.make_text_item(&state, Color::default(), false)
             .bounds()
             .unwrap()
             .inflate(10.0, 6.0)
@@ -105,11 +108,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         rect
     }
 
-    fn draw(
-        &mut self,
-        state: state::ButtonState,
-        aux: &dyn base::GraphicalAuxiliary,
-    ) -> Vec<DisplayCommand> {
+    fn draw(&mut self, state: state::ButtonState) -> Vec<DisplayCommand> {
         let mut interaction_state = state::InteractionState::empty();
 
         let (background, border, text, focus) = match state.button_type {
@@ -313,7 +312,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         );
 
         // Text
-        builder.push_text(ButtonPainter::make_text_item(&state, aux, text, true), None);
+        builder.push_text(self.make_text_item(&state, text, true), None);
 
         // Focus rect
         if (interaction_state.contains(state::InteractionState::FOCUSED)
@@ -363,7 +362,7 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
         theme.checkbox()
     }
 
-    fn size_hint(&self, _state: state::CheckboxState, _aux: &dyn base::GraphicalAuxiliary) -> Size {
+    fn size_hint(&self, _state: state::CheckboxState) -> Size {
         Size::new(20.0, 20.0)
     }
 
@@ -375,11 +374,7 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
         Rect::new(rect.origin, Size::new(20.0, 20.0))
     }
 
-    fn draw(
-        &mut self,
-        mut state: state::CheckboxState,
-        _aux: &dyn base::GraphicalAuxiliary,
-    ) -> Vec<DisplayCommand> {
+    fn draw(&mut self, mut state: state::CheckboxState) -> Vec<DisplayCommand> {
         state.rect.size = Size::new(20.0, 20.0);
 
         let (background, checkmark_alpha, interaction) = match state.state {

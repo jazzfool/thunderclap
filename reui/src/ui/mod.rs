@@ -135,7 +135,6 @@ pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     button_type: Option<draw::state::ButtonType>,
     disabled: Option<bool>,
     u_aux: &mut U,
-    g_aux: &mut G,
 ) -> Button<U, G> {
     Button::new(
         display::DisplayText::Simple(text),
@@ -145,7 +144,6 @@ pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
         disabled.unwrap_or(false),
         theme,
         u_aux,
-        g_aux,
     )
 }
 

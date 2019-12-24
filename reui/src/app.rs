@@ -23,7 +23,7 @@ pub fn create<R, T, TF, RF>(theme: TF, root: RF, opts: AppOptions) -> Result<App
 where
     R: base::WidgetChildren<UpdateAux = UAux, GraphicalAux = GAux, DisplayObject = DisplayCommand>,
     T: draw::Theme,
-    TF: FnOnce(&mut dyn GraphicsDisplay) -> T,
+    TF: FnOnce(&mut GAux, &mut dyn GraphicsDisplay) -> T,
     RF: FnOnce(&mut UAux, &mut GAux, &T) -> R,
 {
     let event_loop = EventLoop::new();
@@ -65,7 +65,7 @@ where
         scale: hidpi_factor as _,
     };
 
-    let theme = theme(&mut display);
+    let theme = theme(&mut g_aux, &mut display);
     let root = root(&mut u_aux, &mut g_aux, &theme);
 
     let mut app = App {
