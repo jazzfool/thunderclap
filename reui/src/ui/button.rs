@@ -57,7 +57,7 @@ where
             }) {
                 obj.interaction().insert(state::InteractionState::PRESSED);
                 obj.event_queue().emit_owned(ButtonEvent::Press(*pos));
-                obj.command_group().repaint();
+                obj.repaint();
             }
         }
 
@@ -70,7 +70,7 @@ where
                 obj.interaction().remove(state::InteractionState::PRESSED);
                 obj.interaction().insert(state::InteractionState::FOCUSED);
                 obj.event_queue().emit_owned(ButtonEvent::Release(*pos));
-                obj.command_group().repaint();
+                obj.repaint();
             }
         }
 
@@ -80,13 +80,13 @@ where
                     obj.interaction().insert(state::InteractionState::HOVERED);
                     obj.event_queue()
                         .emit_owned(ButtonEvent::BeginHover(pos.clone()));
-                    obj.command_group().repaint();
+                    obj.repaint();
                 }
             } else if obj.interaction().contains(state::InteractionState::HOVERED) {
                 obj.interaction().remove(state::InteractionState::HOVERED);
                 obj.event_queue()
                     .emit_owned(ButtonEvent::EndHover(event.get().clone()));
-                obj.command_group().repaint();
+                obj.repaint();
             }
         }
 
@@ -97,13 +97,11 @@ where
 }
 
 /// Getters required for a button window event handler.
-pub trait LogicalButton {
+pub trait LogicalButton: Repaintable {
     /// Returns a mutable reference to the user interaction state.
     fn interaction(&mut self) -> &mut state::InteractionState;
     /// Returns a mutable reference to the output `ButtonEvent` event queue.
     fn event_queue(&mut self) -> &mut RcEventQueue<ButtonEvent>;
-    /// Returns a mutable reference to the command group.
-    fn command_group(&mut self) -> &mut CommandGroup;
     /// Returns the rectangle which captures mouse events.
     fn mouse_bounds(&self) -> Rect;
     /// Returns the disabled state.
@@ -150,11 +148,6 @@ where
     #[inline(always)]
     fn event_queue(&mut self) -> &mut RcEventQueue<ButtonEvent> {
         &mut self.event_queue
-    }
-
-    #[inline(always)]
-    fn command_group(&mut self) -> &mut CommandGroup {
-        &mut self.command_group
     }
 
     #[inline]

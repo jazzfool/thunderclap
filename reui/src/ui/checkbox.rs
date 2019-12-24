@@ -58,7 +58,7 @@ where
             }) {
                 obj.interaction().insert(state::InteractionState::PRESSED);
                 obj.event_queue().emit_owned(CheckboxEvent::Press(*pos));
-                obj.command_group().repaint();
+                obj.repaint();
             }
         }
 
@@ -80,7 +80,7 @@ where
                     CheckboxEvent::Release(*pos)
                 });
 
-                obj.command_group().repaint();
+                obj.repaint();
             }
         }
 
@@ -89,13 +89,13 @@ where
                 if !obj.interaction().contains(state::InteractionState::HOVERED) {
                     obj.interaction().insert(state::InteractionState::HOVERED);
                     obj.event_queue().emit_owned(CheckboxEvent::BeginHover(*pos));
-                    obj.command_group().repaint();
+                    obj.repaint();
                 }
             } else if obj.interaction().contains(state::InteractionState::HOVERED) {
                 obj.interaction().remove(state::InteractionState::HOVERED);
                 obj.event_queue()
                     .emit_owned(CheckboxEvent::EndHover(*event.get()));
-                obj.command_group().repaint();
+                obj.repaint();
             }
         }
 
@@ -106,13 +106,11 @@ where
 }
 
 /// Getters required for a checkbox window event handler.
-pub trait LogicalCheckbox {
+pub trait LogicalCheckbox: Repaintable {
     /// Returns a mutable reference to the user interaction state.
     fn interaction(&mut self) -> &mut state::InteractionState;
     /// Returns a mutable reference to the output `CheckboxEvent` event queue.
     fn event_queue(&mut self) -> &mut RcEventQueue<CheckboxEvent>;
-    /// Returns a mutable reference to the command group.
-    fn command_group(&mut self) -> &mut CommandGroup;
     /// Returns the rectangle which captures mouse events.
     fn mouse_bounds(&self) -> Rect;
     /// Returns the disabled state.
