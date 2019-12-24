@@ -162,11 +162,6 @@ where
         &mut self.event_queue
     }
 
-    #[inline(always)]
-    fn command_group(&mut self) -> &mut CommandGroup {
-        &mut self.command_group
-    }
-
     #[inline]
     fn mouse_bounds(&self) -> Rect {
         self.painter.mouse_hint(self.rect)
