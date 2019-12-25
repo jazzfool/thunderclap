@@ -7,7 +7,7 @@ use {
         pipe,
     },
     reclutch::{
-        display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect, Size},
+        display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect},
         event::RcEventQueue,
         prelude::*,
     },
@@ -50,7 +50,7 @@ where
         base::WindowEvent as event,
 
         mouse_press {
-            if let Some((pos, _)) = event.with(|(pos, button)| {
+            if let Some((pos, _, _)) = event.with(|(pos, button, _)| {
                 !obj.disabled()
                     && *button == base::MouseButton::Left
                     && obj.mouse_bounds().contains(*pos)
@@ -62,7 +62,7 @@ where
         }
 
         mouse_release {
-            if let Some((pos, _)) = event.with(|(_, button)| {
+            if let Some((pos, _, _)) = event.with(|(_, button, _)| {
                 !obj.disabled()
                     && *button == base::MouseButton::Left
                     && obj.interaction().contains(state::InteractionState::PRESSED)
@@ -75,7 +75,7 @@ where
         }
 
         mouse_move {
-            if let Some(pos) = event.with(|pos| obj.mouse_bounds().contains(*pos)) {
+            if let Some((pos, _)) = event.with(|(pos, _)| obj.mouse_bounds().contains(*pos)) {
                 if !obj.interaction().contains(state::InteractionState::HOVERED) {
                     obj.interaction().insert(state::InteractionState::HOVERED);
                     obj.event_queue()
@@ -85,7 +85,7 @@ where
             } else if obj.interaction().contains(state::InteractionState::HOVERED) {
                 obj.interaction().remove(state::InteractionState::HOVERED);
                 obj.event_queue()
-                    .emit_owned(ButtonEvent::EndHover(event.get().clone()));
+                    .emit_owned(ButtonEvent::EndHover(event.get().0));
                 obj.repaint();
             }
         }
@@ -109,8 +109,12 @@ pub trait LogicalButton: Repaintable {
 }
 
 /// Focus-able button widget.
-#[derive(WidgetChildren)]
+#[derive(
+    WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
+)]
 #[widget_children_trait(base::WidgetChildren)]
+#[reui_crate(crate)]
+#[widget_transform_callback(on_transform)]
 pub struct Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -122,15 +126,20 @@ where
     pub text_size: base::Observed<Option<f32>>,
     pub button_type: base::Observed<state::ButtonType>,
     pub disabled: base::Observed<bool>,
-    rect: Rect,
-
-    interaction: state::InteractionState,
-    visibility: base::Visibility,
-    painter: Box<dyn draw::Painter<state::ButtonState>>,
-    command_group: CommandGroup,
-    layout: base::WidgetLayoutEvents,
-    drop_event: RcEventQueue<base::DropEvent>,
     pipe: Option<pipe::Pipeline<Self, U>>,
+    interaction: state::InteractionState,
+    painter: Box<dyn draw::Painter<state::ButtonState>>,
+
+    #[widget_rect]
+    rect: Rect,
+    #[widget_visibility]
+    visibility: base::Visibility,
+    #[repaint_target]
+    command_group: CommandGroup,
+    #[widget_layout]
+    layout: base::WidgetLayoutEvents,
+    #[widget_drop_event]
+    drop_event: RcEventQueue<base::DropEvent>,
 
     phantom_g: PhantomData<G>,
 }
@@ -190,10 +199,7 @@ where
             button_type,
         };
 
-        let text = base::Observed::new(text);
-        let text_size = base::Observed::new(text_size);
-        let button_type = base::Observed::new(button_type);
-        let disabled = base::Observed::new(disabled);
+        observe![text, text_size, button_type, disabled];
 
         let mut pipe = pipeline! {
             Self as obj,
@@ -214,6 +220,8 @@ where
 
         pipe = pipe.add(button_terminal::<Self, U>().bind(u_aux.window_queue()));
 
+        let size = painter.size_hint(temp_state);
+
         Self {
             event_queue: RcEventQueue::new(),
 
@@ -221,18 +229,23 @@ where
             text_size,
             button_type,
             disabled,
-            rect: Rect::new(position, painter.size_hint(temp_state)),
-
+            pipe: pipe.into(),
             interaction: state::InteractionState::empty(),
-            visibility: Default::default(),
             painter,
+
+            rect: Rect::new(position, size),
+            visibility: Default::default(),
             command_group: CommandGroup::new(),
             layout: Default::default(),
             drop_event: Default::default(),
-            pipe: pipe.into(),
 
             phantom_g: Default::default(),
         }
+    }
+
+    fn on_transform(&mut self) {
+        self.repaint();
+        self.layout.notify(self.rect);
     }
 
     fn derive_state(&self) -> state::ButtonState {
@@ -293,86 +306,6 @@ where
     }
 }
 
-impl<U, G> base::LayableWidget for Button<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn listen_to_layout(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
-        self.layout.update(layout);
-    }
-
-    #[inline]
-    fn layout_id(&self) -> Option<u64> {
-        self.layout.id()
-    }
-}
-
-impl<U, G> base::HasVisibility for Button<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn set_visibility(&mut self, visibility: base::Visibility) {
-        self.visibility = visibility
-    }
-
-    #[inline]
-    fn visibility(&self) -> base::Visibility {
-        self.visibility
-    }
-}
-
-impl<U, G> Repaintable for Button<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn repaint(&mut self) {
-        self.command_group.repaint();
-    }
-}
-
-// FIXME(jazzfool): the blanket `Rectangular` implementation causes `self.layout.notify()` to be called twice.
-// to be frank, this isn't a big deal since bidir_single overwrites the previous event, but in the old implementation this meant emitting the event twice.
-
-impl<U, G> base::Movable for Button<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    fn set_position(&mut self, position: Point) {
-        self.rect.origin = position;
-        self.repaint();
-        self.layout.notify(self.rect);
-    }
-
-    #[inline]
-    fn position(&self) -> Point {
-        self.rect.origin
-    }
-}
-
-impl<U, G> Resizable for Button<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    fn set_size(&mut self, size: Size) {
-        self.rect.size = size;
-        self.repaint();
-        self.layout.notify(self.rect);
-    }
-
-    #[inline]
-    fn size(&self) -> Size {
-        self.rect.size
-    }
-}
-
 impl<U, G> HasTheme for Button<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -389,17 +322,6 @@ where
             button_type: state::ButtonType::Normal,
             ..self.derive_state()
         }));
-    }
-}
-
-impl<U, G> base::DropNotifier for Button<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline(always)]
-    fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
-        &self.drop_event
     }
 }
 

@@ -399,20 +399,40 @@ impl<T> Clone for ConsumableEvent<T> {
 pub enum WindowEvent {
     /// The user pressed a mouse button.
     #[event_key(mouse_press)]
-    MousePress(ConsumableEvent<(Point, MouseButton)>),
+    MousePress(ConsumableEvent<(Point, MouseButton, KeyModifiers)>),
     /// The user released a mouse button.
     /// This event complements `MousePress`, which means it realistically can only
     /// be emitted after `MousePress` has been emitted.
     #[event_key(mouse_release)]
-    MouseRelease(ConsumableEvent<(Point, MouseButton)>),
+    MouseRelease(ConsumableEvent<(Point, MouseButton, KeyModifiers)>),
     /// The user moved the cursor.
     #[event_key(mouse_move)]
-    MouseMove(ConsumableEvent<Point>),
+    MouseMove(ConsumableEvent<(Point, KeyModifiers)>),
+    /// Emitted when a text input is received.
+    #[event_key(text_input)]
+    TextInput(ConsumableEvent<char>),
+    /// Emitted when a key is pressed.
+    #[event_key(key_press)]
+    KeyPress(ConsumableEvent<(KeyInput, KeyModifiers)>),
+    /// Emitted when a key is released.
+    #[event_key(key_release)]
+    KeyRelease(ConsumableEvent<(KeyInput, KeyModifiers)>),
     /// Emitted immediately before an event which is capable of changing focus.
     /// If implementing a focus-able widget, to handle this event, simply clear
     /// the local "focused" flag (which should ideally be stored as `draw::state::InteractionState`).
     #[event_key(clear_focus)]
     ClearFocus,
+}
+
+// Most of these are copied from `winit`.
+// We can't reuse the `winit` types because `winit` is an optional dependency (app feature).
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct KeyModifiers {
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    pub logo: bool,
 }
 
 /// Button on a mouse.
@@ -421,6 +441,173 @@ pub enum MouseButton {
     Left,
     Middle,
     Right,
+}
+
+/// Key on a keyboard.
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeyInput {
+    Key1,
+    Key2,
+    Key3,
+    Key4,
+    Key5,
+    Key6,
+    Key7,
+    Key8,
+    Key9,
+    Key0,
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z,
+    Escape,
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
+    F13,
+    F14,
+    F15,
+    F16,
+    F17,
+    F18,
+    F19,
+    F20,
+    F21,
+    F22,
+    F23,
+    F24,
+    Snapshot,
+    Scroll,
+    Pause,
+    Insert,
+    Home,
+    Delete,
+    End,
+    PageDown,
+    PageUp,
+    Left,
+    Up,
+    Right,
+    Down,
+    Back,
+    Return,
+    Space,
+    Compose,
+    Caret,
+    Numlock,
+    Numpad0,
+    Numpad1,
+    Numpad2,
+    Numpad3,
+    Numpad4,
+    Numpad5,
+    Numpad6,
+    Numpad7,
+    Numpad8,
+    Numpad9,
+    AbntC1,
+    AbntC2,
+    Add,
+    Apostrophe,
+    Apps,
+    At,
+    Ax,
+    Backslash,
+    Calculator,
+    Capital,
+    Colon,
+    Comma,
+    Convert,
+    Decimal,
+    Divide,
+    Equals,
+    Grave,
+    Kana,
+    Kanji,
+    LAlt,
+    LBracket,
+    LControl,
+    LShift,
+    LWin,
+    Mail,
+    MediaSelect,
+    MediaStop,
+    Minus,
+    Multiply,
+    Mute,
+    MyComputer,
+    NavigateForward,
+    NavigateBackward,
+    NextTrack,
+    NoConvert,
+    NumpadComma,
+    NumpadEnter,
+    NumpadEquals,
+    OEM102,
+    Period,
+    PlayPause,
+    Power,
+    PrevTrack,
+    RAlt,
+    RBracket,
+    RControl,
+    RShift,
+    RWin,
+    Semicolon,
+    Slash,
+    Sleep,
+    Stop,
+    Subtract,
+    Sysrq,
+    Tab,
+    Underline,
+    Unlabeled,
+    VolumeDown,
+    VolumeUp,
+    Wake,
+    WebBack,
+    WebFavorites,
+    WebForward,
+    WebHome,
+    WebRefresh,
+    WebSearch,
+    WebStop,
+    Yen,
+    Copy,
+    Paste,
+    Cut,
 }
 
 /// Information about a parent layout with a queue which receives updated rectangles..
@@ -535,6 +722,13 @@ impl<T: Sized> Observed<T> {
         self.on_change.emit_owned(ObservedEvent);
         &mut self.inner
     }
+}
+
+#[macro_export]
+macro_rules! observe {
+    ($($x:ident),*) => {
+        $(let $x = $crate::base::Observed::new($x);)*
+    };
 }
 
 /// Propagates `update` for the children of a widget.

@@ -5,7 +5,7 @@ use {
         pipe,
     },
     reclutch::{
-        display::{CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect, Size},
+        display::{CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect},
         event::RcEventQueue,
         prelude::*,
     },
@@ -53,7 +53,7 @@ where
         base::WindowEvent as event,
 
         mouse_press {
-            if let Some((pos, _)) = event.with(|(pos, button)| {
+            if let Some((pos, _, _)) = event.with(|(pos, button, _)| {
                 !obj.disabled() && *button == base::MouseButton::Left && obj.mouse_bounds().contains(*pos)
             }) {
                 obj.interaction().insert(state::InteractionState::PRESSED);
@@ -63,7 +63,7 @@ where
         }
 
         mouse_release {
-            if let Some((pos, _)) = event.with(|(_, button)| {
+            if let Some((pos, _, _)) = event.with(|(_, button, _)| {
                 !obj.disabled()
                     && *button == base::MouseButton::Left
                     && obj.interaction().contains(state::InteractionState::PRESSED)
@@ -85,7 +85,7 @@ where
         }
 
         mouse_move {
-            if let Some(pos) = event.with(|pos| obj.mouse_bounds().contains(*pos)) {
+            if let Some((pos, _)) = event.with(|(pos, _)| obj.mouse_bounds().contains(*pos)) {
                 if !obj.interaction().contains(state::InteractionState::HOVERED) {
                     obj.interaction().insert(state::InteractionState::HOVERED);
                     obj.event_queue().emit_owned(CheckboxEvent::BeginHover(*pos));
@@ -94,7 +94,7 @@ where
             } else if obj.interaction().contains(state::InteractionState::HOVERED) {
                 obj.interaction().remove(state::InteractionState::HOVERED);
                 obj.event_queue()
-                    .emit_owned(CheckboxEvent::EndHover(*event.get()));
+                    .emit_owned(CheckboxEvent::EndHover(event.get().0));
                 obj.repaint();
             }
         }
@@ -122,8 +122,12 @@ pub trait LogicalCheckbox: Repaintable {
 }
 
 /// Checkbox widget; useful for boolean input.
-#[derive(WidgetChildren)]
+#[derive(
+    WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
+)]
 #[widget_children_trait(base::WidgetChildren)]
+#[reui_crate(crate)]
+#[widget_transform_callback(on_transform)]
 pub struct Checkbox<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -133,15 +137,20 @@ where
 
     pub checked: base::Observed<bool>,
     pub disabled: base::Observed<bool>,
-    rect: Rect,
-
-    command_group: CommandGroup,
+    pipe: Option<pipe::Pipeline<Self, U>>,
     painter: Box<dyn draw::Painter<state::CheckboxState>>,
+
+    #[widget_rect]
+    rect: Rect,
+    #[repaint_target]
+    command_group: CommandGroup,
+    #[widget_layout]
     layout: base::WidgetLayoutEvents,
+    #[widget_visibility]
     visibility: base::Visibility,
     interaction: state::InteractionState,
+    #[widget_drop_event]
     drop_event: RcEventQueue<base::DropEvent>,
-    pipe: Option<pipe::Pipeline<Self, U>>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -223,6 +232,7 @@ where
             checked,
             disabled,
             rect,
+            pipe: pipe.into(),
 
             command_group: Default::default(),
             painter,
@@ -230,11 +240,15 @@ where
             visibility: Default::default(),
             interaction: state::InteractionState::empty(),
             drop_event: Default::default(),
-            pipe: pipe.into(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
         }
+    }
+
+    fn on_transform(&mut self) {
+        self.repaint();
+        self.layout.notify(self.rect);
     }
 
     fn derive_state(&self) -> state::CheckboxState {
@@ -292,83 +306,6 @@ where
     }
 }
 
-impl<U, G> base::LayableWidget for Checkbox<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn listen_to_layout(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
-        self.layout.update(layout);
-    }
-
-    #[inline]
-    fn layout_id(&self) -> Option<u64> {
-        self.layout.id()
-    }
-}
-
-impl<U, G> base::HasVisibility for Checkbox<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn set_visibility(&mut self, visibility: base::Visibility) {
-        self.visibility = visibility
-    }
-
-    #[inline]
-    fn visibility(&self) -> base::Visibility {
-        self.visibility
-    }
-}
-
-impl<U, G> Repaintable for Checkbox<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn repaint(&mut self) {
-        self.command_group.repaint();
-    }
-}
-
-impl<U, G> base::Movable for Checkbox<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    fn set_position(&mut self, position: Point) {
-        self.rect.origin = position;
-        self.repaint();
-        self.layout.notify(self.rect);
-    }
-
-    #[inline]
-    fn position(&self) -> Point {
-        self.rect.origin
-    }
-}
-
-impl<U, G> Resizable for Checkbox<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    fn set_size(&mut self, size: Size) {
-        self.rect.size = size;
-        self.repaint();
-        self.layout.notify(self.rect);
-    }
-
-    #[inline]
-    fn size(&self) -> Size {
-        self.rect.size
-    }
-}
-
 impl<U, G> draw::HasTheme for Checkbox<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -381,17 +318,6 @@ where
 
     fn resize_from_theme(&mut self) {
         self.set_size(self.painter.size_hint(self.derive_state()));
-    }
-}
-
-impl<U, G> base::DropNotifier for Checkbox<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline(always)]
-    fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
-        &self.drop_event
     }
 }
 

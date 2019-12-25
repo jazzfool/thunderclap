@@ -3,7 +3,7 @@ use {
     crate::{base, draw},
     indexmap::IndexMap,
     reclutch::{
-        display::{self, DisplayCommand, Point, Rect, Size},
+        display::{self, DisplayCommand, Rect},
         event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
         prelude::*,
     },
@@ -56,22 +56,26 @@ lazy_widget! {
 }
 
 /// Abstract layout widget which arranges children in a horizontal list, possibly with left/right margins and vertical alignment (see `HStackData`).
-#[derive(WidgetChildren, Debug)]
+#[derive(WidgetChildren, LayableWidget, Movable, Resizable, Debug)]
 #[widget_children_trait(base::WidgetChildren)]
+#[reui_crate(crate)]
+#[widget_transform_callback(on_transform)]
 pub struct HStack<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    rect: Rect,
     rects: IndexMap<u64, ChildData>,
     next_rect_id: u64,
     dirty: bool,
+    themed: draw::PhantomThemed,
+    drop_event: RcEventQueue<base::DropEvent>,
     visibility: base::Visibility,
 
-    themed: draw::PhantomThemed,
+    #[widget_rect]
+    rect: Rect,
+    #[widget_layout]
     layout: base::WidgetLayoutEvents,
-    drop_event: RcEventQueue<base::DropEvent>,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -81,19 +85,24 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> HStack<U, G> {
     /// Creates a new horizontal stack widget with a given rectangle.
     pub fn new(rect: Rect) -> Self {
         HStack {
-            rect,
             rects: IndexMap::new(),
             next_rect_id: 0,
             dirty: true,
-
             themed: Default::default(),
-            layout: Default::default(),
-            visibility: Default::default(),
             drop_event: Default::default(),
+            visibility: Default::default(),
+
+            rect,
+            layout: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
         }
+    }
+
+    fn on_transform(&mut self) {
+        self.dirty = true;
+        self.layout.notify(self.rect);
     }
 }
 
@@ -195,41 +204,5 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for HStack<U,
 
             self.dirty = false;
         }
-    }
-}
-
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::LayableWidget for HStack<U, G> {
-    #[inline]
-    fn listen_to_layout(&mut self, layout: impl Into<Option<base::WidgetLayoutEventsInner>>) {
-        self.layout.update(layout);
-    }
-
-    #[inline]
-    fn layout_id(&self) -> Option<u64> {
-        self.layout.id()
-    }
-}
-
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Movable for HStack<U, G> {
-    #[inline]
-    fn set_position(&mut self, position: Point) {
-        self.rect.origin = position;
-    }
-
-    #[inline]
-    fn position(&self) -> Point {
-        self.rect.origin
-    }
-}
-
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Resizable for HStack<U, G> {
-    #[inline]
-    fn set_size(&mut self, size: Size) {
-        self.rect.size = size;
-    }
-
-    #[inline]
-    fn size(&self) -> Size {
-        self.rect.size
     }
 }

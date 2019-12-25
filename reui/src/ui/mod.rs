@@ -5,9 +5,10 @@ pub mod checkbox;
 pub mod container;
 pub mod hstack;
 pub mod label;
+pub mod text_area;
 pub mod vstack;
 
-pub use {button::*, checkbox::*, container::*, hstack::*, label::*, vstack::*};
+pub use {button::*, checkbox::*, container::*, hstack::*, label::*, text_area::*, vstack::*};
 
 use {
     crate::{base, draw},
@@ -53,57 +54,6 @@ macro_rules! define_layout {
                 $layout.push($data, $target);
             )*
             &mut $layout
-        }
-    }
-}
-
-/// An event which is "toggled". That is to say, `Stop` is always received only after `Start` and `Stop` indicates an exact opposite event to `Start`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ToggledEvent<T> {
-    Start(T),
-    Stop(T),
-}
-
-impl<T> ToggledEvent<T> {
-    /// Creates a new toggled event with given data, either as start or stop (indicated by `is_start`).
-    pub fn new(is_start: bool, data: T) -> Self {
-        if is_start {
-            ToggledEvent::Start(data)
-        } else {
-            ToggledEvent::Stop(data)
-        }
-    }
-
-    /// Returns `true` if the current value is `ToggledEvent::Start`, otherwise `false`.
-    #[inline]
-    pub fn is_start(&self) -> bool {
-        match self {
-            ToggledEvent::Start(_) => true,
-            ToggledEvent::Stop(_) => false,
-        }
-    }
-
-    /// Returns the inner data immutably.
-    #[inline]
-    pub fn data(&self) -> &T {
-        match self {
-            ToggledEvent::Start(ref x) | ToggledEvent::Stop(ref x) => x,
-        }
-    }
-
-    /// Returns the inner data mutably.
-    #[inline]
-    pub fn data_mut(&mut self) -> &mut T {
-        match self {
-            ToggledEvent::Start(ref mut x) | ToggledEvent::Stop(ref mut x) => x,
-        }
-    }
-
-    /// Consumes self, returning the inner data.
-    #[inline]
-    pub fn into_data(self) -> T {
-        match self {
-            ToggledEvent::Start(x) | ToggledEvent::Stop(x) => x,
         }
     }
 }
@@ -154,5 +104,5 @@ pub fn simple_label<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
     rect: display::Rect,
     g_aux: &mut G,
 ) -> Label<U, G> {
-    Label::new(None, None, None, rect, text.into(), theme, g_aux)
+    Label::new(None, None, None, rect, text.into(), true, theme, g_aux)
 }

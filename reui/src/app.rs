@@ -90,6 +90,15 @@ where
     Ok(app)
 }
 
+fn convert_modifiers(modifiers: event::ModifiersState) -> base::KeyModifiers {
+    base::KeyModifiers {
+        shift: modifiers.shift,
+        ctrl: modifiers.ctrl,
+        alt: modifiers.alt,
+        logo: modifiers.logo,
+    }
+}
+
 /// Settings on how an app should be created.
 #[derive(Debug, Clone)]
 pub struct AppOptions {
@@ -199,17 +208,22 @@ where
                     let window_size = window_size.to_physical(g_aux.scale as _);
                     size = Size::new(window_size.width as _, window_size.height as _);
                 }
-                Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
+                Event::WindowEvent {
+                    event: WindowEvent::CursorMoved { position, modifiers, .. },
+                    ..
+                } => {
                     let position = Point::new(position.x as _, position.y as _);
+                    let modifiers = convert_modifiers(modifiers);
 
                     u_aux.cursor = position;
 
                     u_aux.window_queue.emit_owned(base::WindowEvent::MouseMove(
-                        base::ConsumableEvent::new(position),
+                        base::ConsumableEvent::new((position, modifiers)),
                     ));
                 }
                 Event::WindowEvent {
-                    event: WindowEvent::MouseInput { state, button, .. }, ..
+                    event: WindowEvent::MouseInput { state, button, modifiers, .. },
+                    ..
                 } => {
                     let mouse_button = match button {
                         event::MouseButton::Left => base::MouseButton::Left,
@@ -217,15 +231,41 @@ where
                         event::MouseButton::Right => base::MouseButton::Right,
                         _ => base::MouseButton::Left,
                     };
+                    let modifiers = convert_modifiers(modifiers);
 
                     u_aux.window_queue.emit_owned(base::WindowEvent::ClearFocus);
 
                     u_aux.window_queue.emit_owned(match state {
                         event::ElementState::Pressed => base::WindowEvent::MousePress(
-                            base::ConsumableEvent::new((u_aux.cursor, mouse_button)),
+                            base::ConsumableEvent::new((u_aux.cursor, mouse_button, modifiers)),
                         ),
                         event::ElementState::Released => base::WindowEvent::MouseRelease(
-                            base::ConsumableEvent::new((u_aux.cursor, mouse_button)),
+                            base::ConsumableEvent::new((u_aux.cursor, mouse_button, modifiers)),
+                        ),
+                    });
+                }
+                Event::WindowEvent { event: WindowEvent::ReceivedCharacter(character), .. } => {
+                    u_aux.window_queue.emit_owned(base::WindowEvent::TextInput(
+                        base::ConsumableEvent::new(character),
+                    ));
+                }
+                Event::WindowEvent {
+                    event:
+                        WindowEvent::KeyboardInput {
+                            input: event::KeyboardInput { virtual_keycode, state, modifiers, .. },
+                            ..
+                        },
+                    ..
+                } => {
+                    let key_input = unsafe { std::mem::transmute(virtual_keycode) };
+                    let modifiers = convert_modifiers(modifiers);
+
+                    u_aux.window_queue.emit_owned(match state {
+                        event::ElementState::Pressed => base::WindowEvent::KeyPress(
+                            base::ConsumableEvent::new((key_input, modifiers)),
+                        ),
+                        event::ElementState::Released => base::WindowEvent::KeyRelease(
+                            base::ConsumableEvent::new((key_input, modifiers)),
                         ),
                     });
                 }
