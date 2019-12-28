@@ -382,7 +382,7 @@ fn impl_drop_notifier_macro(ast: syn::DeriveInput) -> TokenStream {
                     quote!{
                         impl #impl_generics #crate_name::base::DropNotifier for #name #ty_generics #where_clause {
                             #[inline(always)]
-                            fn drop_event(&self) -> &RcEventQueue<#crate_name::base::DropEvent> {
+                            fn drop_event(&self) -> &#crate_name::reclutch::event::RcEventQueue<#crate_name::base::DropEvent> {
                                 &#ident
                             }
                         }
@@ -532,6 +532,10 @@ fn impl_repaintable_macro(ast: syn::DeriveInput) -> TokenStream {
                         #[inline]
                         fn repaint(&mut self) {
                             #(#repaint_targets)*
+
+                            for child in #crate_name::base::WidgetChildren::children_mut(self) {
+                                child.repaint();
+                            }
                         }
                     }
                 }
@@ -630,6 +634,7 @@ fn impl_movable_macro(ast: syn::DeriveInput) -> TokenStream {
                         impl #impl_generics #crate_name::base::Movable for #name #ty_generics #where_clause {
                             fn set_position(&mut self, position: #crate_name::reclutch::display::Point) {
                                 #assignment
+                                #crate_name::base::Repaintable::repaint(self);
                                 #callback
                             }
 
@@ -770,6 +775,7 @@ fn impl_resizable_macro(ast: syn::DeriveInput) -> TokenStream {
                         impl #impl_generics #crate_name::base::Resizable for #name #ty_generics #where_clause {
                             fn set_size(&mut self, size: #crate_name::reclutch::display::Size) {
                                 #assignment
+                                #crate_name::base::Repaintable::repaint(self);
                                 #callback
                             }
 

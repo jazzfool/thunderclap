@@ -11,8 +11,8 @@ pub mod vstack;
 pub use {button::*, checkbox::*, container::*, hstack::*, label::*, text_area::*, vstack::*};
 
 use {
-    crate::{base, draw},
-    reclutch::display,
+    crate::{base, draw::state, pipe},
+    reclutch::display::{Point, Rect},
 };
 
 /// Simply pushes a list of widgets, each with specified layout data, into a layout, then returns a mutable reference to the layout.
@@ -78,31 +78,74 @@ impl Default for Align {
     }
 }
 
-/// Button creation helper.
-pub fn simple_button<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
-    text: String,
-    theme: &dyn draw::Theme,
-    button_type: Option<draw::state::ButtonType>,
-    disabled: Option<bool>,
-    u_aux: &mut U,
-) -> Button<U, G> {
-    Button::new(
-        display::DisplayText::Simple(text),
-        display::Point::default(),
-        None,
-        button_type.unwrap_or(draw::state::ButtonType::Normal),
-        disabled.unwrap_or(false),
-        theme,
-        u_aux,
-    )
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InteractionEvent {
+    Pressed(Point),
+    Released(Point),
+    BeginHover(Point),
+    EndHover(Point),
+    Focus,
+    Blur,
 }
 
-/// Label creation helper.
-pub fn simple_label<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary>(
-    text: String,
-    theme: &dyn draw::Theme,
-    rect: display::Rect,
-    g_aux: &mut G,
-) -> Label<U, G> {
-    Label::new(None, None, None, rect, text.into(), true, theme, g_aux)
+pub trait InteractiveWidget {
+    fn interaction(&mut self) -> &mut state::InteractionState;
+    fn mouse_bounds(&self) -> Rect;
+    fn disabled(&self) -> bool;
+    fn on_interaction_event(&mut self, event: InteractionEvent);
+}
+
+/// Generates an unbound terminal which handles basic interactivity.
+/// This simply means it will appropriately modify a `state::InteractionState` and emit events
+/// when interactivity changes occur.
+pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary + 'static>(
+) -> pipe::UnboundTerminal<W, U, base::WindowEvent> {
+    unbound_terminal! {
+        W as obj,
+        U as aux,
+        base::WindowEvent as event,
+
+        mouse_press {
+            let bounds = aux.tracer().absolute_bounds(obj.mouse_bounds());
+            if let Some((pos, _, _)) = event.with(|(pos, button, _)| {
+                !obj.disabled()
+                    && *button == base::MouseButton::Left
+                    && bounds.contains(*pos)
+            }) {
+                obj.interaction().insert(state::InteractionState::PRESSED);
+                obj.on_interaction_event(InteractionEvent::Pressed(*pos));
+            }
+        }
+
+        mouse_release {
+            if let Some((pos, _, _)) = event.with(|(_, button, _)| {
+                !obj.disabled()
+                    && *button == base::MouseButton::Left
+                    && obj.interaction().contains(state::InteractionState::PRESSED)
+            }) {
+                obj.interaction().remove(state::InteractionState::PRESSED);
+                obj.interaction().insert(state::InteractionState::FOCUSED);
+                obj.on_interaction_event(InteractionEvent::Released(*pos));
+                obj.on_interaction_event(InteractionEvent::Focus);
+            }
+        }
+
+        mouse_move {
+            let bounds = aux.tracer().absolute_bounds(obj.mouse_bounds());
+            if let Some((pos, _)) = event.with(|(pos, _)| bounds.contains(*pos)) {
+                if !obj.interaction().contains(state::InteractionState::HOVERED) {
+                    obj.interaction().insert(state::InteractionState::HOVERED);
+                    obj.on_interaction_event(InteractionEvent::BeginHover(*pos));
+                }
+            } else if obj.interaction().contains(state::InteractionState::HOVERED) {
+                obj.interaction().remove(state::InteractionState::HOVERED);
+                obj.on_interaction_event(InteractionEvent::EndHover(event.get().0));
+            }
+        }
+
+        clear_focus {
+            obj.interaction().remove(state::InteractionState::FOCUSED);
+            obj.on_interaction_event(InteractionEvent::Blur);
+        }
+    }
 }

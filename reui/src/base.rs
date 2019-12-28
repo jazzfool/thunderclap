@@ -1,12 +1,19 @@
 use {
     crate::draw,
     reclutch::{
-        display::{Color, FontInfo, GraphicsDisplay, Point, Rect, ResourceReference, Size},
+        display::{
+            Color, CommandGroup, DisplayClip, DisplayCommand, GraphicsDisplay, Point, Rect, Size,
+            Vector,
+        },
         event::RcEventQueue,
         prelude::*,
         widget::Widget,
     },
-    std::{cell::RefCell, rc::Rc},
+    std::{
+        cell::RefCell,
+        collections::{HashMap, HashSet},
+        rc::Rc,
+    },
 };
 
 /// Naively implements `HasVisibility`, `Repaintable`, `HasTheme` and `DropEvent` (and hence `Drop`) for a widget.
@@ -17,13 +24,15 @@ use {
 ///     visibility: Visibility,
 ///     themed: PhantomThemed,
 ///     drop_event: RcEventQueue<()>,
+///     position: Position,
 /// }
 ///
 /// lazy_widget! {
 ///     LazyWidget,
 ///     visibility: visibility,
 ///     theme: themed,
-///     drop_event: drop_event
+///     drop_event: drop_event,
+///     position: position
 /// }
 /// ```
 ///
@@ -38,7 +47,8 @@ use {
 ///     generic GenericWidget,
 ///     visibility: visibility,
 ///     theme: themed,
-///     drop_event: drop_event
+///     drop_event: drop_event,
+///     position: position
 /// }
 /// ```
 #[macro_export]
@@ -57,8 +67,12 @@ macro_rules! lazy_widget {
         }
 
         impl $crate::base::Repaintable for $name {
-            #[inline(always)]
-            fn repaint(&mut self) {}
+            #[inline]
+            fn repaint(&mut self) {
+                for child in $crate::base::WidgetChildren::children_mut(self) {
+                    child.repaint();
+                }
+            }
         }
 
         impl $crate::draw::HasTheme for $name {
@@ -73,7 +87,9 @@ macro_rules! lazy_widget {
 
         impl $crate::base::DropNotifier for $name {
             #[inline(always)]
-            fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
+            fn drop_event(
+                &self,
+            ) -> &$crate::reclutch::event::RcEventQueue<$crate::base::DropEvent> {
                 &self.$de
             }
         }
@@ -103,8 +119,12 @@ macro_rules! lazy_widget {
         impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
             $crate::base::Repaintable for $name<U, G>
         {
-            #[inline(always)]
-            fn repaint(&mut self) {}
+            #[inline]
+            fn repaint(&mut self) {
+                for child in $crate::base::WidgetChildren::children_mut(self) {
+                    child.repaint();
+                }
+            }
         }
 
         impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
@@ -123,7 +143,9 @@ macro_rules! lazy_widget {
             $crate::base::DropNotifier for $name<U, G>
         {
             #[inline(always)]
-            fn drop_event(&self) -> &RcEventQueue<base::DropEvent> {
+            fn drop_event(
+                &self,
+            ) -> &$crate::reclutch::event::RcEventQueue<$crate::base::DropEvent> {
                 &self.$de
             }
         }
@@ -203,7 +225,7 @@ macro_rules! lazy_propagate {
 /// #[widget_children_trait(reui::base::WidgetChildren)]
 /// struct MyWidget;
 /// ```
-pub trait WidgetChildren: Widget + draw::HasTheme + Repaintable + HasVisibility {
+pub trait WidgetChildren: Widget + draw::HasTheme + Repaintable + HasVisibility + Movable {
     /// Returns a list of all the children as a vector of immutable `dyn WidgetChildren`.
     fn children(
         &self,
@@ -319,18 +341,37 @@ pub trait UpdateAuxiliary {
     fn window_queue(&self) -> &RcEventQueue<WindowEvent>;
     /// Returns the queue where window events (`WindowEvent`) are emitted, mutably.
     fn window_queue_mut(&mut self) -> &mut RcEventQueue<WindowEvent>;
+    /// Returns a mutable widget tracer.
+    fn tracer(&mut self) -> &mut AdditiveTracer;
 }
 
 /// Trait required for any type passed as the `GraphicalAux` type (seen as `G` in the widget type parameters)
 /// with accessors required for usage within Reui-implemented widgets.
 pub trait GraphicalAuxiliary {
-    /// Returns the UI font.
-    fn ui_font(&self) -> (ResourceReference, FontInfo);
-    /// Returns the UI font in semi-bold variant.
-    /// This may be used over `ui_font` stylistically by a theme.
-    fn semibold_ui_font(&self) -> (ResourceReference, FontInfo);
     /// Returns the HiDPI scaling factor.
     fn scaling(&self) -> f32;
+    /// Returns a mutable widget tracer.
+    fn tracer(&mut self) -> &mut AdditiveTracer;
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub struct AdditiveTracer {
+    offset: Vector,
+}
+
+impl AdditiveTracer {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn absolute(&self, position: Point) -> Point {
+        position + self.offset
+    }
+
+    pub fn absolute_bounds(&self, mut rect: Rect) -> Rect {
+        rect.origin = self.absolute(rect.origin);
+        rect
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -610,7 +651,7 @@ pub enum KeyInput {
     Cut,
 }
 
-/// Information about a parent layout with a queue which receives updated rectangles..
+/// Information about a parent layout with a queue which receives updated rectangles.
 #[derive(Debug)]
 pub struct WidgetLayoutEventsInner {
     pub id: u64,
@@ -724,6 +765,19 @@ impl<T: Sized> Observed<T> {
     }
 }
 
+impl<T: Sized> std::ops::Deref for Observed<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.inner
+    }
+}
+
+impl<T: Sized> std::ops::DerefMut for Observed<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+}
+
 #[macro_export]
 macro_rules! observe {
     ($($x:ident),*) => {
@@ -731,30 +785,102 @@ macro_rules! observe {
     };
 }
 
-/// Propagates `update` for the children of a widget.
-pub fn invoke_update<U, G, D>(
-    widget: &mut dyn WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
+/// Propagates `update` to the children of a widget.
+pub fn invoke_update<U: UpdateAuxiliary, G>(
+    widget: &mut dyn WidgetChildren<
+        UpdateAux = U,
+        GraphicalAux = G,
+        DisplayObject = DisplayCommand,
+    >,
     aux: &mut U,
 ) {
+    let position = widget.position();
+    aux.tracer().offset += position.to_vector();
     // Iterate in reverse because most visually forefront widgets should get events first.
     for child in widget.children_mut().into_iter().rev() {
         if child.visibility() != Visibility::Static || child.visibility() != Visibility::None {
             child.update(aux);
         }
     }
+    aux.tracer().offset -= position.to_vector();
 }
 
-/// Propagates `draw` for the children of a widget.
-pub fn invoke_draw<U, G, D>(
-    widget: &mut dyn WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = D>,
-    display: &mut dyn GraphicsDisplay<D>,
+lazy_static::lazy_static! {
+    static ref DRAW_COUNTER: std::sync::Mutex<u8> = std::sync::Mutex::new(0);
+    // Map of pre/post command groups loosely linked to a widget by using the memory address as a unique identifier.
+    static ref CLIP_LIST: std::sync::Mutex<HashMap<usize, (CommandGroup, CommandGroup)>> =
+        std::sync::Mutex::new(HashMap::new());
+}
+
+fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
+    widget: &mut dyn WidgetChildren<
+        UpdateAux = U,
+        GraphicalAux = G,
+        DisplayObject = DisplayCommand,
+    >,
+    display: &mut dyn GraphicsDisplay,
     aux: &mut G,
+    clip_list: &mut HashMap<usize, (CommandGroup, CommandGroup)>,
+    checked: &mut Option<HashSet<usize>>,
 ) {
-    for child in widget.children_mut() {
-        if child.visibility() != Visibility::Invisible || child.visibility() != Visibility::None {
-            child.draw(display, aux);
+    if widget.visibility() != Visibility::Invisible || widget.visibility() != Visibility::None {
+        let id = widget as *const _ as *const usize as _;
+        let (clip, restore) =
+            clip_list.entry(id).or_insert_with(|| (CommandGroup::new(), CommandGroup::new()));
+        let clip_rect = aux.tracer().absolute_bounds(widget.bounds());
+        clip.push(
+            display,
+            &[
+                DisplayCommand::Save,
+                DisplayCommand::Clip(DisplayClip::Rectangle { rect: clip_rect, antialias: false }),
+                DisplayCommand::Save,
+            ],
+            false,
+            None,
+        );
+
+        widget.draw(display, aux);
+
+        restore.push(display, &[DisplayCommand::Restore, DisplayCommand::Restore], false, None);
+
+        if let Some(ref mut checked) = *checked {
+            checked.insert(id);
         }
     }
+
+    let position = widget.position();
+    aux.tracer().offset += position.to_vector();
+    for child in widget.children_mut() {
+        invoke_draw_impl(child, display, aux, clip_list, checked);
+    }
+    aux.tracer().offset -= position.to_vector();
+}
+
+/// Recursively invokes `draw`.
+pub fn invoke_draw<U, G: GraphicalAuxiliary>(
+    widget: &mut dyn WidgetChildren<
+        UpdateAux = U,
+        GraphicalAux = G,
+        DisplayObject = DisplayCommand,
+    >,
+    display: &mut dyn GraphicsDisplay,
+    aux: &mut G,
+) {
+    let mut draw_counter = DRAW_COUNTER.lock().unwrap();
+    let mut clip_list = CLIP_LIST.lock().unwrap();
+
+    // Every 60 frames clean up CLIP_LIST.
+    // To do so, gather information on which widget ptrs have been maintained.
+    let mut checked = if *draw_counter >= 60 { Some(HashSet::new()) } else { None };
+
+    invoke_draw_impl(widget, display, aux, &mut clip_list, &mut checked);
+
+    if let Some(checked) = checked {
+        *draw_counter = 0;
+        clip_list.retain(|widget_ptr, _| checked.contains(widget_ptr));
+    }
+
+    *draw_counter += 1;
 }
 
 /// Creates a color from 3 unsigned 8-bit components and an `f32` alpha.
@@ -766,5 +892,5 @@ pub fn color_from_urgba(r: u8, g: u8, b: u8, a: f32) -> Color {
 ///
 /// Use this if you have, for example, a 1px stroke and want it to look sharp without losing curve anti-aliasing.
 pub fn sharp_align(rect: Rect) -> Rect {
-    rect.round_in().inflate(-0.5, -0.5)
+    rect.round_in().inflate(0.5, 0.5)
 }

@@ -20,6 +20,7 @@ reclutch = { git = "https://github.com/jazzfool/reclutch" }
 thiserror = "1.0"
 image = "0.22.3"
 paste = "0.1"
+lazy_static = "1.4"
 glutin = { version = "0.22.0-alpha5", optional = true }
 
 [[example]]

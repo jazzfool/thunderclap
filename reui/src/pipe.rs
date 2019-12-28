@@ -183,7 +183,7 @@ macro_rules! unbound_terminal {
         $(
             terminal = terminal.on(
                 std::stringify!($ev),
-                |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo: $et| {
+                |$obj: &mut $ot, #[allow(unused_variables)] $add: &mut $at, $eo: $et| {
                     #[allow(unused_variables)]
                     $crate::paste::expr!{
                         let $eo = $eo.[<unwrap_as_ $ev>]().unwrap();

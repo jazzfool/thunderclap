@@ -2,7 +2,7 @@
     <img src=".media/reui.png" width="150px"/>
 </p>
 
-## <p align="center">Themable GUI toolkit</p>
+## <p align="center">Themeable GUI toolkit</p>
 
 <img align="right" src=".media/showcase.png" width="200px"/>
 
@@ -94,49 +94,6 @@ Pipeline::new()
     ));
 ```
 
-To simplify the creation of the events you can use the derive;
-```rust
-#[derive(PipelineEvent, Clone, Copy, PartialEq)]
-enum MyEvent {
-    #[event_key(stop)]
-    Stop,
-    #[event_key(play)]
-    Play(f32),
-    #[event_key(rewind)]
-    Rewind {
-        seconds: u32,
-        play: bool,
-    },
-}
-```
-
-Which resolves down to:
-```rust
-impl reui::pipe::Event for MyEvent {
-    fn get_key(&self) -> &'static str {
-        match self {
-            MyEvent::Stop => "stop",
-            MyEvent::Play(..) => "play",
-            MyEvent::Rewind{..} => "rewind",
-        }
-    }
-}
-
-impl MyEvent { // These are automatically called by `pipeline!` to "cast" the event.
-    pub fn unwrap_as_stop(self) -> Option<()> {
-        if let MyEvent::Stop = self { Some(()) } else { None }
-    }
-
-    pub fn unwrap_as_play(self) -> Option<(f32)> {
-        if let MyEvent::Play(x0) = self { Some(x0) } else { None }
-    }
-
-    pub fn unwrap_as_rewind(self) -> Option<(u32, bool)> {
-        if let MyEvent::Rewind{seconds, play} = self { Some((seconds, play)) } else { None }
-    }
-}
-```
-
 ---
 
 ### You can see a rundown of all the widgets [here](Widgets.md).
@@ -151,6 +108,7 @@ impl MyEvent { // These are automatically called by `pipeline!` to "cast" the ev
 - Label
 - Checkbox
 - Horizontal Stack
+- Text area
 
 ## License
 

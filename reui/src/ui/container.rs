@@ -1,7 +1,10 @@
 use {
-    crate::{base, draw},
+    crate::{
+        base::{self, WidgetChildren},
+        draw,
+    },
     reclutch::{
-        display::{DisplayCommand, GraphicsDisplay},
+        display::{DisplayCommand, Rect},
         event::RcEventQueue,
         prelude::*,
     },
@@ -18,6 +21,8 @@ lazy_widget! {
 /// Container which dynamically stores widgets.
 /// If you don't need access to children past their creation then you can bundle them up in this.
 /// Those children will still be rendered and receive updates.
+#[derive(Movable)]
+#[reui_crate(crate)]
 pub struct Container<U, G>
 where
     U: base::UpdateAuxiliary,
@@ -36,6 +41,8 @@ where
     themed: draw::PhantomThemed,
     visibility: base::Visibility,
     drop_event: RcEventQueue<base::DropEvent>,
+    #[widget_rect]
+    rect: Rect,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -60,6 +67,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Container<U, G> {
             themed: Default::default(),
             visibility: Default::default(),
             drop_event: Default::default(),
+            rect: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
@@ -69,15 +77,10 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Container<U, G> {
     /// Moves a child into the container.
     pub fn push(
         &mut self,
-        child: Box<
-            dyn base::WidgetChildren<
-                UpdateAux = U,
-                GraphicalAux = G,
-                DisplayObject = DisplayCommand,
-            >,
-        >,
+        child: impl base::WidgetChildren<UpdateAux = U, GraphicalAux = G, DisplayObject = DisplayCommand>
+            + 'static,
     ) {
-        self.children.push(child);
+        self.children.push(Box::new(child));
     }
 }
 
@@ -88,16 +91,21 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Container
 
     fn update(&mut self, aux: &mut U) {
         base::invoke_update(self, aux);
-    }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
-        base::invoke_draw(self, display, aux);
+        // FIXME(jazzfool): only do this when a child position changes.
+        let mut rect: Option<Rect> = None;
+        for child in self.children() {
+            if let Some(ref mut rect) = rect {
+                *rect = rect.union(&child.bounds());
+            } else {
+                rect = Some(child.bounds());
+            }
+        }
+        self.rect = rect.unwrap_or_default();
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::WidgetChildren
-    for Container<U, G>
-{
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> WidgetChildren for Container<U, G> {
     fn children(
         &self,
     ) -> Vec<

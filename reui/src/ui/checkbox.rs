@@ -1,8 +1,8 @@
 use {
     crate::{
         base::{self, Repaintable, Resizable},
-        draw::{self, state},
-        pipe,
+        draw::{self, state, ColorSwatch},
+        pipe, ui,
     },
     reclutch::{
         display::{CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect},
@@ -42,85 +42,6 @@ pub enum CheckboxEvent {
     Blur,
 }
 
-pub fn checkbox_terminal<C, U>() -> pipe::UnboundTerminal<C, U, base::WindowEvent>
-where
-    C: LogicalCheckbox,
-    U: base::UpdateAuxiliary + 'static,
-{
-    unbound_terminal! {
-        C as obj,
-        U as _aux,
-        base::WindowEvent as event,
-
-        mouse_press {
-            if let Some((pos, _, _)) = event.with(|(pos, button, _)| {
-                !obj.disabled() && *button == base::MouseButton::Left && obj.mouse_bounds().contains(*pos)
-            }) {
-                obj.interaction().insert(state::InteractionState::PRESSED);
-                obj.event_queue().emit_owned(CheckboxEvent::Press(*pos));
-                obj.repaint();
-            }
-        }
-
-        mouse_release {
-            if let Some((pos, _, _)) = event.with(|(_, button, _)| {
-                !obj.disabled()
-                    && *button == base::MouseButton::Left
-                    && obj.interaction().contains(state::InteractionState::PRESSED)
-            }) {
-                obj.interaction().remove(state::InteractionState::PRESSED);
-                obj.interaction().insert(state::InteractionState::FOCUSED);
-                obj.event_queue().emit_owned(CheckboxEvent::Release(*pos));
-
-                obj.toggle_checked();
-                let checked = obj.checked();
-                obj.event_queue().emit_owned(if checked {
-                    CheckboxEvent::Press(*pos)
-                } else {
-                    CheckboxEvent::Release(*pos)
-                });
-
-                obj.repaint();
-            }
-        }
-
-        mouse_move {
-            if let Some((pos, _)) = event.with(|(pos, _)| obj.mouse_bounds().contains(*pos)) {
-                if !obj.interaction().contains(state::InteractionState::HOVERED) {
-                    obj.interaction().insert(state::InteractionState::HOVERED);
-                    obj.event_queue().emit_owned(CheckboxEvent::BeginHover(*pos));
-                    obj.repaint();
-                }
-            } else if obj.interaction().contains(state::InteractionState::HOVERED) {
-                obj.interaction().remove(state::InteractionState::HOVERED);
-                obj.event_queue()
-                    .emit_owned(CheckboxEvent::EndHover(event.get().0));
-                obj.repaint();
-            }
-        }
-
-        clear_focus {
-            obj.interaction().remove(state::InteractionState::FOCUSED);
-        }
-    }
-}
-
-/// Getters required for a checkbox window event handler.
-pub trait LogicalCheckbox: Repaintable {
-    /// Returns a mutable reference to the user interaction state.
-    fn interaction(&mut self) -> &mut state::InteractionState;
-    /// Returns a mutable reference to the output `CheckboxEvent` event queue.
-    fn event_queue(&mut self) -> &mut RcEventQueue<CheckboxEvent>;
-    /// Returns the rectangle which captures mouse events.
-    fn mouse_bounds(&self) -> Rect;
-    /// Returns the disabled state.
-    fn disabled(&self) -> bool;
-    /// Toggles the checked state.
-    fn toggle_checked(&mut self);
-    /// Returns the checked state.
-    fn checked(&self) -> bool;
-}
-
 /// Checkbox widget; useful for boolean input.
 #[derive(
     WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
@@ -134,9 +55,8 @@ where
     G: base::GraphicalAuxiliary + 'static,
 {
     pub event_queue: RcEventQueue<CheckboxEvent>,
+    pub data: base::Observed<CheckboxData>,
 
-    pub checked: base::Observed<bool>,
-    pub disabled: base::Observed<bool>,
     pipe: Option<pipe::Pipeline<Self, U>>,
     painter: Box<dyn draw::Painter<state::CheckboxState>>,
 
@@ -152,11 +72,10 @@ where
     #[widget_drop_event]
     drop_event: RcEventQueue<base::DropEvent>,
 
-    phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
 }
 
-impl<U, G> LogicalCheckbox for Checkbox<U, G>
+impl<U, G> ui::InteractiveWidget for Checkbox<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -166,11 +85,6 @@ where
         &mut self.interaction
     }
 
-    #[inline(always)]
-    fn event_queue(&mut self) -> &mut RcEventQueue<CheckboxEvent> {
-        &mut self.event_queue
-    }
-
     #[inline]
     fn mouse_bounds(&self) -> Rect {
         self.painter.mouse_hint(self.rect)
@@ -178,17 +92,108 @@ where
 
     #[inline(always)]
     fn disabled(&self) -> bool {
-        *self.disabled.get()
+        self.data.disabled
     }
 
-    #[inline]
-    fn toggle_checked(&mut self) {
-        self.checked.set(!*self.checked.get());
+    fn on_interaction_event(&mut self, event: ui::InteractionEvent) {
+        self.repaint();
+        match event {
+            ui::InteractionEvent::Pressed(pos) => {
+                self.event_queue.emit_owned(CheckboxEvent::Press(pos));
+            }
+            ui::InteractionEvent::Released(pos) => {
+                self.data.checked = !self.data.checked;
+                self.event_queue.emit_owned(if self.data.checked {
+                    CheckboxEvent::Check(pos)
+                } else {
+                    CheckboxEvent::Uncheck(pos)
+                });
+                self.event_queue.emit_owned(CheckboxEvent::Release(pos));
+            }
+            ui::InteractionEvent::BeginHover(pos) => {
+                self.event_queue.emit_owned(CheckboxEvent::BeginHover(pos));
+            }
+            ui::InteractionEvent::EndHover(pos) => {
+                self.event_queue.emit_owned(CheckboxEvent::EndHover(pos));
+            }
+            ui::InteractionEvent::Focus => {
+                self.event_queue.emit_owned(CheckboxEvent::Focus);
+            }
+            ui::InteractionEvent::Blur => {
+                self.event_queue.emit_owned(CheckboxEvent::Blur);
+            }
+        };
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CheckboxData {
+    pub foreground: ColorSwatch,
+    pub background: ColorSwatch,
+    pub focus: ColorSwatch,
+    pub checked: bool,
+    pub disabled: bool,
+}
+
+impl CheckboxData {
+    pub fn from_theme(theme: &dyn draw::Theme) -> Self {
+        let data = theme.data();
+        CheckboxData {
+            foreground: data.scheme.over_control_inset,
+            background: data.scheme.control_inset,
+            focus: data.scheme.focus,
+            checked: false,
+            disabled: false,
+        }
     }
 
-    #[inline]
-    fn checked(&self) -> bool {
-        *self.checked.get()
+    pub fn construct<U, G>(
+        self,
+        theme: &dyn draw::Theme,
+        u_aux: &mut U,
+        _g_aux: &mut G,
+    ) -> Checkbox<U, G>
+    where
+        U: base::UpdateAuxiliary + 'static,
+        G: base::GraphicalAuxiliary + 'static,
+    {
+        let data = base::Observed::new(self);
+
+        let mut pipe = pipeline! {
+            Checkbox<U, G> as obj,
+            U as _aux,
+            _ev in &data.on_change => { change { obj.command_group.repaint(); } }
+        };
+
+        pipe = pipe
+            .add(ui::basic_interaction_terminal::<Checkbox<U, G>, U>().bind(u_aux.window_queue()));
+
+        let painter = theme.checkbox();
+        let rect = Rect::new(
+            Default::default(),
+            painter.size_hint(state::CheckboxState {
+                rect: Default::default(),
+                data: data.clone(),
+                interaction: state::InteractionState::empty(),
+            }),
+        );
+
+        Checkbox {
+            event_queue: Default::default(),
+            data,
+
+            pipe: pipe.into(),
+            painter,
+
+            rect,
+            command_group: Default::default(),
+            layout: Default::default(),
+            visibility: Default::default(),
+            interaction: state::InteractionState::empty(),
+            drop_event: Default::default(),
+
+            phantom_g: Default::default(),
+        }
     }
 }
 
@@ -197,55 +202,6 @@ where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
-    /// Creates a new checkbox with a specified checked state, disabled state, position and theme.
-    pub fn new(
-        checked: bool,
-        disabled: bool,
-        position: Point,
-        theme: &dyn draw::Theme,
-        u_aux: &mut U,
-    ) -> Self {
-        let temp_state = state::CheckboxState {
-            rect: Default::default(),
-            checked,
-            state: state::ControlState::Normal(state::InteractionState::empty()),
-        };
-
-        let painter = theme.checkbox();
-        let rect = Rect::new(position, painter.size_hint(temp_state));
-
-        let checked = base::Observed::new(checked);
-        let disabled = base::Observed::new(disabled);
-
-        let mut pipe = pipeline! {
-            Self as obj,
-            U as _aux,
-            _ev in &checked.on_change => { change { obj.command_group.repaint(); } }
-            _ev in &disabled.on_change => { change { obj.command_group.repaint(); } }
-        };
-
-        pipe = pipe.add(checkbox_terminal::<Self, U>().bind(u_aux.window_queue()));
-
-        Checkbox {
-            event_queue: Default::default(),
-
-            checked,
-            disabled,
-            rect,
-            pipe: pipe.into(),
-
-            command_group: Default::default(),
-            painter,
-            layout: Default::default(),
-            visibility: Default::default(),
-            interaction: state::InteractionState::empty(),
-            drop_event: Default::default(),
-
-            phantom_u: Default::default(),
-            phantom_g: Default::default(),
-        }
-    }
-
     fn on_transform(&mut self) {
         self.repaint();
         self.layout.notify(self.rect);
@@ -254,12 +210,8 @@ where
     fn derive_state(&self) -> state::CheckboxState {
         state::CheckboxState {
             rect: self.rect,
-            checked: *self.checked.get(),
-            state: if *self.disabled.get() {
-                state::ControlState::Disabled
-            } else {
-                state::ControlState::Normal(self.interaction)
-            },
+            data: self.data.clone(),
+            interaction: self.interaction,
         }
     }
 }

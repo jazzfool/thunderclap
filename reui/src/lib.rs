@@ -8,7 +8,9 @@ pub extern crate reclutch;
 #[macro_use]
 extern crate reui_derive;
 
-pub use reui_derive::PipelineEvent;
+pub use reui_derive::{
+    DropNotifier, HasVisibility, LayableWidget, Movable, PipelineEvent, Repaintable, Resizable,
+};
 
 pub use paste;
 
@@ -18,11 +20,12 @@ pub mod draw;
 pub mod error;
 #[macro_use]
 pub mod pipe;
-pub mod themes;
 pub mod ui;
 
 #[cfg(feature = "app")]
 pub mod app;
+#[cfg(feature = "default-themes")]
+pub mod themes;
 
 pub mod prelude {
     pub use crate::base::{Layout, Movable, Rectangular, Repaintable, Resizable, WidgetChildren};

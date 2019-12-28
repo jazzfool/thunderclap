@@ -1,12 +1,13 @@
 use {
     crate::{
         base::{self, Repaintable},
-        draw, pipe,
+        draw::{self, ColorSwatch},
+        pipe,
     },
     reclutch::{
         display::{
-            center_horizontally, CommandGroup, DisplayCommand, DisplayListBuilder, DisplayText,
-            FontInfo, GraphicsDisplay, Rect, ResourceReference, StyleColor, TextDisplayItem,
+            center_horizontally, Color, CommandGroup, DisplayCommand, DisplayListBuilder,
+            DisplayText, FontInfo, GraphicsDisplay, Rect, ResourceReference, Size, TextDisplayItem,
         },
         event::RcEventQueue,
         prelude::*,
@@ -28,19 +29,17 @@ pub enum TextAlign {
 )]
 #[widget_children_trait(base::WidgetChildren)]
 #[reui_crate(crate)]
+#[widget_transform_callback(on_transform)]
 pub struct Label<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
-    pub text: base::Observed<DisplayText>,
-    pub size: base::Observed<f32>,
-    pub color: base::Observed<StyleColor>,
-    pub font: base::Observed<(ResourceReference, FontInfo)>,
-    pub align: base::Observed<TextAlign>,
-    pub wrap: base::Observed<bool>,
+    pub data: base::Observed<LabelData>,
+
     pipe: Option<pipe::Pipeline<Self, U>>,
     text_items: Vec<TextDisplayItem>,
+    previous_rect: Rect,
 
     #[widget_rect]
     rect: Rect,
@@ -54,108 +53,112 @@ where
     drop_event: RcEventQueue<base::DropEvent>,
 
     themed: draw::PhantomThemed,
-    phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
-    /// Creates a new label widget.
-    pub fn new(
-        size: Option<f32>,
-        color: Option<StyleColor>,
-        align: Option<TextAlign>,
-        rect: Rect,
-        text: DisplayText,
-        wrap: bool,
-        theme: &dyn draw::Theme,
-        g_aux: &mut G,
-    ) -> Self {
-        let size = base::Observed::new(size.unwrap_or(theme.default_text_size()));
-        let color = base::Observed::new(color.unwrap_or(theme.label_color()));
-        let font = base::Observed::new(g_aux.ui_font());
-        let align = base::Observed::new(align.unwrap_or(TextAlign::Left));
-        observe![text, wrap];
+pub struct LabelData {
+    pub text: DisplayText,
+    pub typeface: draw::TypefaceStyle,
+    pub color: ColorSwatch,
+    pub align: TextAlign,
+    pub wrap: bool,
+}
 
-        let text_items = Self::create_text_items(
-            rect,
-            text.get().clone(),
-            color.get().clone(),
-            *align.get(),
-            (font.get().0.clone(), font.get().1.clone()),
-            *size.get(),
-            *wrap.get(),
+impl LabelData {
+    pub fn from_theme(theme: &dyn draw::Theme) -> Self {
+        let data = theme.data();
+        LabelData {
+            text: "".to_string().into(),
+            typeface: data.typography.body.clone(),
+            color: data.scheme.over_primary,
+            align: TextAlign::Left,
+            wrap: true,
+        }
+    }
+
+    pub fn construct<U, G>(self, _: &dyn draw::Theme, _u_aux: &mut U, _g_aux: &mut G) -> Label<U, G>
+    where
+        U: base::UpdateAuxiliary + 'static,
+        G: base::GraphicalAuxiliary + 'static,
+    {
+        let data = base::Observed::new(self);
+
+        let (text_items, rect) = Label::<U, G>::create_text_items(
+            Rect::new(Default::default(), Size::new(std::f32::MAX, 0.0)),
+            data.text.clone(),
+            data.color.into(),
+            data.align,
+            data.typeface.typeface.pick(data.typeface.style),
+            data.typeface.size,
+            data.wrap,
         );
 
         let pipe = pipeline! {
-            Self as obj,
+            Label<U, G> as obj,
             U as _aux,
-            _ev in &text.on_change => { change {
-                obj.update_text_items();
-            }}
-            _ev in &size.on_change => { change {
-                obj.update_text_items();
-            }}
-            _ev in &color.on_change => { change {
-                for item in &mut obj.text_items {
-                    item.color = obj.color.get().clone();
+            _ev in &data.on_change => {
+                change {
+                    obj.update_text_items();
                 }
-                obj.repaint();
-            }}
-            _ev in &font.on_change => { change {
-                obj.update_text_items();
-            }}
-            _ev in &align.on_change => { change {
-                obj.update_text_items();
-            }}
-            _ev in &wrap.on_change => { change {
-                obj.update_text_items();
-            }}
+            }
         };
 
         Label {
-            text,
-            size,
-            color,
-            font,
-            align,
-            wrap,
-            rect,
+            data,
+
             pipe: pipe.into(),
             text_items,
+            previous_rect: rect,
 
+            rect,
             command_group: Default::default(),
             layout: Default::default(),
             visibility: Default::default(),
             drop_event: Default::default(),
 
             themed: Default::default(),
-            phantom_u: Default::default(),
             phantom_g: Default::default(),
         }
+    }
+}
+
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
+    fn on_transform(&mut self) {
+        if self.previous_rect.size.width != self.rect.size.width {
+            self.update_text_items();
+        } else if self.previous_rect.origin != self.rect.origin {
+            let diff = self.rect.origin - self.previous_rect.origin;
+            for item in &mut self.text_items {
+                item.bottom_left += diff;
+            }
+        }
+
+        self.previous_rect = self.rect;
+        self.layout.notify(self.rect);
+        self.repaint();
     }
 
     fn create_text_items(
         rect: Rect,
         text: DisplayText,
-        color: StyleColor,
+        color: Color,
         align: TextAlign,
         font: (ResourceReference, FontInfo),
         size: f32,
         wrap: bool,
-    ) -> Vec<TextDisplayItem> {
+    ) -> (Vec<TextDisplayItem>, Rect) {
         let mut text = TextDisplayItem {
             text,
             font: font.0,
             font_info: font.1.clone(),
             size,
             bottom_left: Default::default(),
-            color,
+            color: color.into(),
         };
 
         text.set_top_left(rect.origin);
 
         let metrics = font.1.font.metrics();
-
         let mut text_items = if wrap {
             text.linebreak(
                 rect,
@@ -167,32 +170,39 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
             vec![text]
         };
 
+        let mut total_bounds: Option<Rect> = None;
         for text_item in &mut text_items {
             let bounds = text_item.bounds().unwrap();
+            if let Some(ref mut total_bounds) = total_bounds {
+                *total_bounds = total_bounds.union(&bounds);
+            } else {
+                total_bounds = Some(bounds);
+            }
             let left = match align {
                 TextAlign::Left => text_item.bottom_left.x,
                 TextAlign::Middle => center_horizontally(bounds, rect).x,
                 TextAlign::Right => rect.max_x() - bounds.size.width,
             };
-
             text_item.bottom_left.x = left;
         }
 
-        text_items
+        (text_items, total_bounds.unwrap_or_default())
     }
 
     fn update_text_items(&mut self) {
-        let text_items = Self::create_text_items(
+        let (text_items, bounds) = Self::create_text_items(
             self.rect,
-            self.text.get().clone(),
-            self.color.get().clone(),
-            *self.align.get(),
-            (self.font.get().0.clone(), self.font.get().1.clone()),
-            *self.size.get(),
-            *self.wrap.get(),
+            self.data.text.clone(),
+            self.data.color.into(),
+            self.data.align,
+            self.data.typeface.typeface.pick(self.data.typeface.style),
+            self.data.typeface.size,
+            self.data.wrap,
         );
 
         self.text_items = text_items;
+        self.rect = bounds;
+        self.layout.notify(self.rect);
         self.repaint();
     }
 }
@@ -219,13 +229,10 @@ where
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
         let mut builder = DisplayListBuilder::new();
-
         builder.push_rectangle_clip(self.rect, true);
-
         for text_item in &self.text_items {
             builder.push_text(text_item.clone(), None);
         }
-
         self.command_group.push(display, &builder.build(), None, None);
     }
 }

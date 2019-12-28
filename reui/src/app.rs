@@ -45,25 +45,13 @@ where
             size: (opts.window_size.width as _, opts.window_size.height as _),
         })?;
 
-    let mut u_aux = UAux { window_queue: RcEventQueue::new(), cursor: Default::default() };
-
-    let mut g_aux = GAux {
-        ui_font: {
-            let resource = display.new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                SharedData::RefCount(std::sync::Arc::new(opts.ui_font.data().unwrap())),
-            )))?;
-
-            (resource, opts.ui_font)
-        },
-        semibold_font: {
-            let resource = display.new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                SharedData::RefCount(std::sync::Arc::new(opts.semibold_font.data().unwrap())),
-            )))?;
-
-            (resource, opts.semibold_font)
-        },
-        scale: hidpi_factor as _,
+    let mut u_aux = UAux {
+        window_queue: RcEventQueue::new(),
+        cursor: Default::default(),
+        tracer: Default::default(),
     };
+
+    let mut g_aux = GAux { scale: hidpi_factor as _, tracer: Default::default() };
 
     let theme = theme(&mut g_aux, &mut display);
     let root = root(&mut u_aux, &mut g_aux, &theme);
@@ -108,10 +96,6 @@ pub struct AppOptions {
     pub warmup: u32,
     /// The background color of the window.
     pub background: Color,
-    /// The regular UI font.
-    pub ui_font: FontInfo,
-    /// The semibold UI font.
-    pub semibold_font: FontInfo,
     /// Initial size of the app window.
     pub window_size: Size,
 }
@@ -184,7 +168,7 @@ where
                         None,
                     );
 
-                    root.draw(&mut display, &mut g_aux);
+                    base::invoke_draw(&mut root, &mut display, &mut g_aux);
 
                     command_group_post.push(&mut display, &[DisplayCommand::Restore], false, None);
 
@@ -289,6 +273,7 @@ where
 pub struct UAux {
     pub window_queue: RcEventQueue<base::WindowEvent>,
     pub cursor: Point,
+    tracer: base::AdditiveTracer,
 }
 
 impl base::UpdateAuxiliary for UAux {
@@ -301,28 +286,27 @@ impl base::UpdateAuxiliary for UAux {
     fn window_queue_mut(&mut self) -> &mut RcEventQueue<base::WindowEvent> {
         &mut self.window_queue
     }
+
+    #[inline]
+    fn tracer(&mut self) -> &mut base::AdditiveTracer {
+        &mut self.tracer
+    }
 }
 
 /// Rudimentary graphical auxiliary.
 pub struct GAux {
-    pub ui_font: (ResourceReference, FontInfo),
-    pub semibold_font: (ResourceReference, FontInfo),
     pub scale: f32,
+    tracer: base::AdditiveTracer,
 }
 
 impl base::GraphicalAuxiliary for GAux {
     #[inline]
-    fn ui_font(&self) -> (ResourceReference, FontInfo) {
-        self.ui_font.clone()
-    }
-
-    #[inline]
-    fn semibold_ui_font(&self) -> (ResourceReference, FontInfo) {
-        self.semibold_font.clone()
-    }
-
-    #[inline]
     fn scaling(&self) -> f32 {
         self.scale
+    }
+
+    #[inline]
+    fn tracer(&mut self) -> &mut base::AdditiveTracer {
+        &mut self.tracer
     }
 }

@@ -13,6 +13,14 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Themed.....`** ✔️
 - **`Focusable..`** ✔️
 - **`Layable....`** ✔️
+- **Properties:**
+    - `text`: Text shown in the button.
+    - `typeface`: Typeface used in for the text.
+    - `color`: Color of the text.
+    - `background`: Background color of the text.
+    - `focus`: Color used to indicate focus (usually in the form of a border).
+    - `contrast`: Contrast mode of `background` and `color`.
+    - `disabled`: Whether the button can be interacted with.
 - **Outgoing Event Queues:**
     - `event_queue`: `ButtonEvent`
         - `press`: The button has been pressed.
@@ -29,6 +37,12 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Themed.....`** ❌
 - **`Focusable..`** ❌
 - **`Layable....`** ✔️
+- **Properties:**
+    - `text`: Text shown by the label.
+    - `typeface`: Typeface of the text.
+    - `color`: Color of the text.
+    - `align`: Horizontal alignment of the text.
+    - `wrap`: Whether text should be wrapped to fit in the rectangle.
 - **Outgoing Event Queues:**
     - *None*
 
@@ -39,6 +53,12 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Themed.....`** ✔️
 - **`Focusable..`** ✔️
 - **`Layable....`** ✔️
+- **Properties:**
+    - `foreground`: Color of the checkmark.
+    - `background`: Color of the checkbox.
+    - `focus`: Color used to indicate focus (usually in the form of a border).
+    - `checked`: Whether the checkbox is checked.
+    - `disabled`: Whether the checkbox can be interacted with.
 - **Outgoing Event Queues:**
     - `event_queue`: `CheckboxEvent`
         - `press`: The checkbox has been pressed.

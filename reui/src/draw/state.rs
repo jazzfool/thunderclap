@@ -3,16 +3,14 @@
 //! These are simply the fields relevant to rendering, existing only
 //! in the scope of the `draw` method.
 
-use reclutch::display::{DisplayText, Rect};
+use {crate::ui, reclutch::display::Rect};
 
 /// Visually relevant states of a [`Button`](../ui/struct.Button.html).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct ButtonState {
     pub rect: Rect,
-    pub text: DisplayText,
-    pub text_size: Option<f32>,
-    pub state: ControlState,
-    pub button_type: ButtonType,
+    pub data: ui::ButtonData,
+    pub interaction: InteractionState,
 }
 
 bitflags::bitflags! {
@@ -23,26 +21,25 @@ bitflags::bitflags! {
     }
 }
 
-/// Either the interaction state (`InteractionState`) or the disabled state (none) of a widget.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ControlState {
-    Normal(InteractionState),
-    Disabled,
-}
-
-/// Visual button type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ButtonType {
-    Normal,
-    Primary,
-    Danger,
-    Outline,
-}
-
 /// Visually relevant states of a [`Checkbox`](../ui/struct.Checkbox.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CheckboxState {
     pub rect: Rect,
-    pub checked: bool,
-    pub state: ControlState,
+    pub data: ui::CheckboxData,
+    pub interaction: InteractionState,
+}
+
+/// Visually relevant states of a [`TextArea`](../ui/struct.TextArea.html).
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextAreaState {
+    pub rect: Rect,
+    pub data: ui::TextAreaData,
+    pub interaction: InteractionState,
+}
+
+/// Text which can either be display normally or as placeholder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputText {
+    Normal(String),
+    Placeholder(String),
 }

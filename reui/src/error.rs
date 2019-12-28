@@ -14,7 +14,7 @@ pub enum AppError {
 #[derive(Error, Debug)]
 pub enum ThemeError {
     #[error("{0}")]
-    ImageError(#[from] image::ImageError),
-    #[error("{0}")]
     ResourceError(#[from] error::ResourceError),
+    #[error("{0}")]
+    FontError(#[from] error::FontError),
 }

@@ -1,12 +1,12 @@
 use {
-    super::{recolor_icon, Primer},
+    super::Primer,
     crate::{
         base,
         draw::{self, state},
-        error,
+        error, ui,
     },
     reclutch::display::{
-        self, Color, DisplayCommand, DisplayListBuilder, Filter, FontInfo, Gradient,
+        self, Color, DisplayCommand, DisplayListBuilder, DisplayText, Filter, FontInfo, Gradient,
         GraphicsDisplay, GraphicsDisplayPaint, GraphicsDisplayStroke, ImageData, RasterImageFormat,
         RasterImageInfo, Rect, ResourceData, ResourceDescriptor, ResourceReference, SharedData,
         Size, StyleColor, TextDisplayItem, Vector,
@@ -22,67 +22,154 @@ impl Primer {
         g_aux: &mut G,
         display: &mut dyn GraphicsDisplay,
     ) -> Result<Self, error::ThemeError> {
-        let mut img: image::RgbaImage =
-            image::load_from_memory(include_bytes!("checkmark.png"))?.to_rgba();
+        let typeface = {
+            let fonts = &[
+                std::sync::Arc::new(include_bytes!("assets/Inter-Regular.ttf").to_vec()),
+                std::sync::Arc::new(include_bytes!("assets/Inter-Italic.ttf").to_vec()),
+                std::sync::Arc::new(include_bytes!("assets/Inter-SemiBold.ttf").to_vec()),
+                std::sync::Arc::new(include_bytes!("assets/Inter-SemiBoldItalic.ttf").to_vec()),
+            ];
 
-        recolor_icon(&mut img, Color::new(1.0, 1.0, 1.0, 1.0), Color::new(0.0, 0.0, 0.0, 1.0));
+            let fonts: Vec<(ResourceReference, FontInfo)> = fonts
+                .into_iter()
+                .map(|font| -> Result<(ResourceReference, FontInfo), error::ThemeError> {
+                    let font_info = FontInfo::from_data(font.clone(), 0)?;
+                    let font_resource = display.new_resource(ResourceDescriptor::Font(
+                        ResourceData::Data(SharedData::RefCount(font.clone())),
+                    ))?;
 
-        let checkmark = display.new_resource(ResourceDescriptor::Image(ImageData::Raw(
-            ResourceData::Data(SharedData::RefCount(std::sync::Arc::new(img.clone().into_raw()))),
-            RasterImageInfo { size: (128, 128), format: RasterImageFormat::Rgba8 },
-        )))?;
+                    Ok((font_resource, font_info))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
 
-        recolor_icon(&mut img, Color::new(0.0, 0.0, 0.0, 1.0), Color::new(0.0, 0.0, 1.0, 1.0));
+            draw::Typeface {
+                regular: fonts[0].clone(),
+                italic: fonts[1].clone(),
+                bold: fonts[2].clone(),
+                bold_italic: fonts[3].clone(),
+            }
+        };
 
-        Ok(Primer { semibold_font: g_aux.semibold_ui_font(), checkmark })
+        Ok(Primer {
+            data: draw::ThemeData {
+                scheme: draw::ColorScheme {
+                    background: draw::ColorSwatch::generate(
+                        base::color_from_urgba(255, 255, 255, 1.0),
+                        0.3,
+                    ),
+                    error: draw::ColorSwatch::generate(
+                        base::color_from_urgba(211, 50, 63, 1.0),
+                        0.3,
+                    ),
+                    focus: draw::ColorSwatch::generate(
+                        base::color_from_urgba(3, 102, 214, 0.3),
+                        0.3,
+                    ),
+                    primary: draw::ColorSwatch::generate(
+                        base::color_from_urgba(46, 186, 78, 1.0),
+                        0.3,
+                    ),
+                    control_outset: draw::ColorSwatch::generate(
+                        base::color_from_urgba(244, 247, 249, 1.0),
+                        0.1,
+                    ),
+                    control_inset: draw::ColorSwatch::generate(
+                        base::color_from_urgba(255, 255, 255, 1.0),
+                        0.3,
+                    ),
+                    over_error: draw::ColorSwatch::generate(
+                        base::color_from_urgba(255, 255, 255, 1.0),
+                        0.3,
+                    ),
+                    over_focus: draw::ColorSwatch::generate(
+                        base::color_from_urgba(255, 255, 255, 1.0),
+                        0.3,
+                    ),
+                    over_primary: draw::ColorSwatch::generate(
+                        base::color_from_urgba(255, 255, 255, 1.0),
+                        0.3,
+                    ),
+                    over_control_outset: draw::ColorSwatch::generate(
+                        base::color_from_urgba(36, 41, 46, 1.0),
+                        0.5,
+                    ),
+                    over_control_inset: draw::ColorSwatch::generate(
+                        base::color_from_urgba(36, 41, 46, 1.0),
+                        0.3,
+                    ),
+                },
+                typography: draw::Typography {
+                    header: draw::TypefaceStyle {
+                        typeface: typeface.clone(),
+                        size: 32.0,
+                        style: draw::TextStyle::Bold,
+                    },
+                    sub_header: draw::TypefaceStyle {
+                        typeface: typeface.clone(),
+                        size: 24.0,
+                        style: draw::TextStyle::Bold,
+                    },
+                    body: draw::TypefaceStyle {
+                        typeface: typeface.clone(),
+                        size: 16.0,
+                        style: draw::TextStyle::Regular,
+                    },
+                    button: draw::TypefaceStyle {
+                        typeface: typeface.clone(),
+                        size: 12.0,
+                        style: draw::TextStyle::Bold,
+                    },
+                },
+                contrast: draw::ThemeContrast::Light,
+            },
+        })
     }
 }
 
 impl draw::Theme for Primer {
     fn button(&self) -> Box<dyn draw::Painter<state::ButtonState>> {
-        Box::new(ButtonPainter { font: self.semibold_font.clone() })
+        Box::new(ButtonPainter)
     }
 
     fn checkbox(&self) -> Box<dyn draw::Painter<state::CheckboxState>> {
-        Box::new(CheckboxPainter { checkmark: self.checkmark.clone() })
+        Box::new(CheckboxPainter)
     }
 
-    fn label_color(&self) -> StyleColor {
-        base::color_from_urgba(36, 41, 46, 1.0).into()
+    fn text_area(&self) -> Box<dyn draw::Painter<state::TextAreaState>> {
+        Box::new(TextAreaPainter)
     }
 
-    fn default_text_size(&self) -> f32 {
-        LABEL_TEXT_SIZE
+    fn data(&self) -> &draw::ThemeData {
+        &self.data
     }
 }
 
-struct ButtonPainter {
-    font: (ResourceReference, FontInfo),
-}
+struct ButtonPainter;
 
 impl ButtonPainter {
     fn make_text_item(
         &self,
         state: &state::ButtonState,
-        color: Color,
+        color: StyleColor,
         centered: bool,
     ) -> TextDisplayItem {
-        let mut text = TextDisplayItem {
-            text: state.text.clone(),
-            font: self.font.0.clone(),
-            font_info: self.font.1.clone(),
-            size: state.text_size.unwrap_or(BUTTON_TEXT_SIZE),
+        let typeface = state.data.typeface.typeface.pick(state.data.typeface.style);
+        let mut text_item = TextDisplayItem {
+            text: state.data.text.clone().into(),
+            font: typeface.0,
+            font_info: typeface.1,
+            size: state.data.typeface.size,
             bottom_left: Default::default(),
-            color: color.into(),
+            color,
         };
 
-        text.set_top_left(if centered {
-            display::center(text.bounds().unwrap().size, state.rect)
+        text_item.set_top_left(if centered {
+            display::center(text_item.bounds().unwrap().size, state.rect)
         } else {
             state.rect.origin
         });
 
-        text
+        text_item
     }
 }
 
@@ -92,7 +179,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
     }
 
     fn size_hint(&self, state: state::ButtonState) -> Size {
-        self.make_text_item(&state, Color::default(), false)
+        self.make_text_item(&state, Color::default().into(), false)
             .bounds()
             .unwrap()
             .inflate(10.0, 6.0)
@@ -109,185 +196,54 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
     }
 
     fn draw(&mut self, state: state::ButtonState) -> Vec<DisplayCommand> {
-        let mut interaction_state = state::InteractionState::empty();
+        let (background, border, text, focus) = if state.data.disabled {
+            (
+                state.data.background.strengthen_500(state.data.contrast, 1).into(),
+                state.data.color.weaken_500(state.data.contrast, 3).into(),
+                state.data.color.weaken_500(state.data.contrast, 3).into(),
+                state.data.focus[500].into(),
+            )
+        } else if state.interaction.contains(state::InteractionState::PRESSED) {
+            let background = state.data.background.strengthen_500(state.data.contrast, 4);
+            (
+                background.into(),
+                state.data.color.weaken_500(state.data.contrast, 3).into(),
+                state.data.color[500].into(),
+                state.data.focus[500].into(),
+            )
+        } else if state.interaction.contains(state::InteractionState::HOVERED) {
+            let background = draw::ColorSwatch::generate(
+                state.data.background.strengthen_500(state.data.contrast, 2),
+                0.1,
+            );
 
-        let (background, border, text, focus) = match state.button_type {
-            state::ButtonType::Normal => match state.state {
-                state::ControlState::Normal(interaction) => {
-                    interaction_state = interaction;
-
-                    if interaction.intersects(
-                        state::InteractionState::HOVERED | state::InteractionState::PRESSED,
-                    ) {
-                        (
-                            StyleColor::LinearGradient(Gradient {
-                                start: state.rect.origin,
-                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
-                                stops: vec![
-                                    (0.0, base::color_from_urgba(239, 243, 246, 1.0)),
-                                    (0.9, base::color_from_urgba(230, 235, 241, 1.0)),
-                                ],
-                            }),
-                            base::color_from_urgba(27, 31, 35, 0.35).into(),
-                            base::color_from_urgba(36, 41, 46, 1.0).into(),
-                            base::color_from_urgba(3, 102, 214, 0.3).into(),
-                        )
-                    } else {
-                        (
-                            StyleColor::LinearGradient(Gradient {
-                                start: state.rect.origin,
-                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
-                                stops: vec![
-                                    (0.0, base::color_from_urgba(250, 251, 252, 1.0)),
-                                    (0.9, base::color_from_urgba(239, 243, 246, 1.0)),
-                                ],
-                            }),
-                            base::color_from_urgba(27, 31, 35, 0.35).into(),
-                            base::color_from_urgba(36, 41, 46, 1.0).into(),
-                            base::color_from_urgba(3, 102, 214, 0.3).into(),
-                        )
-                    }
-                }
-                state::ControlState::Disabled => (
-                    base::color_from_urgba(239, 243, 246, 1.0).into(),
-                    base::color_from_urgba(27, 31, 35, 0.2).into(),
-                    base::color_from_urgba(36, 41, 46, 0.4).into(),
-                    base::color_from_urgba(3, 102, 214, 0.3).into(),
-                ),
-            },
-            state::ButtonType::Primary => match state.state {
-                state::ControlState::Normal(interaction) => {
-                    interaction_state = interaction;
-
-                    if interaction.contains(state::InteractionState::PRESSED) {
-                        (
-                            base::color_from_urgba(39, 159, 67, 1.0).into(),
-                            base::color_from_urgba(27, 31, 35, 0.5).into(),
-                            base::color_from_urgba(255, 255, 255, 1.0).into(),
-                            base::color_from_urgba(46, 200, 82, 0.5).into(),
-                        )
-                    } else if interaction.contains(state::InteractionState::HOVERED) {
-                        (
-                            StyleColor::LinearGradient(Gradient {
-                                start: state.rect.origin,
-                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
-                                stops: vec![
-                                    (0.0, base::color_from_urgba(46, 200, 82, 1.0)),
-                                    (0.9, base::color_from_urgba(38, 159, 66, 1.0)),
-                                ],
-                            }),
-                            base::color_from_urgba(27, 31, 35, 0.5).into(),
-                            base::color_from_urgba(255, 255, 255, 1.0).into(),
-                            base::color_from_urgba(46, 200, 82, 0.5).into(),
-                        )
-                    } else {
-                        (
-                            StyleColor::LinearGradient(Gradient {
-                                start: state.rect.origin,
-                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
-                                stops: vec![
-                                    (0.0, base::color_from_urgba(52, 208, 88, 1.0)),
-                                    (0.9, base::color_from_urgba(40, 167, 69, 1.0)),
-                                ],
-                            }),
-                            base::color_from_urgba(27, 31, 35, 0.5).into(),
-                            base::color_from_urgba(255, 255, 255, 1.0).into(),
-                            base::color_from_urgba(46, 200, 82, 0.5).into(),
-                        )
-                    }
-                }
-                state::ControlState::Disabled => (
-                    base::color_from_urgba(148, 211, 162, 1.0).into(),
-                    base::color_from_urgba(27, 31, 35, 0.5).into(),
-                    base::color_from_urgba(255, 255, 255, 0.75).into(),
-                    base::color_from_urgba(46, 200, 82, 0.5).into(),
-                ),
-            },
-            state::ButtonType::Danger => match state.state {
-                state::ControlState::Normal(interaction) => {
-                    interaction_state = interaction;
-
-                    if interaction.contains(state::InteractionState::PRESSED) {
-                        (
-                            base::color_from_urgba(181, 32, 44, 1.0).into(),
-                            base::color_from_urgba(104, 32, 40, 1.0).into(),
-                            base::color_from_urgba(255, 255, 255, 1.0).into(),
-                            base::color_from_urgba(181, 32, 44, 0.4).into(),
-                        )
-                    } else if interaction.contains(state::InteractionState::HOVERED) {
-                        (
-                            StyleColor::LinearGradient(Gradient {
-                                start: state.rect.origin,
-                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
-                                stops: vec![
-                                    (0.0, base::color_from_urgba(221, 66, 78, 1.0)),
-                                    (0.9, base::color_from_urgba(203, 36, 49, 1.0)),
-                                ],
-                            }),
-                            base::color_from_urgba(104, 32, 40, 1.0).into(),
-                            base::color_from_urgba(255, 255, 255, 1.0).into(),
-                            base::color_from_urgba(181, 32, 44, 0.4).into(),
-                        )
-                    } else {
-                        (
-                            StyleColor::LinearGradient(Gradient {
-                                start: state.rect.origin,
-                                end: state.rect.origin + Size::new(0.0, state.rect.size.height),
-                                stops: vec![
-                                    (0.0, base::color_from_urgba(250, 251, 252, 1.0)),
-                                    (0.9, base::color_from_urgba(239, 243, 246, 1.0)),
-                                ],
-                            }),
-                            base::color_from_urgba(27, 31, 35, 0.35).into(),
-                            base::color_from_urgba(203, 36, 49, 1.0).into(),
-                            base::color_from_urgba(181, 32, 44, 0.4).into(),
-                        )
-                    }
-                }
-                state::ControlState::Disabled => (
-                    base::color_from_urgba(239, 243, 246, 1.0).into(),
-                    base::color_from_urgba(27, 31, 35, 0.2).into(),
-                    base::color_from_urgba(203, 36, 49, 0.4).into(),
-                    base::color_from_urgba(3, 102, 214, 0.3).into(),
-                ),
-            },
-            state::ButtonType::Outline => match state.state {
-                state::ControlState::Normal(interaction) => {
-                    interaction_state = interaction;
-
-                    if interaction.intersects(
-                        state::InteractionState::PRESSED | state::InteractionState::HOVERED,
-                    ) {
-                        (
-                            base::color_from_urgba(3, 102, 214, 1.0).into(),
-                            base::color_from_urgba(3, 102, 214, 1.0).into(),
-                            base::color_from_urgba(255, 255, 255, 1.0).into(),
-                            base::color_from_urgba(3, 102, 214, 0.5).into(),
-                        )
-                    } else if interaction.contains(state::InteractionState::FOCUSED) {
-                        (
-                            base::color_from_urgba(255, 255, 255, 1.0).into(),
-                            base::color_from_urgba(3, 102, 214, 1.0).into(),
-                            base::color_from_urgba(3, 102, 214, 1.0).into(),
-                            base::color_from_urgba(3, 102, 214, 0.5).into(),
-                        )
-                    } else {
-                        (
-                            base::color_from_urgba(255, 255, 255, 1.0).into(),
-                            base::color_from_urgba(27, 31, 35, 0.35).into(),
-                            base::color_from_urgba(3, 102, 214, 1.0).into(),
-                            base::color_from_urgba(3, 102, 214, 0.5).into(),
-                        )
-                    }
-                }
-                state::ControlState::Disabled => (
-                    base::color_from_urgba(255, 255, 255, 1.0).into(),
-                    base::color_from_urgba(27, 31, 35, 0.35).into(),
-                    base::color_from_urgba(36, 41, 46, 0.4).into(),
-                    base::color_from_urgba(3, 102, 214, 0.5).into(),
-                ),
-            },
+            (
+                StyleColor::LinearGradient(Gradient {
+                    start: state.rect.origin,
+                    end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                    stops: vec![(0.0, background[50]), (0.9, background[900])],
+                }),
+                state.data.color.weaken_500(state.data.contrast, 3).into(),
+                state.data.color[500].into(),
+                state.data.focus[500].into(),
+            )
+        } else {
+            (
+                StyleColor::LinearGradient(Gradient {
+                    start: state.rect.origin,
+                    end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                    stops: vec![
+                        (0.0, state.data.background[50]),
+                        (0.9, state.data.background[900]),
+                    ],
+                }),
+                state.data.color.weaken_500(state.data.contrast, 3).into(),
+                state.data.color[500].into(),
+                state.data.focus[500].into(),
+            )
         };
+
+        let text_item = self.make_text_item(&state, text, true);
 
         let mut builder = DisplayListBuilder::new();
 
@@ -304,7 +260,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
             base::sharp_align(state.rect),
             [3.5; 4],
             GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
-                thickness: 2.0 / 3.0,
+                thickness: 1.0 / 3.0,
                 color: border,
                 ..Default::default()
             }),
@@ -312,13 +268,11 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         );
 
         // Text
-        builder.push_text(self.make_text_item(&state, text, true), None);
+        builder.push_text(text_item, None);
 
         // Focus rect
-        if (interaction_state.contains(state::InteractionState::FOCUSED)
-            && !interaction_state.contains(state::InteractionState::PRESSED))
-            || (state.button_type == state::ButtonType::Outline
-                && interaction_state.contains(state::InteractionState::PRESSED))
+        if state.interaction.contains(state::InteractionState::FOCUSED)
+            && !state.interaction.contains(state::InteractionState::PRESSED)
         {
             builder.push_round_rectangle(
                 base::sharp_align(state.rect).inflate(1.5, 1.5),
@@ -333,9 +287,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         }
 
         // Pressed inset shadow
-        if state.button_type != state::ButtonType::Outline
-            && interaction_state.contains(state::InteractionState::PRESSED)
-        {
+        if state.interaction.contains(state::InteractionState::PRESSED) {
             builder.push_round_rectangle_clip(base::sharp_align(state.rect), [3.5; 4]);
             builder.push_round_rectangle(
                 state.rect.inflate(10.0, 10.0).translate(Vector::new(0.0, 7.0)),
@@ -353,9 +305,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
     }
 }
 
-struct CheckboxPainter {
-    checkmark: ResourceReference,
-}
+struct CheckboxPainter;
 
 impl draw::Painter<state::CheckboxState> for CheckboxPainter {
     fn invoke(&self, theme: &dyn draw::Theme) -> Box<dyn draw::Painter<state::CheckboxState>> {
@@ -376,78 +326,92 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
 
     fn draw(&mut self, mut state: state::CheckboxState) -> Vec<DisplayCommand> {
         state.rect.size = Size::new(20.0, 20.0);
+        vec![]
+    }
+}
 
-        let (background, checkmark_alpha, interaction) = match state.state {
-            state::ControlState::Normal(interaction) => {
-                if state.checked {
-                    (
-                        if interaction.contains(state::InteractionState::PRESSED) {
-                            base::color_from_urgba(203, 208, 214, 1.0).into()
-                        } else {
-                            base::color_from_urgba(239, 243, 246, 1.0).into()
-                        },
-                        1.0,
-                        interaction,
-                    )
-                } else if interaction.contains(state::InteractionState::PRESSED) {
-                    (base::color_from_urgba(203, 208, 214, 1.0).into(), 0.3, interaction)
-                } else if interaction.contains(state::InteractionState::HOVERED) {
-                    (base::color_from_urgba(239, 243, 246, 1.0).into(), 0.1, interaction)
-                } else {
-                    (base::color_from_urgba(239, 243, 246, 1.0).into(), 0.0, interaction)
-                }
+struct TextAreaPainter;
+
+impl TextAreaPainter {
+    fn make_text_item(&self, state: &state::TextAreaState, color: StyleColor) -> TextDisplayItem {
+        let typeface = state.data.typeface.typeface.pick(state.data.typeface.style);
+
+        let mut text_item = TextDisplayItem {
+            text: if state.data.text.is_empty() {
+                state.data.text.clone()
+            } else {
+                state.data.placeholder.clone()
             }
-            _ => todo!(),
+            .into(),
+            font: typeface.0,
+            font_info: typeface.1,
+            size: state.data.typeface.size,
+            bottom_left: Default::default(),
+            color,
         };
 
-        let border: StyleColor = base::color_from_urgba(27, 31, 35, 0.35).into();
-        let focus: StyleColor = base::color_from_urgba(3, 102, 214, 0.3).into();
+        text_item.set_top_left(state.rect.origin);
+
+        text_item
+    }
+}
+
+impl draw::Painter<state::TextAreaState> for TextAreaPainter {
+    #[inline]
+    fn invoke(&self, theme: &dyn draw::Theme) -> Box<dyn draw::Painter<state::TextAreaState>> {
+        theme.text_area()
+    }
+
+    #[inline]
+    fn size_hint(&self, state: state::TextAreaState) -> Size {
+        self.make_text_item(&state, Color::default().into()).bounds().unwrap().size
+    }
+
+    #[inline]
+    fn paint_hint(&self, rect: Rect) -> Rect {
+        rect
+    }
+
+    #[inline]
+    fn mouse_hint(&self, rect: Rect) -> Rect {
+        rect
+    }
+
+    fn draw(&mut self, state: state::TextAreaState) -> Vec<DisplayCommand> {
+        let text = if state.data.text.is_empty() {
+            state.data.placeholder_color[500]
+        } else {
+            state.data.color[500]
+        }
+        .into();
+
+        let text_item = self.make_text_item(&state, text);
+
+        let cursor = if state.interaction.contains(state::InteractionState::FOCUSED) {
+            let bounds = text_item.limited_bounds(state.data.cursor).unwrap();
+            Some((bounds.origin + Size::new(bounds.size.width, 0.0), bounds.origin + bounds.size))
+        } else {
+            None
+        };
 
         let mut builder = DisplayListBuilder::new();
 
-        // Background
-        builder.push_round_rectangle(
-            base::sharp_align(state.rect),
-            [3.5; 4],
-            GraphicsDisplayPaint::Fill(background),
-            None,
-        );
+        builder.push_rectangle_clip(state.rect, true);
 
-        // Border
-        builder.push_round_rectangle(
-            base::sharp_align(state.rect),
-            [3.5; 4],
-            GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
-                thickness: 2.0 / 3.0,
-                color: border,
-                ..Default::default()
-            }),
-            None,
-        );
-
-        // Focus rect
-        if interaction.contains(state::InteractionState::FOCUSED) {
-            builder.push_round_rectangle(
-                base::sharp_align(state.rect).inflate(1.5, 1.5),
-                [3.5; 4],
-                GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
-                    thickness: 3.5,
-                    color: focus,
+        if let Some((a, b)) = cursor {
+            builder.push_line(
+                a + Size::new(1.0, 0.0),
+                b + Size::new(1.0, 0.0),
+                GraphicsDisplayStroke {
+                    thickness: 1.0,
+                    color: state.data.cursor_color[500].into(),
                     ..Default::default()
-                }),
+                },
                 None,
             );
         }
 
-        builder.save_layer(checkmark_alpha);
-
-        // Checkmark
-        builder.push_image(
-            None,
-            base::sharp_align(state.rect).inflate(-2.0, -2.0),
-            self.checkmark.clone(),
-            None,
-        );
+        builder.push_text(text_item, None);
 
         builder.build()
     }
