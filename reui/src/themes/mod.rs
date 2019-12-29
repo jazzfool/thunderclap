@@ -1,9 +1,6 @@
 //! A collection of various themes to quickly get up and running with Reui.
 
-use {
-    crate::draw::ThemeData,
-    reclutch::display::{FontInfo, ResourceReference},
-};
+use crate::draw::ThemeData;
 
 mod primer;
 

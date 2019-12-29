@@ -8,8 +8,7 @@ use {
     },
     reclutch::{
         display::{
-            skia, Color, CommandGroup, DisplayCommand, FontInfo, GraphicsDisplay, Point,
-            ResourceData, ResourceDescriptor, ResourceReference, SharedData, Size, Vector,
+            skia, Color, CommandGroup, DisplayCommand, GraphicsDisplay, Point, Size, Vector,
         },
         event::RcEventQueue,
         prelude::*,

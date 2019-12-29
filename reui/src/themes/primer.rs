@@ -3,13 +3,13 @@ use {
     crate::{
         base,
         draw::{self, state},
-        error, ui,
+        error,
     },
     reclutch::display::{
-        self, Color, DisplayCommand, DisplayListBuilder, DisplayText, Filter, FontInfo, Gradient,
-        GraphicsDisplay, GraphicsDisplayPaint, GraphicsDisplayStroke, ImageData, RasterImageFormat,
-        RasterImageInfo, Rect, ResourceData, ResourceDescriptor, ResourceReference, SharedData,
-        Size, StyleColor, TextDisplayItem, Vector, VectorPath, VectorPathBuilder, VectorPathEvent,
+        self, Color, DisplayCommand, DisplayListBuilder, Filter, FontInfo, Gradient,
+        GraphicsDisplay, GraphicsDisplayPaint, GraphicsDisplayStroke, Rect, ResourceData,
+        ResourceDescriptor, ResourceReference, SharedData, Size, StyleColor, TextDisplayItem,
+        Vector, VectorPath, VectorPathBuilder,
     },
 };
 
@@ -28,10 +28,7 @@ fn check_mark_icon(rect: Rect) -> VectorPath {
 
 impl Primer {
     /// Creates an instance of the GitHub Primer theme.
-    pub fn new<G: base::GraphicalAuxiliary>(
-        g_aux: &mut G,
-        display: &mut dyn GraphicsDisplay,
-    ) -> Result<Self, error::ThemeError> {
+    pub fn new(display: &mut dyn GraphicsDisplay) -> Result<Self, error::ThemeError> {
         let typeface = {
             let fonts = &[
                 std::sync::Arc::new(include_bytes!("assets/Inter-Regular.ttf").to_vec()),
@@ -159,7 +156,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         self.make_text_item(&state, Color::default().into(), false)
             .bounds()
             .unwrap()
-            .inflate(10.0, 6.0)
+            .inflate(10.0, 5.0)
             .size
     }
 
@@ -308,7 +305,7 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
         let (background, foreground, border, focus) = if state.data.checked {
             (
                 state.data.background.into(),
-                state.data.foreground.into(),
+                draw::weaken(state.data.foreground, 0.1, state.data.contrast).into(),
                 draw::weaken(state.data.foreground, 0.4, state.data.contrast).into(),
                 state.data.focus.into(),
             )
@@ -362,7 +359,7 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
             check_mark_icon(state.rect.inflate(-4.0, -4.0)),
             false,
             GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
-                thickness: 3.0,
+                thickness: 2.5,
                 color: foreground,
                 ..Default::default()
             }),

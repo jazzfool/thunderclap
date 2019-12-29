@@ -1,7 +1,7 @@
 use reui::{
     app, base, draw,
     reclutch::{
-        display::{DisplayCommand, FontInfo, GraphicsDisplay, Point, Rect, Size},
+        display::{DisplayCommand, Point, Rect, Size},
         event::RcEventQueue,
         prelude::*,
     },
@@ -140,7 +140,7 @@ lazy_widget! {
 
 fn main() {
     let app = app::create(
-        |g_aux, display| Primer::new(g_aux, display).unwrap(),
+        |_g_aux, display| Primer::new(display).unwrap(),
         |u_aux, g_aux, theme| Showcase::new(theme, u_aux, g_aux),
         app::AppOptions {
             name: "Showcase".to_string(),
