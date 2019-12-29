@@ -308,7 +308,7 @@ where
     }
 }
 
-/// Describes the interactivity/visibility state of a widget.
+/// Describes the interactivity/visibility condition of a widget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Visibility {
     /// Is rendered and receives updates.
@@ -806,6 +806,8 @@ pub fn invoke_update<U: UpdateAuxiliary, G>(
 }
 
 lazy_static::lazy_static! {
+    // Frame counter used by `invoke_draw`, resets back to 0 after 60 frames.
+    // This is used to only clean up `CLIP_LIST` every 60 frames.
     static ref DRAW_COUNTER: std::sync::Mutex<u8> = std::sync::Mutex::new(0);
     // Map of pre/post command groups loosely linked to a widget by using the memory address as a unique identifier.
     static ref CLIP_LIST: std::sync::Mutex<HashMap<usize, (CommandGroup, CommandGroup)>> =
@@ -832,7 +834,7 @@ fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
             display,
             &[
                 DisplayCommand::Save,
-                DisplayCommand::Clip(DisplayClip::Rectangle { rect: clip_rect, antialias: false }),
+                DisplayCommand::Clip(DisplayClip::Rectangle { rect: clip_rect, antialias: true }),
                 DisplayCommand::Save,
             ],
             false,
@@ -857,6 +859,13 @@ fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
 }
 
 /// Recursively invokes `draw`.
+/// This will invoke draw (with some extra steps, see below)
+/// for `widget`, then invoke `invoke_draw` all of `widget`s children.
+///
+/// Extra processing steps:
+/// - Skip if widget visibility is `Invisible` or `None`.
+/// - Clip to absolute widget bounds.
+/// - Add widget position to auxiliary tracer.
 pub fn invoke_draw<U, G: GraphicalAuxiliary>(
     widget: &mut dyn WidgetChildren<
         UpdateAux = U,
@@ -875,6 +884,7 @@ pub fn invoke_draw<U, G: GraphicalAuxiliary>(
 
     invoke_draw_impl(widget, display, aux, &mut clip_list, &mut checked);
 
+    // Perform cleanup (checked is only contains a value if on 60th frame).
     if let Some(checked) = checked {
         *draw_counter = 0;
         clip_list.retain(|widget_ptr, _| checked.contains(widget_ptr));
@@ -884,13 +894,12 @@ pub fn invoke_draw<U, G: GraphicalAuxiliary>(
 }
 
 /// Creates a color from 3 unsigned 8-bit components and an `f32` alpha.
+/// This replicates CSS syntax (e.g. `rgba(28, 196, 54, 0.3)`).
 pub fn color_from_urgba(r: u8, g: u8, b: u8, a: f32) -> Color {
     Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a)
 }
 
-/// Aligns a rectangle with regards to anti-aliasing.
-///
-/// Use this if you have, for example, a 1px stroke and want it to look sharp without losing curve anti-aliasing.
+/// Aligns a rectangle with regards to Skia anti-aliasing.
 pub fn sharp_align(rect: Rect) -> Rect {
     rect.round_in().inflate(0.5, 0.5)
 }

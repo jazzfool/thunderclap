@@ -1,11 +1,11 @@
 use {
     crate::{
         base::{self, Repaintable},
-        draw::{self, state, ColorSwatch},
+        draw::{self, state},
         pipe, ui,
     },
     reclutch::{
-        display::{CommandGroup, DisplayCommand, GraphicsDisplay, Rect},
+        display::{Color, CommandGroup, DisplayCommand, GraphicsDisplay, Rect},
         event::RcEventQueue,
         prelude::*,
     },
@@ -164,7 +164,7 @@ where
     #[inline]
     fn remove_char(&mut self) {
         self.repaint();
-        if self.data.text.len() > 0 {
+        if self.data.text.len() > 0 && self.data.cursor > 0 {
             {
                 let cursor = self.data.cursor;
                 self.data.text.remove(cursor - 1);
@@ -188,9 +188,9 @@ pub struct TextAreaData {
     pub text: String,
     pub placeholder: String,
     pub typeface: draw::TypefaceStyle,
-    pub color: ColorSwatch,
-    pub placeholder_color: ColorSwatch,
-    pub cursor_color: ColorSwatch,
+    pub color: Color,
+    pub placeholder_color: Color,
+    pub cursor_color: Color,
     pub disabled: bool,
     pub cursor: usize,
 }
@@ -203,14 +203,8 @@ impl TextAreaData {
             placeholder: "".into(),
             typeface: data.typography.body.clone(),
             color: data.scheme.over_control_inset,
-            placeholder_color: draw::ColorSwatch::generate(
-                data.scheme.over_control_inset.weaken_500(data.contrast, 3),
-                0.8,
-            ),
-            cursor_color: draw::ColorSwatch::generate(
-                data.scheme.over_control_inset.strengthen_500(data.contrast, 3),
-                0.8,
-            ),
+            placeholder_color: draw::weaken(data.scheme.over_control_inset, 0.5, data.contrast),
+            cursor_color: draw::weaken(data.scheme.over_control_inset, 0.1, data.contrast),
             disabled: false,
             cursor: 0,
         }

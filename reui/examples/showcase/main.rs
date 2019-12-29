@@ -31,6 +31,8 @@ struct Showcase {
     #[widget_child]
     checkbox: ui::Checkbox<app::UAux, app::GAux>,
     #[widget_child]
+    text_area: ui::TextArea<app::UAux, app::GAux>,
+    #[widget_child]
     v_stack: ui::VStack<app::UAux, app::GAux>,
 
     visibility: base::Visibility,
@@ -78,6 +80,12 @@ impl Showcase {
 
         let mut checkbox = ui::CheckboxData { ..ui::CheckboxData::from_theme(theme) }
             .construct(theme, u_aux, g_aux);
+
+        let mut text_area = ui::TextAreaData {
+            placeholder: "click me and start typing!".into(),
+            ..ui::TextAreaData::from_theme(theme)
+        }
+        .construct(theme, u_aux, g_aux);
 
         let v_stack_data =
             ui::VStackData { top_margin: 10.0, bottom_margin: 0.0, alignment: ui::Align::Begin };

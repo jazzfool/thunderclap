@@ -3,11 +3,11 @@
 use {
     crate::{
         base::{self, Repaintable, Resizable},
-        draw::{self, state, ColorSwatch, HasTheme},
+        draw::{self, state, HasTheme},
         pipe, ui,
     },
     reclutch::{
-        display::{CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect},
+        display::{Color, CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect},
         event::RcEventQueue,
         prelude::*,
     },
@@ -108,9 +108,9 @@ where
 pub struct ButtonData {
     pub text: DisplayText,
     pub typeface: draw::TypefaceStyle,
-    pub color: ColorSwatch,
-    pub background: ColorSwatch,
-    pub focus: ColorSwatch,
+    pub color: Color,
+    pub background: Color,
+    pub focus: Color,
     pub contrast: draw::ThemeContrast,
     pub disabled: bool,
 }

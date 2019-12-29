@@ -92,7 +92,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Container
     fn update(&mut self, aux: &mut U) {
         base::invoke_update(self, aux);
 
-        // FIXME(jazzfool): only do this when a child position changes.
+        // FIXME(jazzfool): only do this when a child's position changes.
         let mut rect: Option<Rect> = None;
         for child in self.children() {
             if let Some(ref mut rect) = rect {

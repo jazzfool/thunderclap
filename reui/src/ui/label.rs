@@ -1,8 +1,7 @@
 use {
     crate::{
         base::{self, Repaintable},
-        draw::{self, ColorSwatch},
-        pipe,
+        draw, pipe,
     },
     reclutch::{
         display::{
@@ -59,7 +58,7 @@ where
 pub struct LabelData {
     pub text: DisplayText,
     pub typeface: draw::TypefaceStyle,
-    pub color: ColorSwatch,
+    pub color: Color,
     pub align: TextAlign,
     pub wrap: bool,
 }

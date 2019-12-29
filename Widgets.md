@@ -54,9 +54,10 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Focusable..`** ✔️
 - **`Layable....`** ✔️
 - **Properties:**
-    - `foreground`: Color of the checkmark.
+    - `foreground`: Color of the check mark.
     - `background`: Color of the checkbox.
     - `focus`: Color used to indicate focus (usually in the form of a border).
+    - `contrast`: Contrast mode of `background` and `foreground`.
     - `checked`: Whether the checkbox is checked.
     - `disabled`: Whether the checkbox can be interacted with.
 - **Outgoing Event Queues:**
@@ -69,6 +70,28 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
         - `end_hover`: The cursor has left the checkbox boundaries.
         - `focus`: The checkbox has gained focus.
         - `blur`: The checkbox has lost focus.
+
+### Text Area - `reui::ui::TextArea`
+
+*Accepts single line text input. Deliberately a visually bare-bones widget so that text input can be placed outside a textbox context. Suitable for string input.*
+
+- **`Themed.....`** ✔️
+- **`Focusable..`** ✔️
+- **`Layable....`** ✔️
+- **Properties:**
+    - `text`: Text within the text area.
+    - `placeholder`: Placeholder text to appear when text is empty.
+    - `typeface`: Typeface used for text.
+    - `color`: Color of the text.
+    - `placeholder_color`: Color of the placeholder text.
+    - `cursor_color`: Color of text cursor/caret.
+    - `disabled`: Whether the text area can be interacted with.
+    - `cursor`: Text cursor/caret position.
+- **Outgoing Event Queues:**
+    - `event_queue`: `TextAreaEvent`
+        - `focus`: The text area has gained focus.
+        - `blur`: The text area has lost focus.
+        - `user_modify`: The text area has been modified by the user.
 
 ## Abstract Widgets
 

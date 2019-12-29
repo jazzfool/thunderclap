@@ -1,11 +1,11 @@
 use {
     crate::{
         base::{self, Repaintable, Resizable},
-        draw::{self, state, ColorSwatch},
+        draw::{self, state},
         pipe, ui,
     },
     reclutch::{
-        display::{CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect},
+        display::{Color, CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect},
         event::RcEventQueue,
         prelude::*,
     },
@@ -128,9 +128,10 @@ where
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CheckboxData {
-    pub foreground: ColorSwatch,
-    pub background: ColorSwatch,
-    pub focus: ColorSwatch,
+    pub foreground: Color,
+    pub background: Color,
+    pub focus: Color,
+    pub contrast: draw::ThemeContrast,
     pub checked: bool,
     pub disabled: bool,
 }
@@ -142,6 +143,7 @@ impl CheckboxData {
             foreground: data.scheme.over_control_inset,
             background: data.scheme.control_inset,
             focus: data.scheme.focus,
+            contrast: data.contrast,
             checked: false,
             disabled: false,
         }
