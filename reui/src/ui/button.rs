@@ -45,14 +45,14 @@ pub enum ButtonEvent {
 #[widget_children_trait(base::WidgetChildren)]
 #[reui_crate(crate)]
 #[widget_transform_callback(on_transform)]
-pub struct Button<U, G>
+pub struct ButtonWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
     pub event_queue: RcEventQueue<ButtonEvent>,
 
-    pub data: base::Observed<ButtonData>,
+    pub data: base::Observed<Button>,
     pipe: Option<pipe::Pipeline<Self, U>>,
     interaction: state::InteractionState,
     painter: Box<dyn draw::Painter<state::ButtonState>>,
@@ -71,7 +71,7 @@ where
     phantom_g: PhantomData<G>,
 }
 
-impl<U, G> ui::InteractiveWidget for Button<U, G>
+impl<U, G> ui::InteractiveWidget for ButtonWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -105,7 +105,7 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ButtonData {
+pub struct Button {
     pub text: DisplayText,
     pub typeface: draw::TypefaceStyle,
     pub color: Color,
@@ -115,10 +115,18 @@ pub struct ButtonData {
     pub disabled: bool,
 }
 
-impl ButtonData {
+impl<U, G> ui::WidgetDataTarget<U, G> for Button
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    type Target = ButtonWidget<U, G>;
+}
+
+impl Button {
     pub fn from_theme(theme: &dyn draw::Theme) -> Self {
         let data = theme.data();
-        ButtonData {
+        Button {
             text: "".to_string().into(),
             typeface: data.typography.button.clone(),
             color: data.scheme.over_control_outset,
@@ -134,7 +142,7 @@ impl ButtonData {
         theme: &dyn draw::Theme,
         u_aux: &mut U,
         _g_aux: &mut G,
-    ) -> Button<U, G>
+    ) -> ButtonWidget<U, G>
     where
         U: base::UpdateAuxiliary + 'static,
         G: base::GraphicalAuxiliary + 'static,
@@ -142,7 +150,7 @@ impl ButtonData {
         let data = base::Observed::new(self);
 
         let mut pipe = pipeline! {
-            Button<U, G> as obj,
+            ButtonWidget<U, G> as obj,
             U as _aux,
             _ev in &data.on_change => {
                 change {
@@ -152,8 +160,9 @@ impl ButtonData {
             }
         };
 
-        pipe = pipe
-            .add(ui::basic_interaction_terminal::<Button<U, G>, U>().bind(u_aux.window_queue()));
+        pipe = pipe.add(
+            ui::basic_interaction_terminal::<ButtonWidget<U, G>, U>().bind(u_aux.window_queue()),
+        );
 
         let painter = theme.button();
         let rect = Rect::new(
@@ -165,7 +174,7 @@ impl ButtonData {
             }),
         );
 
-        Button {
+        ButtonWidget {
             event_queue: Default::default(),
             data,
             pipe: pipe.into(),
@@ -181,7 +190,7 @@ impl ButtonData {
     }
 }
 
-impl<U, G> Button<U, G>
+impl<U, G> ButtonWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -200,7 +209,7 @@ where
     }
 }
 
-impl<U, G> Widget for Button<U, G>
+impl<U, G> Widget for ButtonWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -232,7 +241,7 @@ where
     }
 }
 
-impl<U, G> HasTheme for Button<U, G>
+impl<U, G> HasTheme for ButtonWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -247,7 +256,29 @@ where
     }
 }
 
-impl<U, G> Drop for Button<U, G>
+impl<U, G> ui::DefaultEventQueue<ButtonEvent> for ButtonWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    #[inline]
+    fn default_event_queue(&self) -> &RcEventQueue<ButtonEvent> {
+        &self.event_queue
+    }
+}
+
+impl<U, G> ui::DefaultWidgetData<Button> for ButtonWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    #[inline]
+    fn default_data(&mut self) -> &mut base::Observed<Button> {
+        &mut self.data
+    }
+}
+
+impl<U, G> Drop for ButtonWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,

@@ -12,7 +12,10 @@ pub use {button::*, checkbox::*, container::*, hstack::*, label::*, text_area::*
 
 use {
     crate::{base, draw::state, pipe},
-    reclutch::display::{Point, Rect},
+    reclutch::{
+        display::{Point, Rect},
+        event::RcEventQueue,
+    },
 };
 
 /// Simply pushes a list of widgets, each with specified layout data, into a layout, then returns a mutable reference to the layout.
@@ -47,7 +50,7 @@ use {
 ///
 #[macro_export]
 macro_rules! define_layout {
-    (for $layout:expr => {$($data:expr => $target:expr),*}) => {
+    (for $layout:expr => {$($data:expr => $target:expr),* $(,)? }) => {
         {
             use $crate::base::Layout;
             $(
@@ -55,7 +58,7 @@ macro_rules! define_layout {
             )*
             &mut $layout
         }
-    }
+    };
 }
 
 /// How a child should be aligned within a layout.
@@ -93,6 +96,22 @@ pub trait InteractiveWidget {
     fn mouse_bounds(&self) -> Rect;
     fn disabled(&self) -> bool;
     fn on_interaction_event(&mut self, event: InteractionEvent);
+}
+
+pub trait WidgetDataTarget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    type Target: base::WidgetChildren;
+}
+
+pub trait DefaultEventQueue<E: pipe::Event> {
+    fn default_event_queue(&self) -> &RcEventQueue<E>;
+}
+
+pub trait DefaultWidgetData<D> {
+    fn default_data(&mut self) -> &mut base::Observed<D>;
 }
 
 /// Generates an unbound terminal which handles basic interactivity.

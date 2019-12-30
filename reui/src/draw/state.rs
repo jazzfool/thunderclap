@@ -9,7 +9,7 @@ use {crate::ui, reclutch::display::Rect};
 #[derive(Debug, Clone)]
 pub struct ButtonState {
     pub rect: Rect,
-    pub data: ui::ButtonData,
+    pub data: ui::Button,
     pub interaction: InteractionState,
 }
 
@@ -25,7 +25,7 @@ bitflags::bitflags! {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CheckboxState {
     pub rect: Rect,
-    pub data: ui::CheckboxData,
+    pub data: ui::Checkbox,
     pub interaction: InteractionState,
 }
 
@@ -33,7 +33,7 @@ pub struct CheckboxState {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextAreaState {
     pub rect: Rect,
-    pub data: ui::TextAreaData,
+    pub data: ui::TextArea,
     pub interaction: InteractionState,
 }
 

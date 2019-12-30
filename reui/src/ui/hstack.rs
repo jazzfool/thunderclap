@@ -1,6 +1,6 @@
 use {
     super::Align,
-    crate::{base, draw},
+    crate::{base, draw, ui},
     indexmap::IndexMap,
     reclutch::{
         display::{self, DisplayCommand, Rect},
@@ -12,7 +12,7 @@ use {
 
 /// Information about how a `HStack` child should be layed out.
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub struct HStackData {
+pub struct HStackItem {
     /// The margin given between the previous widget (or left of container) and the left side of the child.
     pub left_margin: f32,
     /// The margin given between the next widget and right side of the child.
@@ -21,26 +21,26 @@ pub struct HStackData {
     pub alignment: Align,
 }
 
-impl HStackData {
+impl HStackItem {
     /// Sets the `top_margin` value.
-    pub fn left_margin(self, left_margin: f32) -> HStackData {
-        HStackData { left_margin, ..self }
+    pub fn left_margin(self, left_margin: f32) -> HStackItem {
+        HStackItem { left_margin, ..self }
     }
 
     /// Sets the `right_margin` value.
-    pub fn right_margin(self, right_margin: f32) -> HStackData {
-        HStackData { right_margin, ..self }
+    pub fn right_margin(self, right_margin: f32) -> HStackItem {
+        HStackItem { right_margin, ..self }
     }
 
     /// Sets the `align` value.
-    pub fn align(self, alignment: Align) -> HStackData {
-        HStackData { alignment, ..self }
+    pub fn align(self, alignment: Align) -> HStackItem {
+        HStackItem { alignment, ..self }
     }
 }
 
 #[derive(Debug)]
 struct ChildData {
-    data: HStackData,
+    data: HStackItem,
     evq: BidirSingleEventQueue<Rect, Rect>,
     drop_listener: RcEventListener<base::DropEvent>,
     rect: Rect,
@@ -49,7 +49,7 @@ struct ChildData {
 }
 
 lazy_widget! {
-    generic HStack,
+    generic HStackWidget,
     visibility: visibility,
     theme: themed,
     drop_event: drop_event
@@ -60,11 +60,13 @@ lazy_widget! {
 #[widget_children_trait(base::WidgetChildren)]
 #[reui_crate(crate)]
 #[widget_transform_callback(on_transform)]
-pub struct HStack<U, G>
+pub struct HStackWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
+    pub data: base::Observed<HStack>,
+
     rects: IndexMap<u64, ChildData>,
     next_rect_id: u64,
     dirty: bool,
@@ -81,10 +83,41 @@ where
     phantom_g: PhantomData<G>,
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> HStack<U, G> {
-    /// Creates a new horizontal stack widget with a given rectangle.
-    pub fn new(rect: Rect) -> Self {
-        HStack {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HStack {
+    pub left_margin: f32,
+    pub right_margin: f32,
+    pub alignment: Align,
+}
+
+impl<U, G> ui::WidgetDataTarget<U, G> for HStack
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    type Target = HStackWidget<U, G>;
+}
+
+impl HStack {
+    pub fn from_theme(_theme: &dyn draw::Theme) -> Self {
+        HStack { left_margin: 0.0, right_margin: 0.0, alignment: Align::Begin }
+    }
+
+    pub fn construct<U, G>(
+        self,
+        _theme: &dyn draw::Theme,
+        _u_aux: &mut U,
+        _g_aux: &mut G,
+    ) -> HStackWidget<U, G>
+    where
+        U: base::UpdateAuxiliary + 'static,
+        G: base::GraphicalAuxiliary + 'static,
+    {
+        let data = base::Observed::new(self);
+
+        HStackWidget {
+            data,
+
             rects: IndexMap::new(),
             next_rect_id: 0,
             dirty: true,
@@ -92,11 +125,35 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> HStack<U, G> {
             drop_event: Default::default(),
             visibility: Default::default(),
 
-            rect,
+            rect: Default::default(),
             layout: Default::default(),
 
             phantom_u: Default::default(),
             phantom_g: Default::default(),
+        }
+    }
+}
+
+impl<U, G> HStackWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    fn resize_to_fit(&mut self) {
+        let mut max_rect: Option<Rect> = None;
+        for (_, child) in &self.rects {
+            if let Some(ref mut max_rect) = max_rect {
+                *max_rect = max_rect.union(&child.rect);
+            } else {
+                max_rect = child.rect.into();
+            }
+        }
+
+        if let Some(rect) = max_rect {
+            self.rect = rect;
+            self.layout.notify(self.rect);
+            use base::Repaintable;
+            self.repaint();
         }
     }
 
@@ -106,8 +163,12 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> HStack<U, G> {
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for HStack<U, G> {
-    type PushData = HStackData;
+impl<U, G> base::Layout for HStackWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    type PushData = Option<HStackItem>;
 
     fn push(&mut self, data: Self::PushData, child: &mut impl base::LayableWidget) {
         self.dirty = true;
@@ -124,7 +185,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for HSt
         self.rects.insert(
             id,
             ChildData {
-                data,
+                data: data.unwrap_or(HStackItem {
+                    left_margin: self.data.left_margin,
+                    right_margin: self.data.right_margin,
+                    alignment: self.data.alignment,
+                }),
                 evq,
                 drop_listener: child.drop_event().listen(),
                 rect,
@@ -132,6 +197,8 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for HSt
                 id,
             },
         );
+
+        self.resize_to_fit();
     }
 
     fn remove(&mut self, child: &mut impl base::LayableWidget, restore_original: bool) {
@@ -144,7 +211,11 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> base::Layout for HSt
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for HStack<U, G> {
+impl<U, G> Widget for HStackWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
     type UpdateAux = U;
     type GraphicalAux = G;
     type DisplayObject = DisplayCommand;
@@ -180,6 +251,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for HStack<U,
         }
 
         if self.dirty {
+            self.resize_to_fit();
             let mut advance = self.rect.origin.x;
             for (_, data) in &mut self.rects {
                 advance += data.data.left_margin;
@@ -204,5 +276,16 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for HStack<U,
 
             self.dirty = false;
         }
+    }
+}
+
+impl<U, G> ui::DefaultWidgetData<HStack> for HStackWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    #[inline]
+    fn default_data(&mut self) -> &mut base::Observed<HStack> {
+        &mut self.data
     }
 }

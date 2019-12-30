@@ -99,6 +99,17 @@ pub struct AppOptions {
     pub window_size: Size,
 }
 
+impl Default for AppOptions {
+    fn default() -> Self {
+        AppOptions {
+            name: "Reui App".into(),
+            warmup: 2,
+            background: Color::new(1.0, 1.0, 1.0, 1.0),
+            window_size: Size::new(500.0, 500.0),
+        }
+    }
+}
+
 /// Reui/Reclutch based application.
 pub struct App<R>
 where

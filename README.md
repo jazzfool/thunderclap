@@ -2,97 +2,121 @@
     <img src=".media/reui.png" width="150px"/>
 </p>
 
-## <p align="center">Themeable GUI toolkit</p>
+<h2 align="center">Rust UI Toolkit</h2>
+<h3 align="center">Designed for anything from a quick and dirty GUI to a completely custom application.</h3>
 
 <img align="right" src=".media/showcase.png" width="200px"/>
 
-## Using Reui
-The only notable difference between Reclutch on how you should use widgets is
-that Reui defines it's own version of `WidgetChildren`, this is so that the widget
-tree is enforced to be theme-able (implements `HasTheme`).
-You can still `derive` this `WidgetChildren` like so:
+## Writing a counter
+
+First we need to import some things.
 ```rust
-#[derive(WidgetChildren)]
-#[widget_children_trait(reui::base::WidgetChildren)]
-struct MyWidget;
+use reui::{
+    app, base,
+    reclutch::display::Color,
+    themes::Primer,
+    ui::{Button, Label, VStack},
+};
 ```
 
-### Layout
-Layout is simple and idiomatic with the provided macros:
+After that we need to create the widget; we use the `rooftop!` macro for this;
 ```rust
-let v_stack_data = VStackData::default().align(Align::Middle);
+rooftop! {
+    struct Counter {
+        fn build() {}
+    }
+}
+```
 
-define_layout! {
-    for v_stack => {
-        v_stack_data => &mut button,
-        v_stack_data => define_layout! {
-            for another_v_stack => {
-                v_stack_data => &mut nested_button
+This may seem a little unusual; a struct method being declared outside `impl`, but you'll see why.
+Just note that `fn build() {}` never declares a method.
+
+Now we need to add our state; the counting number itself.
+
+```rust
+rooftop! {
+    struct Counter {
+        fn build(
+            count = (0): i32,
+        ) {}
+    }
+}
+```
+
+However, what good is this state if it never changes? To make it change, you need a UI.
+If you've ever used Flutter or SwiftUI then this should come quite naturally.
+
+```rust
+rooftop! {
+    struct Counter {
+        fn build(
+            count = (0): i32,
+        ) {
+            VStack(): v_stack {
+                Label(
+                    text=bind(format!("Count: {}", bind.count).into()), // <-- runtime bindings
+                    wrap=false, // <-- properties
+                ): count_label, // <-- variable name
+                Button(text="Count Up"): count_up
+                    @press { // <-- event handling
+                        widget.data.count += 1;
+                    },
+                Button(text="Count Down"): count_down
+                    @press {
+                        widget.data.count -= 1;
+                    },
             }
         }
     }
 }
 ```
 
-### Events
-Reui introduces an additional (optional) event handling layer to achieve more traditional callbacks.
+Although this emulates the syntax of Flutter and SwiftUI, it does things very differently. This `build` pseudo-method is only called once in the widget's lifetime (when the widget is created). Because of this, a `bind` syntax is introduced.
 
-The managing type here is `reui::update::Pipeline`. Typically it is one pipeline to one widget.
-Each pipeline has a list of "terminals" `reui::update::Terminal`. One terminal goes to one event queue.
-Then, each terminal has a list of handlers (callbacks) which use a static string as a key.
-This key is used to cherry-pick events from an event queue.
+These widgets are declared as fields in the underlying code, hence the need to annotate the widget variable name. This has a distinct advantage of being able to reference widgets within event handlers, for example `widget.label.set_size(..)`.
 
-All event data types must implement `reui::update::Event`. This trait has a method which enables event
-cherry-picking. These events must, for each key, implement a method which extracts the inner info.
+We've made our counter, but we still need to make it show up on the screen.
 
-Example of a pipeline for a simple counter:
+Building with the `app` and `default-themes` features, this is quite simple:
 ```rust
-let pipe = pipeline! {
-    Counter as obj,
-    UpdateAux as _aux,
-    _event in &count_up.event_queue => { // first terminal
-        // note that the event is converted, so we can access the relevant event info quickly.
-        press { obj.count += 1; } // handler
-    }
-    _event in &count_down.event_queue => { // second terminal
-        press { obj.count -= 1; } // handler
-    }
-};
-```
-The above code would be found where `Counter` is being created.
-
-Then when it comes time to update we simply defer to the pipeline.
-```rust
-impl Widget for Counter {
-    // ...
-    fn update(&mut self, aux: &mut UpdateAux) {
-        let mut pipe = self.pipe.take().unwrap(); // we must move the pipeline out first or else the borrow checker will complain.
-        pipe.update(self, aux);
-        self.pipe = Some(pipe); // we move it back in when we're done.
-    }
+fn main() {
+    let app = app::create(
+        |_, display| Primer::new(display).unwrap(), // <-- create our theme
+        |u_aux, g_aux, theme| {
+            Counter {
+                count: 5, // <-- we want to start counting from 5 instead of 0
+                ..Counter::from_theme(theme)
+            }.construct(theme, u_aux, g_aux) // <-- create the root widget
+        },
+        app::AppOptions {
+            name: "Counter App",
+            ..Default::default()
+        },
+    ).unwrap();
+    app.start(|_| None);
 }
 ```
 
-That's it! This is a much nicer solution than manually matching events, and best of all we can now separate the logic into a single variable (pipelines), or even modularize parts of it (terminals)! Further, this is a *layer* on event queues, which means you can still get more granular control over the queue/listeners if you want to.
+That's it. In under 50 lines you can go from creating a layout, declaring a state, handling events, and showing it all in a window.
 
-The `pipeline!` macro roughly (it doesn't chain methods directly) translates to the following:
+Keep in mind that `Counter` is now an actual widget. Somewhere else in your code it is completely valid to now do something along the lines of:
 ```rust
-Pipeline::new()
-    .add(Terminal::new(&count_up.event_queue).on(
-        "press",
-        |obj: &mut Counter, _aux: &mut UpdateAux, _event| {
-            let _event = _event.unwrap_as_press().unwrap();
-            { obj.count += 1; }
-        },
-    ))
-    .add(Terminal::new(&count_down.event_queue).on(
-        "press",
-        |obj: &mut Counter, _aux: &mut UpdateAux, _event| {
-            let _event = _event.unwrap_as_press().unwrap();
-            { obj.count -= 1; }
-        },
-    ));
+rooftop! {
+    // ...
+        fn build() {
+            VStack() {
+                Counter(
+                    count: 0, // <-- optional but valid
+                ),
+            }
+        }
+    // ...
+}
 ```
+
+### Lack of control
+
+Although the Fluuter/SwiftUI inspired syntax of the `rooftop!` macro is very useful for cobbling together something quickly, some applications need finer control. Thankfully, all the code that the `rooftop!` macro generates is regular Rust code. The code uses pipelines to simplify event queue handling (`reui::pipe::Pipeline`), all of which is equivalent to manually iterating over and matching events. You can peel away any of these abstractions and build something that still works with everything else.
 
 ---
 

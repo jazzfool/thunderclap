@@ -1,7 +1,7 @@
 use {
     crate::{
         base::{self, Repaintable},
-        draw, pipe,
+        draw, pipe, ui,
     },
     reclutch::{
         display::{
@@ -29,16 +29,17 @@ pub enum TextAlign {
 #[widget_children_trait(base::WidgetChildren)]
 #[reui_crate(crate)]
 #[widget_transform_callback(on_transform)]
-pub struct Label<U, G>
+pub struct LabelWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
-    pub data: base::Observed<LabelData>,
+    pub data: base::Observed<Label>,
 
     pipe: Option<pipe::Pipeline<Self, U>>,
     text_items: Vec<TextDisplayItem>,
     previous_rect: Rect,
+    dirty: bool,
 
     #[widget_rect]
     rect: Rect,
@@ -55,7 +56,7 @@ where
     phantom_g: PhantomData<G>,
 }
 
-pub struct LabelData {
+pub struct Label {
     pub text: DisplayText,
     pub typeface: draw::TypefaceStyle,
     pub color: Color,
@@ -63,26 +64,39 @@ pub struct LabelData {
     pub wrap: bool,
 }
 
-impl LabelData {
+impl<U, G> ui::WidgetDataTarget<U, G> for Label
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    type Target = LabelWidget<U, G>;
+}
+
+impl Label {
     pub fn from_theme(theme: &dyn draw::Theme) -> Self {
         let data = theme.data();
-        LabelData {
+        Label {
             text: "".to_string().into(),
             typeface: data.typography.body.clone(),
-            color: data.scheme.over_primary,
+            color: data.scheme.over_control_outset,
             align: TextAlign::Left,
             wrap: true,
         }
     }
 
-    pub fn construct<U, G>(self, _: &dyn draw::Theme, _u_aux: &mut U, _g_aux: &mut G) -> Label<U, G>
+    pub fn construct<U, G>(
+        self,
+        _: &dyn draw::Theme,
+        u_aux: &mut U,
+        _g_aux: &mut G,
+    ) -> LabelWidget<U, G>
     where
         U: base::UpdateAuxiliary + 'static,
         G: base::GraphicalAuxiliary + 'static,
     {
         let data = base::Observed::new(self);
 
-        let (text_items, rect) = Label::<U, G>::create_text_items(
+        let (text_items, rect) = LabelWidget::<U, G>::create_text_items(
             Rect::new(Default::default(), Size::new(std::f32::MAX, 0.0)),
             data.text.clone(),
             data.color.into(),
@@ -90,24 +104,26 @@ impl LabelData {
             data.typeface.typeface.pick(data.typeface.style),
             data.typeface.size,
             data.wrap,
+            u_aux.tracer(),
         );
 
         let pipe = pipeline! {
-            Label<U, G> as obj,
-            U as _aux,
+            LabelWidget<U, G> as obj,
+            U as aux,
             _ev in &data.on_change => {
                 change {
-                    obj.update_text_items();
+                    obj.update_text_items(aux.tracer());
                 }
             }
         };
 
-        Label {
+        LabelWidget {
             data,
 
             pipe: pipe.into(),
             text_items,
             previous_rect: rect,
+            dirty: true,
 
             rect,
             command_group: Default::default(),
@@ -121,10 +137,10 @@ impl LabelData {
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
     fn on_transform(&mut self) {
         if self.previous_rect.size.width != self.rect.size.width {
-            self.update_text_items();
+            self.dirty = true;
         } else if self.previous_rect.origin != self.rect.origin {
             let diff = self.rect.origin - self.previous_rect.origin;
             for item in &mut self.text_items {
@@ -145,6 +161,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
         font: (ResourceReference, FontInfo),
         size: f32,
         wrap: bool,
+        tracer: &base::AdditiveTracer,
     ) -> (Vec<TextDisplayItem>, Rect) {
         let mut text = TextDisplayItem {
             text,
@@ -155,7 +172,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
             color: color.into(),
         };
 
-        text.set_top_left(rect.origin);
+        text.set_top_left(tracer.absolute(rect.origin));
 
         let metrics = font.1.font.metrics();
         let mut text_items = if wrap {
@@ -188,7 +205,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
         (text_items, total_bounds.unwrap_or_default())
     }
 
-    fn update_text_items(&mut self) {
+    fn update_text_items(&mut self, tracer: &base::AdditiveTracer) {
         let (text_items, bounds) = Self::create_text_items(
             self.rect,
             self.data.text.clone(),
@@ -197,16 +214,19 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Label<U, G> {
             self.data.typeface.typeface.pick(self.data.typeface.style),
             self.data.typeface.size,
             self.data.wrap,
+            tracer,
         );
 
         self.text_items = text_items;
-        self.rect = bounds;
-        self.layout.notify(self.rect);
-        self.repaint();
+        use base::Rectangular;
+        self.set_rect(bounds);
+        //self.rect = bounds;
+        //self.layout.notify(self.rect);
+        //self.repaint();
     }
 }
 
-impl<U, G> Widget for Label<U, G>
+impl<U, G> Widget for LabelWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -221,6 +241,11 @@ where
     }
 
     fn update(&mut self, aux: &mut U) {
+        if self.dirty {
+            self.dirty = false;
+            self.update_text_items(aux.tracer());
+        }
+
         let mut pipe = self.pipe.take().unwrap();
         pipe.update(self, aux);
         self.pipe = Some(pipe);
@@ -236,7 +261,7 @@ where
     }
 }
 
-impl<U, G> draw::HasTheme for Label<U, G>
+impl<U, G> draw::HasTheme for LabelWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -249,7 +274,18 @@ where
     fn resize_from_theme(&mut self) {}
 }
 
-impl<U, G> Drop for Label<U, G>
+impl<U, G> ui::DefaultWidgetData<Label> for LabelWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    #[inline]
+    fn default_data(&mut self) -> &mut base::Observed<Label> {
+        &mut self.data
+    }
+}
+
+impl<U, G> Drop for LabelWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,

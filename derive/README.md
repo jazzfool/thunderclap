@@ -72,12 +72,12 @@ Expands to...
 impl reui::base::LayableWidget for MyWidget {
     #[inline]
     fn listen_to_layout(&mut self, layout: impl Into<Option<reui::base::WidgetLayoutEventsInner>>) {
-        layout.update(layout);
+        self.layout.update(layout);
     }
 
     #[inline]
     fn layout_id(&self) -> Option<u64> {
-        layout.id()
+        self.layout.id()
     }
 }
 ```

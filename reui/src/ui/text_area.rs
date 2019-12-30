@@ -80,13 +80,13 @@ pub trait LogicalTextArea {
 #[widget_children_trait(base::WidgetChildren)]
 #[reui_crate(crate)]
 #[widget_transform_callback(on_transform)]
-pub struct TextArea<U, G>
+pub struct TextAreaWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
     pub event_queue: RcEventQueue<TextAreaEvent>,
-    pub data: base::Observed<TextAreaData>,
+    pub data: base::Observed<TextArea>,
 
     pipe: Option<pipe::Pipeline<Self, U>>,
     painter: Box<dyn draw::Painter<state::TextAreaState>>,
@@ -106,7 +106,7 @@ where
     phantom_g: PhantomData<G>,
 }
 
-impl<U, G> ui::InteractiveWidget for TextArea<U, G>
+impl<U, G> ui::InteractiveWidget for TextAreaWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -141,7 +141,7 @@ where
     }
 }
 
-impl<U, G> LogicalTextArea for TextArea<U, G>
+impl<U, G> LogicalTextArea for TextAreaWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -184,7 +184,7 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TextAreaData {
+pub struct TextArea {
     pub text: String,
     pub placeholder: String,
     pub typeface: draw::TypefaceStyle,
@@ -195,10 +195,18 @@ pub struct TextAreaData {
     pub cursor: usize,
 }
 
-impl TextAreaData {
+impl<U, G> ui::WidgetDataTarget<U, G> for TextArea
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    type Target = TextAreaWidget<U, G>;
+}
+
+impl TextArea {
     pub fn from_theme(theme: &dyn draw::Theme) -> Self {
         let data = theme.data();
-        TextAreaData {
+        TextArea {
             text: "".into(),
             placeholder: "".into(),
             typeface: data.typography.body.clone(),
@@ -215,7 +223,7 @@ impl TextAreaData {
         theme: &dyn draw::Theme,
         u_aux: &mut U,
         _g_aux: &mut G,
-    ) -> TextArea<U, G>
+    ) -> TextAreaWidget<U, G>
     where
         U: base::UpdateAuxiliary + 'static,
         G: base::GraphicalAuxiliary + 'static,
@@ -223,14 +231,15 @@ impl TextAreaData {
         let data = base::Observed::new(self);
 
         let mut pipe = pipeline! {
-            TextArea<U, G> as obj,
+            TextAreaWidget<U, G> as obj,
             U as _aux,
             _ev in &data.on_change => { change { obj.repaint(); } }
         };
 
-        pipe = pipe
-            .add(ui::basic_interaction_terminal::<TextArea<U, G>, U>().bind(u_aux.window_queue()));
-        pipe = pipe.add(text_area_terminal::<TextArea<U, G>, U>().bind(u_aux.window_queue()));
+        pipe = pipe.add(
+            ui::basic_interaction_terminal::<TextAreaWidget<U, G>, U>().bind(u_aux.window_queue()),
+        );
+        pipe = pipe.add(text_area_terminal::<TextAreaWidget<U, G>, U>().bind(u_aux.window_queue()));
 
         let painter = theme.text_area();
         let rect = Rect::new(
@@ -242,7 +251,7 @@ impl TextAreaData {
             }),
         );
 
-        TextArea {
+        TextAreaWidget {
             event_queue: Default::default(),
             data,
 
@@ -261,7 +270,7 @@ impl TextAreaData {
     }
 }
 
-impl<U, G> TextArea<U, G>
+impl<U, G> TextAreaWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -280,7 +289,7 @@ where
     }
 }
 
-impl<U, G> Widget for TextArea<U, G>
+impl<U, G> Widget for TextAreaWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -311,7 +320,7 @@ where
     }
 }
 
-impl<U, G> draw::HasTheme for TextArea<U, G>
+impl<U, G> draw::HasTheme for TextAreaWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -323,7 +332,29 @@ where
     fn resize_from_theme(&mut self) {}
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Drop for TextArea<U, G> {
+impl<U, G> ui::DefaultWidgetData<TextArea> for TextAreaWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    #[inline]
+    fn default_data(&mut self) -> &mut base::Observed<TextArea> {
+        &mut self.data
+    }
+}
+
+impl<U, G> ui::DefaultEventQueue<TextAreaEvent> for TextAreaWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    #[inline]
+    fn default_event_queue(&self) -> &RcEventQueue<TextAreaEvent> {
+        &self.event_queue
+    }
+}
+
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Drop for TextAreaWidget<U, G> {
     fn drop(&mut self) {
         self.drop_event.emit_owned(base::DropEvent);
     }

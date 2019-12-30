@@ -336,7 +336,7 @@ pub trait HasVisibility {
 
 /// Trait required for any type passed as the `UpdateAux` type (seen as `U` in the widget type parameters)
 /// with accessors required for usage within Reui-implemented widgets.
-pub trait UpdateAuxiliary {
+pub trait UpdateAuxiliary: 'static {
     /// Returns the queue where window events (`WindowEvent`) are emitted, immutably.
     fn window_queue(&self) -> &RcEventQueue<WindowEvent>;
     /// Returns the queue where window events (`WindowEvent`) are emitted, mutably.
@@ -347,7 +347,7 @@ pub trait UpdateAuxiliary {
 
 /// Trait required for any type passed as the `GraphicalAux` type (seen as `G` in the widget type parameters)
 /// with accessors required for usage within Reui-implemented widgets.
-pub trait GraphicalAuxiliary {
+pub trait GraphicalAuxiliary: 'static {
     /// Returns the HiDPI scaling factor.
     fn scaling(&self) -> f32;
     /// Returns a mutable widget tracer.
@@ -774,6 +774,7 @@ impl<T: Sized> std::ops::Deref for Observed<T> {
 
 impl<T: Sized> std::ops::DerefMut for Observed<T> {
     fn deref_mut(&mut self) -> &mut T {
+        self.on_change.emit_owned(ObservedEvent);
         &mut self.inner
     }
 }
@@ -830,6 +831,8 @@ fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
         let (clip, restore) =
             clip_list.entry(id).or_insert_with(|| (CommandGroup::new(), CommandGroup::new()));
         let clip_rect = aux.tracer().absolute_bounds(widget.bounds());
+        clip.repaint();
+        restore.repaint();
         clip.push(
             display,
             &[

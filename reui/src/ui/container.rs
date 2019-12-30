@@ -12,7 +12,7 @@ use {
 };
 
 lazy_widget! {
-    generic Container,
+    generic ContainerWidget,
     visibility: visibility,
     theme: themed,
     drop_event: drop_event
@@ -23,7 +23,7 @@ lazy_widget! {
 /// Those children will still be rendered and receive updates.
 #[derive(Movable)]
 #[reui_crate(crate)]
-pub struct Container<U, G>
+pub struct ContainerWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
@@ -48,7 +48,7 @@ where
     phantom_g: PhantomData<G>,
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Container<U, G> {
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> ContainerWidget<U, G> {
     /// Creates a new container widget, possibly with an existing list of dynamic children.
     pub fn new(
         children: Vec<
@@ -61,7 +61,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Container<U, G> {
             >,
         >,
     ) -> Self {
-        Container {
+        ContainerWidget {
             children,
 
             themed: Default::default(),
@@ -84,7 +84,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Container<U, G> {
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Container<U, G> {
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for ContainerWidget<U, G> {
     type UpdateAux = U;
     type GraphicalAux = G;
     type DisplayObject = DisplayCommand;
@@ -105,7 +105,9 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Container
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> WidgetChildren for Container<U, G> {
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> WidgetChildren
+    for ContainerWidget<U, G>
+{
     fn children(
         &self,
     ) -> Vec<

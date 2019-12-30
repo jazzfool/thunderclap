@@ -49,13 +49,13 @@ pub enum CheckboxEvent {
 #[widget_children_trait(base::WidgetChildren)]
 #[reui_crate(crate)]
 #[widget_transform_callback(on_transform)]
-pub struct Checkbox<U, G>
+pub struct CheckboxWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
     pub event_queue: RcEventQueue<CheckboxEvent>,
-    pub data: base::Observed<CheckboxData>,
+    pub data: base::Observed<Checkbox>,
 
     pipe: Option<pipe::Pipeline<Self, U>>,
     painter: Box<dyn draw::Painter<state::CheckboxState>>,
@@ -75,7 +75,7 @@ where
     phantom_g: PhantomData<G>,
 }
 
-impl<U, G> ui::InteractiveWidget for Checkbox<U, G>
+impl<U, G> ui::InteractiveWidget for CheckboxWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -127,7 +127,7 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct CheckboxData {
+pub struct Checkbox {
     pub foreground: Color,
     pub background: Color,
     pub focus: Color,
@@ -136,10 +136,10 @@ pub struct CheckboxData {
     pub disabled: bool,
 }
 
-impl CheckboxData {
+impl Checkbox {
     pub fn from_theme(theme: &dyn draw::Theme) -> Self {
         let data = theme.data();
-        CheckboxData {
+        Checkbox {
             foreground: data.scheme.over_control_inset,
             background: data.scheme.control_inset,
             focus: data.scheme.focus,
@@ -154,7 +154,7 @@ impl CheckboxData {
         theme: &dyn draw::Theme,
         u_aux: &mut U,
         _g_aux: &mut G,
-    ) -> Checkbox<U, G>
+    ) -> CheckboxWidget<U, G>
     where
         U: base::UpdateAuxiliary + 'static,
         G: base::GraphicalAuxiliary + 'static,
@@ -162,13 +162,14 @@ impl CheckboxData {
         let data = base::Observed::new(self);
 
         let mut pipe = pipeline! {
-            Checkbox<U, G> as obj,
+            CheckboxWidget<U, G> as obj,
             U as _aux,
             _ev in &data.on_change => { change { obj.command_group.repaint(); } }
         };
 
-        pipe = pipe
-            .add(ui::basic_interaction_terminal::<Checkbox<U, G>, U>().bind(u_aux.window_queue()));
+        pipe = pipe.add(
+            ui::basic_interaction_terminal::<CheckboxWidget<U, G>, U>().bind(u_aux.window_queue()),
+        );
 
         let painter = theme.checkbox();
         let rect = Rect::new(
@@ -180,7 +181,7 @@ impl CheckboxData {
             }),
         );
 
-        Checkbox {
+        CheckboxWidget {
             event_queue: Default::default(),
             data,
 
@@ -199,7 +200,7 @@ impl CheckboxData {
     }
 }
 
-impl<U, G> Checkbox<U, G>
+impl<U, G> CheckboxWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -218,7 +219,7 @@ where
     }
 }
 
-impl<U, G> Widget for Checkbox<U, G>
+impl<U, G> Widget for CheckboxWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -260,7 +261,7 @@ where
     }
 }
 
-impl<U, G> draw::HasTheme for Checkbox<U, G>
+impl<U, G> draw::HasTheme for CheckboxWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -275,7 +276,7 @@ where
     }
 }
 
-impl<U, G> Drop for Checkbox<U, G>
+impl<U, G> Drop for CheckboxWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,

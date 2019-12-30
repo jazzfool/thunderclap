@@ -9,7 +9,8 @@ pub extern crate reclutch;
 extern crate reui_derive;
 
 pub use reui_derive::{
-    DropNotifier, HasVisibility, LayableWidget, Movable, PipelineEvent, Repaintable, Resizable,
+    rooftop, DropNotifier, HasVisibility, LayableWidget, Movable, PipelineEvent, Repaintable,
+    Resizable,
 };
 
 pub use paste;
