@@ -19,7 +19,6 @@
 ```rust
 use reui::{
     app, base,
-    reclutch::display::Color,
     themes::Primer,
     ui::{Button, Label, VStack},
 };
@@ -58,7 +57,7 @@ fn main() {
             }.construct(theme, u_aux, g_aux) // <-- create the root widget
         },
         app::AppOptions {
-            name: "Counter App",
+            name: "Counter App".into(),
             ..Default::default()
         },
     ).unwrap();
