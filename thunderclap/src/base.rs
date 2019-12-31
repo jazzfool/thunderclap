@@ -1,10 +1,7 @@
 use {
     crate::{draw, geom::*},
     reclutch::{
-        display::{
-            Color, CommandGroup, DisplayClip, DisplayCommand, GraphicsDisplay, Point, Rect, Size,
-            Vector,
-        },
+        display::{Color, CommandGroup, DisplayClip, DisplayCommand, GraphicsDisplay, Rect, Size},
         event::RcEventQueue,
         prelude::*,
         widget::Widget,

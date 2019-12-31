@@ -12,10 +12,7 @@ pub use {button::*, checkbox::*, container::*, hstack::*, label::*, text_area::*
 
 use {
     crate::{base, draw::state, geom::*, pipe},
-    reclutch::{
-        display::{DisplayText, Point, Rect},
-        event::RcEventQueue,
-    },
+    reclutch::{display::DisplayText, event::RcEventQueue},
 };
 
 /// Simply pushes a list of widgets, each with specified layout data, into a layout, then returns a mutable reference to the layout.

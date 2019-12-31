@@ -1,6 +1,5 @@
 use thunderclap::{
     app, base,
-    prelude::*,
     reclutch::display::Color,
     themes::Primer,
     ui::{self, Button, HStack, Label, VStack},

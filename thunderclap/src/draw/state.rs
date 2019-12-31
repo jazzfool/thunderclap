@@ -3,10 +3,7 @@
 //! These are simply the fields relevant to rendering, existing only
 //! in the scope of the `draw` method.
 
-use {
-    crate::{geom::*, ui},
-    reclutch::display::Rect,
-};
+use crate::{geom::*, ui};
 
 /// Visually relevant states of a [`Button`](../ui/struct.Button.html).
 #[derive(Debug, Clone)]

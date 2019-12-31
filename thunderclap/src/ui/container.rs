@@ -4,11 +4,7 @@ use {
         draw,
         geom::*,
     },
-    reclutch::{
-        display::{DisplayCommand, Rect},
-        event::RcEventQueue,
-        prelude::*,
-    },
+    reclutch::{display::DisplayCommand, event::RcEventQueue, prelude::*},
     std::marker::PhantomData,
 };
 

@@ -4,7 +4,7 @@ pub mod state;
 
 use {
     crate::{base, geom::*},
-    reclutch::display::{Color, DisplayCommand, FontInfo, Rect, ResourceReference, Size},
+    reclutch::display::{Color, DisplayCommand, FontInfo, ResourceReference, Size},
 };
 
 /// Implemented by types which are capable of changing themes.

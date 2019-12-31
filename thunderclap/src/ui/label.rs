@@ -8,7 +8,7 @@ use {
     reclutch::{
         display::{
             center_horizontally, Color, CommandGroup, DisplayCommand, DisplayListBuilder,
-            DisplayText, FontInfo, GraphicsDisplay, Rect, ResourceReference, Size, TextDisplayItem,
+            DisplayText, GraphicsDisplay, Rect, TextDisplayItem,
         },
         event::RcEventQueue,
         prelude::*,
@@ -89,8 +89,8 @@ impl Label {
 
     pub fn construct<U, G>(
         self,
-        _: &dyn draw::Theme,
-        u_aux: &mut U,
+        _theme: &dyn draw::Theme,
+        _u_aux: &mut U,
         _g_aux: &mut G,
     ) -> LabelWidget<U, G>
     where
@@ -101,7 +101,7 @@ impl Label {
 
         let pipe = pipeline! {
             LabelWidget<U, G> as obj,
-            U as aux,
+            U as _aux,
             _ev in &data.on_change => {
                 change {
                     obj.update_text_items();
@@ -250,7 +250,7 @@ where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
 {
-    fn perform_bind(&mut self, aux: &mut U) {
+    fn perform_bind(&mut self, _aux: &mut U) {
         self.update_text_items();
     }
 }

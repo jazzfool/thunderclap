@@ -6,7 +6,7 @@ use {
         pipe, ui,
     },
     reclutch::{
-        display::{Color, CommandGroup, DisplayCommand, GraphicsDisplay, Point, Rect},
+        display::{Color, CommandGroup, DisplayCommand, GraphicsDisplay, Rect},
         event::RcEventQueue,
         prelude::*,
     },
