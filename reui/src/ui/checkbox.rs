@@ -2,6 +2,7 @@ use {
     crate::{
         base::{self, Repaintable, Resizable},
         draw::{self, state},
+        geom::*,
         pipe, ui,
     },
     reclutch::{
@@ -18,22 +19,22 @@ use {
 pub enum CheckboxEvent {
     /// Emitted when the checkbox is pressed.
     #[event_key(press)]
-    Press(Point),
+    Press(AbsolutePoint),
     /// Emitted when the checkbox is released.
     #[event_key(release)]
-    Release(Point),
+    Release(AbsolutePoint),
     /// Emitted when the button is checked.
     #[event_key(check)]
-    Check(Point),
+    Check(AbsolutePoint),
     /// Emitted when the button is checked.
     #[event_key(uncheck)]
-    Uncheck(Point),
+    Uncheck(AbsolutePoint),
     /// Emitted when the mouse enters the checkbox boundaries.
     #[event_key(begin_hover)]
-    BeginHover(Point),
+    BeginHover(AbsolutePoint),
     /// Emitted when the mouse leaves the checkbox boundaries.
     #[event_key(end_hover)]
-    EndHover(Point),
+    EndHover(AbsolutePoint),
     /// Emitted when focus is gained.
     #[event_key(focus)]
     Focus,
@@ -59,9 +60,10 @@ where
 
     pipe: Option<pipe::Pipeline<Self, U>>,
     painter: Box<dyn draw::Painter<state::CheckboxState>>,
+    parent_position: AbsolutePoint,
 
     #[widget_rect]
-    rect: Rect,
+    rect: RelativeRect,
     #[repaint_target]
     command_group: CommandGroup,
     #[widget_layout]
@@ -86,7 +88,7 @@ where
     }
 
     #[inline]
-    fn mouse_bounds(&self) -> Rect {
+    fn mouse_bounds(&self) -> RelativeRect {
         self.painter.mouse_hint(self.rect)
     }
 
@@ -172,13 +174,15 @@ impl Checkbox {
         );
 
         let painter = theme.checkbox();
-        let rect = Rect::new(
+        let rect = RelativeRect::new(
             Default::default(),
-            painter.size_hint(state::CheckboxState {
-                rect: Default::default(),
-                data: data.clone(),
-                interaction: state::InteractionState::empty(),
-            }),
+            painter
+                .size_hint(state::CheckboxState {
+                    rect: Default::default(),
+                    data: data.clone(),
+                    interaction: state::InteractionState::empty(),
+                })
+                .cast_unit(),
         );
 
         CheckboxWidget {
@@ -187,6 +191,7 @@ impl Checkbox {
 
             pipe: pipe.into(),
             painter,
+            parent_position: Default::default(),
 
             rect,
             command_group: Default::default(),
@@ -207,12 +212,12 @@ where
 {
     fn on_transform(&mut self) {
         self.repaint();
-        self.layout.notify(self.rect);
+        self.layout.notify(self.abs_rect());
     }
 
     fn derive_state(&self) -> state::CheckboxState {
         state::CheckboxState {
-            rect: self.rect,
+            rect: self.abs_rect(),
             data: self.data.clone(),
             interaction: self.interaction,
         }
@@ -229,7 +234,7 @@ where
     type DisplayObject = DisplayCommand;
 
     fn bounds(&self) -> Rect {
-        self.painter.paint_hint(self.rect)
+        self.painter.paint_hint(self.rect).cast_unit()
     }
 
     fn update(&mut self, aux: &mut U) {
@@ -249,7 +254,7 @@ where
         }
 
         if let Some(rect) = self.layout.receive() {
-            self.rect = rect;
+            self.set_ctxt_rect(rect);
             self.command_group.repaint();
         }
     }
@@ -258,6 +263,21 @@ where
         let state = self.derive_state();
         let painter = &mut self.painter;
         self.command_group.push_with(display, || painter.draw(state), None, None);
+    }
+}
+
+impl<U, G> StoresParentPosition for CheckboxWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
+        self.parent_position = parent_pos;
+        self.on_transform();
+    }
+
+    fn parent_position(&self) -> AbsolutePoint {
+        self.parent_position
     }
 }
 

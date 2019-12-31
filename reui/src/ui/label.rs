@@ -1,7 +1,9 @@
 use {
     crate::{
         base::{self, Repaintable},
-        draw, pipe, ui,
+        draw,
+        geom::*,
+        pipe, ui,
     },
     reclutch::{
         display::{
@@ -38,11 +40,12 @@ where
 
     pipe: Option<pipe::Pipeline<Self, U>>,
     text_items: Vec<TextDisplayItem>,
-    previous_rect: Rect,
+    previous_rect: RelativeRect,
     dirty: bool,
+    parent_position: AbsolutePoint,
 
     #[widget_rect]
-    rect: Rect,
+    rect: RelativeRect,
     #[repaint_target]
     command_group: CommandGroup,
     #[widget_layout]
@@ -91,41 +94,31 @@ impl Label {
         _g_aux: &mut G,
     ) -> LabelWidget<U, G>
     where
-        U: base::UpdateAuxiliary + 'static,
-        G: base::GraphicalAuxiliary + 'static,
+        U: base::UpdateAuxiliary,
+        G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
-
-        let (text_items, rect) = LabelWidget::<U, G>::create_text_items(
-            Rect::new(Default::default(), Size::new(std::f32::MAX, 0.0)),
-            data.text.clone(),
-            data.color.into(),
-            data.align,
-            data.typeface.typeface.pick(data.typeface.style),
-            data.typeface.size,
-            data.wrap,
-            u_aux.tracer(),
-        );
 
         let pipe = pipeline! {
             LabelWidget<U, G> as obj,
             U as aux,
             _ev in &data.on_change => {
                 change {
-                    obj.update_text_items(aux.tracer());
+                    obj.update_text_items();
                 }
             }
         };
 
-        LabelWidget {
+        let mut label = LabelWidget {
             data,
 
             pipe: pipe.into(),
-            text_items,
-            previous_rect: rect,
+            text_items: Vec::new(),
+            previous_rect: Default::default(),
             dirty: true,
+            parent_position: Default::default(),
 
-            rect,
+            rect: Default::default(),
             command_group: Default::default(),
             layout: Default::default(),
             visibility: Default::default(),
@@ -133,7 +126,12 @@ impl Label {
 
             themed: Default::default(),
             phantom_g: Default::default(),
-        }
+        };
+
+        label.update_text_items();
+        label.previous_rect = label.rect;
+
+        label
     }
 }
 
@@ -144,85 +142,66 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
         } else if self.previous_rect.origin != self.rect.origin {
             let diff = self.rect.origin - self.previous_rect.origin;
             for item in &mut self.text_items {
-                item.bottom_left += diff;
+                item.bottom_left += diff.cast_unit();
             }
         }
 
         self.previous_rect = self.rect;
-        self.layout.notify(self.rect);
+        self.layout.notify(self.abs_rect());
         self.repaint();
     }
 
-    fn create_text_items(
-        rect: Rect,
-        text: DisplayText,
-        color: Color,
-        align: TextAlign,
-        font: (ResourceReference, FontInfo),
-        size: f32,
-        wrap: bool,
-        tracer: &base::AdditiveTracer,
-    ) -> (Vec<TextDisplayItem>, Rect) {
-        let mut text = TextDisplayItem {
-            text,
-            font: font.0,
-            font_info: font.1.clone(),
-            size,
-            bottom_left: Default::default(),
-            color: color.into(),
-        };
+    fn update_text_items(&mut self) {
+        let (text_items, bounds) = {
+            let font = self.data.typeface.typeface.pick(self.data.typeface.style);
 
-        text.set_top_left(tracer.absolute(rect.origin));
-
-        let metrics = font.1.font.metrics();
-        let mut text_items = if wrap {
-            text.linebreak(
-                rect,
-                (metrics.ascent + metrics.line_gap) / metrics.units_per_em as f32 * size,
-                true,
-            )
-            .unwrap()
-        } else {
-            vec![text]
-        };
-
-        let mut total_bounds: Option<Rect> = None;
-        for text_item in &mut text_items {
-            let bounds = text_item.bounds().unwrap();
-            if let Some(ref mut total_bounds) = total_bounds {
-                *total_bounds = total_bounds.union(&bounds);
-            } else {
-                total_bounds = Some(bounds);
-            }
-            let left = match align {
-                TextAlign::Left => text_item.bottom_left.x,
-                TextAlign::Middle => center_horizontally(bounds, rect).x,
-                TextAlign::Right => rect.max_x() - bounds.size.width,
+            let mut text = TextDisplayItem {
+                text: self.data.text.clone(),
+                font: font.0,
+                font_info: font.1.clone(),
+                size: self.data.typeface.size,
+                bottom_left: Default::default(),
+                color: self.data.color.into(),
             };
-            text_item.bottom_left.x = left;
-        }
 
-        (text_items, total_bounds.unwrap_or_default())
-    }
+            text.set_top_left(self.abs_rect().origin.cast_unit());
 
-    fn update_text_items(&mut self, tracer: &base::AdditiveTracer) {
-        let (text_items, bounds) = Self::create_text_items(
-            self.rect,
-            self.data.text.clone(),
-            self.data.color.into(),
-            self.data.align,
-            self.data.typeface.typeface.pick(self.data.typeface.style),
-            self.data.typeface.size,
-            self.data.wrap,
-            tracer,
-        );
+            let metrics = font.1.font.metrics();
+            let mut text_items = if self.data.wrap {
+                text.linebreak(
+                    self.abs_rect().cast_unit(),
+                    (metrics.ascent + metrics.line_gap) / metrics.units_per_em as f32
+                        * self.data.typeface.size,
+                    true,
+                )
+                .unwrap()
+            } else {
+                vec![text]
+            };
+
+            let mut total_bounds: Option<AbsoluteRect> = None;
+            for text_item in &mut text_items {
+                let bounds = text_item.bounds().unwrap().cast_unit();
+                if let Some(ref mut total_bounds) = total_bounds {
+                    *total_bounds = total_bounds.union(&bounds);
+                } else {
+                    total_bounds = Some(bounds);
+                }
+                let left = match self.data.align {
+                    TextAlign::Left => text_item.bottom_left.x,
+                    TextAlign::Middle => {
+                        center_horizontally(bounds.cast_unit(), self.abs_rect().cast_unit()).x
+                    }
+                    TextAlign::Right => self.abs_rect().max_x() - bounds.size.width,
+                };
+                text_item.bottom_left.x = left;
+            }
+
+            (text_items, total_bounds.unwrap_or_default())
+        };
 
         self.text_items = text_items;
-        use base::Rectangular;
-        self.set_rect(bounds);
-        //self.rect = bounds;
-        //self.layout.notify(self.rect);
-        //self.repaint();
+        self.set_ctxt_rect(bounds);
     }
 }
 
@@ -237,13 +216,18 @@ where
 
     #[inline]
     fn bounds(&self) -> Rect {
-        self.rect
+        self.rect.cast_unit()
     }
 
     fn update(&mut self, aux: &mut U) {
+        if let Some(rect) = self.layout.receive() {
+            self.set_ctxt_rect(rect);
+            self.dirty = true;
+        }
+
         if self.dirty {
             self.dirty = false;
-            self.update_text_items(aux.tracer());
+            self.update_text_items();
         }
 
         let mut pipe = self.pipe.take().unwrap();
@@ -253,11 +237,36 @@ where
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
         let mut builder = DisplayListBuilder::new();
-        builder.push_rectangle_clip(self.rect, true);
+        builder.push_rectangle_clip(self.abs_rect().cast_unit(), true);
         for text_item in &self.text_items {
             builder.push_text(text_item.clone(), None);
         }
         self.command_group.push(display, &builder.build(), None, None);
+    }
+}
+
+impl<U, G> ui::Bindable<U> for LabelWidget<U, G>
+where
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
+{
+    fn perform_bind(&mut self, aux: &mut U) {
+        self.update_text_items();
+    }
+}
+
+impl<U, G> StoresParentPosition for LabelWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
+        self.parent_position = parent_pos;
+        self.on_transform();
+    }
+
+    fn parent_position(&self) -> AbsolutePoint {
+        self.parent_position
     }
 }
 

@@ -3,12 +3,15 @@
 //! These are simply the fields relevant to rendering, existing only
 //! in the scope of the `draw` method.
 
-use {crate::ui, reclutch::display::Rect};
+use {
+    crate::{geom::*, ui},
+    reclutch::display::Rect,
+};
 
 /// Visually relevant states of a [`Button`](../ui/struct.Button.html).
 #[derive(Debug, Clone)]
 pub struct ButtonState {
-    pub rect: Rect,
+    pub rect: AbsoluteRect,
     pub data: ui::Button,
     pub interaction: InteractionState,
 }
@@ -24,7 +27,7 @@ bitflags::bitflags! {
 /// Visually relevant states of a [`Checkbox`](../ui/struct.Checkbox.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CheckboxState {
-    pub rect: Rect,
+    pub rect: AbsoluteRect,
     pub data: ui::Checkbox,
     pub interaction: InteractionState,
 }
@@ -32,7 +35,7 @@ pub struct CheckboxState {
 /// Visually relevant states of a [`TextArea`](../ui/struct.TextArea.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextAreaState {
-    pub rect: Rect,
+    pub rect: AbsoluteRect,
     pub data: ui::TextArea,
     pub interaction: InteractionState,
 }

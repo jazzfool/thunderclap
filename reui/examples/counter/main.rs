@@ -1,8 +1,9 @@
 use reui::{
     app, base,
+    prelude::*,
     reclutch::display::Color,
     themes::Primer,
-    ui::{Button, Label, VStack},
+    ui::{self, Button, HStack, Label, VStack},
 };
 
 #[macro_use]
@@ -11,26 +12,36 @@ extern crate reclutch;
 extern crate reui;
 
 rooftop! {
-    struct Counter {
+    struct Counter: () {
         fn build(
-            count = (0): i32,
-            btn_color = (theme.data().scheme.control_outset): Color
+            count: i32 = 0,
+            btn_color: Color = theme.data().scheme.control_outset,
         ) {
-            VStack(top_margin=5.0): v_stack {
+           VStack(top_margin=5.0) {
                 Label(
                     text=bind(format!("Count: {}", bind.count).into()),
                     wrap=false,
-                ): count_label,
-                //HStack(): button_list {
-                    Button(text="Count Up".to_string().into(), background=bind(bind.btn_color)): count_up
+                ),
+                HStack(left_margin=5.0) {
+                    Button(
+                        text=ui::txt("Count Up"),
+                        background=bind(bind.btn_color)
+                    )
                         @press {
                             widget.data.count += 1;
                         },
-                    Button(text="Count Down".to_string().into(), background=bind(bind.btn_color)): count_down
+                    Button(
+                        text=ui::txt("Count Down"),
+                        background=bind(bind.btn_color)
+                    )
                         @press {
                             widget.data.count -= 1;
                         },
-                //},
+                },
+                Label(
+                    text=bind(format!("Count: {}", bind.count).into()),
+                    wrap=false,
+                ),
             }
         }
     }

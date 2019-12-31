@@ -4,6 +4,7 @@ use {
         base,
         draw::{self, state},
         error,
+        geom::*,
     },
     reclutch::display::{
         self, Color, DisplayCommand, DisplayListBuilder, Filter, FontInfo, Gradient,
@@ -138,9 +139,9 @@ impl ButtonPainter {
         };
 
         text_item.set_top_left(if centered {
-            display::center(text_item.bounds().unwrap().size, state.rect)
+            display::center(text_item.bounds().unwrap().size, state.rect.cast_unit())
         } else {
-            state.rect.origin
+            state.rect.origin.cast_unit()
         });
 
         text_item
@@ -160,12 +161,12 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
             .size
     }
 
-    fn paint_hint(&self, rect: Rect) -> Rect {
+    fn paint_hint(&self, rect: RelativeRect) -> RelativeRect {
         // account for focus border
         rect.inflate(3.25, 3.25)
     }
 
-    fn mouse_hint(&self, rect: Rect) -> Rect {
+    fn mouse_hint(&self, rect: RelativeRect) -> RelativeRect {
         rect
     }
 
@@ -190,8 +191,8 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
 
             (
                 StyleColor::LinearGradient(Gradient {
-                    start: state.rect.origin,
-                    end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                    start: state.rect.origin.cast_unit(),
+                    end: state.rect.origin.cast_unit() + Size::new(0.0, state.rect.size.height),
                     stops: vec![
                         (0.0, draw::lighten(background, 0.1)),
                         (0.9, draw::darken(background, 0.1)),
@@ -204,8 +205,8 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
         } else {
             (
                 StyleColor::LinearGradient(Gradient {
-                    start: state.rect.origin,
-                    end: state.rect.origin + Size::new(0.0, state.rect.size.height),
+                    start: state.rect.origin.cast_unit(),
+                    end: state.rect.origin.cast_unit() + Size::new(0.0, state.rect.size.height),
                     stops: vec![
                         (0.0, draw::lighten(state.data.background, 0.1)),
                         (0.9, draw::darken(state.data.background, 0.1)),
@@ -223,7 +224,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
 
         // Background
         builder.push_round_rectangle(
-            base::sharp_align(state.rect),
+            base::sharp_align(state.rect.cast_unit()),
             [3.5; 4],
             GraphicsDisplayPaint::Fill(background),
             None,
@@ -231,7 +232,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
 
         // Border
         builder.push_round_rectangle(
-            base::sharp_align(state.rect),
+            base::sharp_align(state.rect.cast_unit()),
             [3.5; 4],
             GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                 thickness: 1.0 / 3.0,
@@ -249,7 +250,7 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
             && !state.interaction.contains(state::InteractionState::PRESSED)
         {
             builder.push_round_rectangle(
-                base::sharp_align(state.rect).inflate(1.5, 1.5),
+                base::sharp_align(state.rect.cast_unit()).inflate(1.5, 1.5),
                 [3.5; 4],
                 GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                     thickness: 3.5,
@@ -262,9 +263,9 @@ impl draw::Painter<state::ButtonState> for ButtonPainter {
 
         // Pressed inset shadow
         if state.interaction.contains(state::InteractionState::PRESSED) {
-            builder.push_round_rectangle_clip(base::sharp_align(state.rect), [3.5; 4]);
+            builder.push_round_rectangle_clip(base::sharp_align(state.rect.cast_unit()), [3.5; 4]);
             builder.push_round_rectangle(
-                state.rect.inflate(10.0, 10.0).translate(Vector::new(0.0, 7.0)),
+                state.rect.cast_unit().inflate(10.0, 10.0).translate(Vector::new(0.0, 7.0)),
                 [10.0; 4],
                 GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                     thickness: 10.0,
@@ -290,17 +291,17 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
         Size::new(20.0, 20.0)
     }
 
-    fn paint_hint(&self, rect: Rect) -> Rect {
+    fn paint_hint(&self, rect: RelativeRect) -> RelativeRect {
         rect.inflate(3.25, 3.25)
     }
 
-    fn mouse_hint(&self, rect: Rect) -> Rect {
-        Rect::new(rect.origin, Size::new(20.0, 20.0))
+    fn mouse_hint(&self, rect: RelativeRect) -> RelativeRect {
+        RelativeRect::new(rect.origin, Size::new(20.0, 20.0).cast_unit())
     }
 
     fn draw(&mut self, mut state: state::CheckboxState) -> Vec<DisplayCommand> {
-        state.rect.size = Size::new(20.0, 20.0);
-        state.rect = base::sharp_align(state.rect);
+        state.rect.size = Size::new(20.0, 20.0).cast_unit();
+        state.rect = base::sharp_align(state.rect.cast_unit()).cast_unit();
 
         let (background, foreground, border, focus) = if state.data.checked {
             (
@@ -336,7 +337,7 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
 
         // Background
         builder.push_round_rectangle(
-            state.rect,
+            state.rect.cast_unit(),
             [3.5; 4],
             GraphicsDisplayPaint::Fill(background),
             None,
@@ -344,7 +345,7 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
 
         // Border
         builder.push_round_rectangle(
-            state.rect,
+            state.rect.cast_unit(),
             [3.5; 4],
             GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                 thickness: 1.0 / 3.0,
@@ -356,7 +357,7 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
 
         // Foreground (check mark)
         builder.push_path(
-            check_mark_icon(state.rect.inflate(-4.0, -4.0)),
+            check_mark_icon(state.rect.cast_unit().inflate(-4.0, -4.0)),
             false,
             GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                 thickness: 2.5,
@@ -371,7 +372,7 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
             && !state.interaction.contains(state::InteractionState::PRESSED)
         {
             builder.push_round_rectangle(
-                state.rect.inflate(1.5, 1.5),
+                state.rect.cast_unit().inflate(1.5, 1.5),
                 [3.5; 4],
                 GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
                     thickness: 3.5,
@@ -406,7 +407,7 @@ impl TextAreaPainter {
             color,
         };
 
-        text_item.set_top_left(state.rect.origin);
+        text_item.set_top_left(state.rect.origin.cast_unit());
 
         text_item
     }
@@ -424,12 +425,12 @@ impl draw::Painter<state::TextAreaState> for TextAreaPainter {
     }
 
     #[inline]
-    fn paint_hint(&self, rect: Rect) -> Rect {
+    fn paint_hint(&self, rect: RelativeRect) -> RelativeRect {
         rect
     }
 
     #[inline]
-    fn mouse_hint(&self, rect: Rect) -> Rect {
+    fn mouse_hint(&self, rect: RelativeRect) -> RelativeRect {
         rect
     }
 
@@ -452,7 +453,7 @@ impl draw::Painter<state::TextAreaState> for TextAreaPainter {
 
         let mut builder = DisplayListBuilder::new();
 
-        builder.push_rectangle_clip(state.rect, true);
+        builder.push_rectangle_clip(state.rect.cast_unit(), true);
 
         if let Some((a, b)) = cursor {
             builder.push_line(

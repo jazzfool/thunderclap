@@ -28,18 +28,18 @@ rooftop! {
     struct Counter: () // <-- output event
     {
         fn build(
-            count = (0): i32,
+            count: i32 = 0,
         ) {
-            VStack(): v_stack {
+            VStack() {
                 Label(
                     text=bind(format!("Count: {}", bind.count).into()), // <-- runtime bindings
                     wrap=false, // <-- properties
-                ): count_label, // <-- variable name
-                Button(text="Count Up"): count_up
+                ),
+                Button(text="Count Up")
                     @press { // <-- event handling
                         widget.data.count += 1;
                     },
-                Button(text="Count Down"): count_down
+                Button(text="Count Down")
                     @press {
                         widget.data.count -= 1;
                     },

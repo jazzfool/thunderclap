@@ -632,14 +632,14 @@ fn impl_movable_macro(ast: syn::DeriveInput) -> TokenStream {
                 {
                     quote!{
                         impl #impl_generics #crate_name::base::Movable for #name #ty_generics #where_clause {
-                            fn set_position(&mut self, position: #crate_name::reclutch::display::Point) {
+                            fn set_position(&mut self, position: #crate_name::geom::RelativePoint) {
                                 #assignment
                                 #crate_name::base::Repaintable::repaint(self);
                                 #callback
                             }
 
                             #[inline]
-                            fn position(&self) -> #crate_name::reclutch::display::Point {
+                            fn position(&self) -> #crate_name::geom::RelativePoint {
                                 #return_val
                             }
                         }
@@ -724,18 +724,18 @@ fn impl_resizable_macro(ast: syn::DeriveInput) -> TokenStream {
                         if let Some(ref ident) = field.ident {
                             if chk_attrs_is_rect(&field.attrs) {
                                 assignment = Some(quote! {
-                                    self.#ident.size = size;
+                                    self.#ident.size = size.cast_unit();
                                 });
                                 return_val = Some(quote! {
-                                    self.#ident.size
+                                    self.#ident.size.cast_unit()
                                 });
                                 break;
                             } else if chk_attrs_is_size(&field.attrs) {
                                 assignment = Some(quote! {
-                                    self.#ident = size;
+                                    self.#ident = size.cast_unit();
                                 });
                                 return_val = Some(quote! {
-                                    self.#ident
+                                    self.#ident.cast_unit()
                                 });
                                 break;
                             }
@@ -747,18 +747,18 @@ fn impl_resizable_macro(ast: syn::DeriveInput) -> TokenStream {
                         let index: syn::Index = i.into();
                         if chk_attrs_is_rect(&field.attrs) {
                             assignment = Some(quote! {
-                                self.#index.size = size;
+                                self.#index.size = size.cast_unit();
                             });
                             return_val = Some(quote! {
-                                self.#index.size
+                                self.#index.size.cast_unit()
                             });
                             break;
                         } else if chk_attrs_is_size(&field.attrs) {
                             assignment = Some(quote! {
-                                self.#index = size;
+                                self.#index = size.cast_unit();
                             });
                             return_val = Some(quote! {
-                                self.#index
+                                self.#index.cast_unit()
                             });
                             break;
                         }
@@ -818,22 +818,23 @@ struct DataFieldList {
 #[derive(Debug)]
 struct RooftopData {
     struct_name: syn::Ident,
+    output_event: syn::Type,
     data_fields: DataFieldList,
     widget_tree_root: WidgetNode,
     bindings: Vec<proc_macro2::TokenStream>,
     terminals: Vec<proc_macro2::TokenStream>,
+    bind_propagation: Vec<proc_macro2::TokenStream>,
     functions: Vec<(syn::Ident, syn::Block)>,
 }
 
 impl syn::parse::Parse for DataField {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let name = input.parse::<syn::Ident>()?;
-        input.parse::<syn::Token![=]>()?;
-        let default_contents;
-        syn::parenthesized!(default_contents in input);
-        let default = default_contents.parse::<syn::Expr>()?;
         input.parse::<syn::Token![:]>()?;
         let field_type = input.parse::<syn::Type>()?;
+        input.parse::<syn::Token![=]>()?;
+        let default = input.parse::<syn::Expr>()?;
+
         Ok(DataField { name, default, field_type })
     }
 }
@@ -922,6 +923,8 @@ fn parse_view(
     stream: syn::parse::ParseStream,
     bindings: &mut Vec<proc_macro2::TokenStream>,
     terminals: &mut Vec<proc_macro2::TokenStream>,
+    bind_propagation: &mut Vec<proc_macro2::TokenStream>,
+    count: &mut u64,
 ) -> syn::Result<(WidgetNode, bool)> {
     let type_name = stream.parse::<syn::Ident>()?;
     let assignments;
@@ -929,23 +932,25 @@ fn parse_view(
     let data_assignments: syn::punctuated::Punctuated<_, syn::Token![,]> =
         assignments.parse_terminated(DataAssignment::parse)?;
     let mut data_assignments: Vec<_> = data_assignments.into_iter().collect();
-    stream.parse::<syn::Token![:]>()?;
-    let var_name = stream.parse::<syn::Ident>()?;
+    let var_name = if stream.parse::<syn::Token![as]>().is_ok() {
+        stream.parse::<syn::Ident>()?
+    } else {
+        *count += 1;
+        quote::format_ident!("unnamed_widget_{}", count)
+    };
 
     for assignment in &data_assignments {
         if assignment.binding {
             let value = assignment.value.clone();
             let var = assignment.var.clone();
-            bindings.push(
+            bindings.push(quote! {
                 {
-                    quote! {
-                        {
-                            widget.#var_name.default_data().#var = #value;
-                        }
-                    }
+                    widget.#var_name.default_data().#var = #value;
                 }
-                .into(),
-            );
+            });
+            bind_propagation.push(quote! {
+                self.#var_name.perform_bind(aux);
+            });
         }
     }
 
@@ -990,7 +995,8 @@ fn parse_view(
             if children_parse.is_empty() {
                 parse_child = false;
             } else {
-                let (node, found_comma) = parse_view(&children_parse, bindings, terminals)?;
+                let (node, found_comma) =
+                    parse_view(&children_parse, bindings, terminals, bind_propagation, count)?;
                 children.push(node);
                 parse_child = found_comma;
             }
@@ -1006,6 +1012,8 @@ impl syn::parse::Parse for RooftopData {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         input.parse::<syn::Token![struct]>()?;
         let struct_name = input.parse()?;
+        input.parse::<syn::Token![:]>()?;
+        let output_event = input.parse()?;
         let struct_content;
         syn::braced!(struct_content in input);
 
@@ -1032,15 +1040,26 @@ impl syn::parse::Parse for RooftopData {
 
         let mut bindings = Vec::new();
         let mut terminals = Vec::new();
-        let widget_tree_root = parse_view(&view_body, &mut bindings, &mut terminals)?.0;
+        let mut bind_propagation = Vec::new();
+        let mut count = 0;
+        let widget_tree_root = parse_view(
+            &view_body,
+            &mut bindings,
+            &mut terminals,
+            &mut bind_propagation,
+            &mut count,
+        )?
+        .0;
 
         Ok(RooftopData {
             struct_name,
+            output_event,
             data_fields: data_fields
                 .expect("failed to find data fields (parameters of build() pseudo-function)"),
             widget_tree_root,
             bindings,
             terminals,
+            bind_propagation,
             functions: other_functions,
         })
     }
@@ -1053,7 +1072,10 @@ fn flatten_widget_node_tree(root: &WidgetNode, output: &mut Vec<WidgetNode>) {
     }
 }
 
-fn find_pseudo_function(name: &'static str, functions: &[(syn::Ident, syn::Block)]) -> Option<proc_macro2::TokenStream> {
+fn find_pseudo_function(
+    name: &'static str,
+    functions: &[(syn::Ident, syn::Block)],
+) -> Option<proc_macro2::TokenStream> {
     use quote::ToTokens;
     let block = functions.iter().find(|func| func.0.to_string() == name)?.1.clone();
     let mut tokens = proc_macro2::TokenStream::new();
@@ -1062,19 +1084,23 @@ fn find_pseudo_function(name: &'static str, functions: &[(syn::Ident, syn::Block
 }
 
 impl WidgetNode {
-     fn compile_layout(&self) -> proc_macro2::TokenStream {
-         let name = &self.var_name; 
+    fn compile_layout(&self) -> proc_macro2::TokenStream {
+        let name = &self.var_name;
         if self.children.is_empty() {
             quote! {
                 &mut #name
             }
         } else {
-            let children: Vec<_> = self.children.iter().map(|child| {
-                let layout = child.compile_layout();
-                quote! {
-                    None => #layout,
-                }
-            }).collect();
+            let children: Vec<_> = self
+                .children
+                .iter()
+                .map(|child| {
+                    let layout = child.compile_layout();
+                    quote! {
+                        None => #layout,
+                    }
+                })
+                .collect();
             quote! {
                 define_layout! {
                     for #name => {
@@ -1083,12 +1109,13 @@ impl WidgetNode {
                 }
             }
         }
-     }
+    }
 }
 
 impl RooftopData {
     fn compile(self) -> TokenStream {
         let struct_name = self.struct_name;
+        let output_event = self.output_event;
 
         let data_fields: Vec<proc_macro2::TokenStream> = self
             .data_fields
@@ -1147,36 +1174,46 @@ impl RooftopData {
                 }
             })
             .collect();
-        
-        let widget_names: Vec<proc_macro2::TokenStream> = flattened_nodes.iter().map(|node| {
-            let name = &node.var_name;
-            quote! {
-                #name,
-            }
-        }).collect();
 
-        let widgets_as_fields: Vec<proc_macro2::TokenStream> = flattened_nodes.iter().rev().map(|node| {
-            let name = &node.var_name;
-            let type_name = &node.type_name;
-            quote! {
-                #[widget_child]
-                #[repaint_target]
-                #name: <#type_name as #reui::ui::WidgetDataTarget<U, G>>::Target,
-            }
-        }).collect();
+        let widget_names: Vec<proc_macro2::TokenStream> = flattened_nodes
+            .iter()
+            .map(|node| {
+                let name = &node.var_name;
+                quote! {
+                    #name,
+                }
+            })
+            .collect();
 
-        let terminals = &self.terminals;
+        let widgets_as_fields: Vec<proc_macro2::TokenStream> = flattened_nodes
+            .iter()
+            .rev()
+            .map(|node| {
+                let name = &node.var_name;
+                let type_name = &node.type_name;
+                quote! {
+                    #[widget_child]
+                    #[repaint_target]
+                    #name: <#type_name as #reui::ui::WidgetDataTarget<U, G>>::Target,
+                }
+            })
+            .collect();
+
         let bindings = &self.bindings;
+        let terminals = &self.terminals;
+        let bind_propagation = &self.bind_propagation;
 
-        let build_pipeline = find_pseudo_function("build_pipeline", &self.functions).unwrap_or(quote! { { pipe } });
-        let before_pipeline = find_pseudo_function("before_pipeline", &self.functions).unwrap_or(proc_macro2::TokenStream::new());
-        let after_pipeline = find_pseudo_function("after_pipeline", &self.functions).unwrap_or(proc_macro2::TokenStream::new());
+        let build_pipeline =
+            find_pseudo_function("build_pipeline", &self.functions).unwrap_or(quote! { { pipe } });
+        let before_pipeline = find_pseudo_function("before_pipeline", &self.functions)
+            .unwrap_or(proc_macro2::TokenStream::new());
+        let after_pipeline = find_pseudo_function("after_pipeline", &self.functions)
+            .unwrap_or(proc_macro2::TokenStream::new());
         let draw = find_pseudo_function("draw", &self.functions).unwrap_or(quote! { &[] });
 
         let define_layout = self.widget_tree_root.compile_layout();
 
         let root_name = &self.widget_tree_root.var_name;
-
         {
             quote! {
                 pub struct #struct_name {
@@ -1192,8 +1229,8 @@ impl RooftopData {
 
                     pub fn construct<U, G>(self, theme: &dyn #reui::draw::Theme, u_aux: &mut U, g_aux: &mut G) -> #widget_name<U, G>
                     where
-                        U: #reui::base::UpdateAuxiliary + 'static,
-                        G: #reui::base::GraphicalAuxiliary + 'static,
+                        U: #reui::base::UpdateAuxiliary,
+                        G: #reui::base::GraphicalAuxiliary,
                     {
                         let mut data = #reui::base::Observed::new(self);
                         #(#widget_declarations)*
@@ -1204,6 +1241,13 @@ impl RooftopData {
                             #widget_name<U, G> as widget,
                             U as aux,
                             #(#terminals)*
+                        };
+
+                        pipe = #build_pipeline;
+
+                        let mut bind_pipe = pipeline! {
+                            #widget_name<U, G> as widget,
+                            U as aux,
                             event in &data.on_change => {
                                 change {
                                     use #reui::ui::DefaultWidgetData;
@@ -1213,14 +1257,15 @@ impl RooftopData {
                             }
                         };
 
-                        pipe = #build_pipeline;
-
                         // emits false positive event to apply bindings
                         data.get_mut();
 
                         let mut output_widget = #widget_name {
+                            event_queue: Default::default(),
                             data,
                             pipe: pipe.into(),
+                            bind_pipe: bind_pipe.into(),
+                            parent_position: Default::default(),
 
                             visibility: Default::default(),
                             command_group: Default::default(),
@@ -1246,8 +1291,8 @@ impl RooftopData {
 
                 impl<U, G> #reui::ui::WidgetDataTarget<U, G> for #struct_name
                 where
-                    U: base::UpdateAuxiliary + 'static,
-                    G: base::GraphicalAuxiliary + 'static,
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
                 {
                     type Target = #widget_name<U, G>;
                 }
@@ -1263,12 +1308,15 @@ impl RooftopData {
                 #[reui_crate(#reui)]
                 pub struct #widget_name<U, G>
                 where
-                    U: base::UpdateAuxiliary + 'static,
-                    G: base::GraphicalAuxiliary + 'static,
+                    U: base::UpdateAuxiliary,
+                    G: base::GraphicalAuxiliary,
                 {
+                    pub event_queue: #reui::reclutch::event::RcEventQueue<#output_event>,
                     pub data: #reui::base::Observed<#struct_name>,
                     pipe: Option<#reui::pipe::Pipeline<Self, U>>,
-                    
+                    bind_pipe: Option<#reui::pipe::Pipeline<Self, U>>,
+                    parent_position: #reui::geom::AbsolutePoint,
+
                     #[widget_visibility]
                     visibility: #reui::base::Visibility,
                     #[repaint_target]
@@ -1286,20 +1334,20 @@ impl RooftopData {
 
                 impl<U, G> #widget_name<U, G>
                 where
-                    U: #reui::base::UpdateAuxiliary + 'static,
-                    G: #reui::base::GraphicalAuxiliary + 'static,
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
                 {
                     fn on_transform(&mut self) {
-                        use #reui::base::{Rectangular, Repaintable};
+                        use #reui::{base::{Repaintable}, geom::ContextuallyRectangular};
                         self.repaint();
-                        self.layout.notify(self.#root_name.rect());
+                        self.layout.notify(self.#root_name.abs_rect());
                     }
                 }
 
                 impl<U, G> #reui::reclutch::widget::Widget for #widget_name<U, G>
                 where
-                    U: #reui::base::UpdateAuxiliary + 'static,
-                    G: #reui::base::GraphicalAuxiliary + 'static,
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
                 {
                     type UpdateAux = U;
                     type GraphicalAux = G;
@@ -1307,7 +1355,7 @@ impl RooftopData {
 
                     #[inline]
                     fn bounds(&self) -> #reui::reclutch::display::Rect {
-                        self.#root_name.bounds()
+                        self.#root_name.bounds().cast_unit()
                     }
 
                     fn update(&mut self, aux: &mut U) {
@@ -1319,9 +1367,14 @@ impl RooftopData {
                         self.pipe = Some(pipe);
                         #after_pipeline
                         if let Some(rect) = self.layout.receive() {
-                            use #reui::base::Rectangular;
-                            self.#root_name.set_rect(rect);
+                            use #reui::geom::ContextuallyRectangular;
+                            self.#root_name.set_ctxt_rect(rect);
                             self.command_group.repaint();
+                        }
+
+                        {
+                            use #reui::ui::Bindable;
+                            self.perform_bind(aux);
                         }
                     }
 
@@ -1330,26 +1383,41 @@ impl RooftopData {
                     }
                 }
 
-                impl<U, G> #reui::base::Movable for #widget_name<U, G>
+                impl<U, G> #reui::ui::Bindable<U> for #widget_name<U, G>
                 where
-                    U: base::UpdateAuxiliary + 'static,
-                    G: base::GraphicalAuxiliary + 'static,
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
                 {
                     #[inline]
-                    fn set_position(&mut self, position: #reui::reclutch::display::Point) {
+                    fn perform_bind(&mut self, aux: &mut U) {
+                        let mut bind_pipe = self.bind_pipe.take().unwrap();
+                        bind_pipe.update(self, aux);
+                        self.bind_pipe = Some(bind_pipe);
+
+                        #(#bind_propagation)*
+                    }
+                }
+
+                impl<U, G> #reui::base::Movable for #widget_name<U, G>
+                where
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
+                {
+                    #[inline]
+                    fn set_position(&mut self, position: #reui::geom::RelativePoint) {
                         self.#root_name.set_position(position);
                     }
 
                     #[inline]
-                    fn position(&self) -> #reui::reclutch::display::Point {
+                    fn position(&self) -> #reui::geom::RelativePoint {
                         self.#root_name.position()
                     }
                 }
 
                 impl<U, G> #reui::base::Resizable for #widget_name<U, G>
                 where
-                    U: base::UpdateAuxiliary + 'static,
-                    G: base::GraphicalAuxiliary + 'static,
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
                 {
                     #[inline]
                     fn set_size(&mut self, size: #reui::reclutch::display::Size) {
@@ -1362,10 +1430,26 @@ impl RooftopData {
                     }
                 }
 
+                impl<U, G> #reui::geom::StoresParentPosition for #widget_name<U, G>
+                where
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
+                {
+                    fn set_parent_position(&mut self, parent_pos: #reui::geom::AbsolutePoint) {
+                        self.parent_position = parent_pos;
+                        self.on_transform();
+                    }
+
+                    #[inline(always)]
+                    fn parent_position(&self) -> #reui::geom::AbsolutePoint {
+                        self.parent_position
+                    }
+                }
+
                 impl<U, G> #reui::draw::HasTheme for #widget_name<U, G>
                 where
-                    U: #reui::base::UpdateAuxiliary + 'static,
-                    G: #reui::base::GraphicalAuxiliary + 'static,
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
                 {
                     #[inline]
                     fn theme(&mut self) -> &mut dyn #reui::draw::Themed {
@@ -1374,9 +1458,42 @@ impl RooftopData {
 
                     fn resize_from_theme(&mut self) {}
                 }
+
+                impl<U, G> #reui::ui::DefaultEventQueue<#output_event> for #widget_name<U, G>
+                where
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
+                {
+                    #[inline]
+                    fn default_event_queue(&self) -> &#reui::reclutch::event::RcEventQueue<#output_event> {
+                        &self.event_queue
+                    }
+                }
+
+                impl<U, G> #reui::ui::DefaultWidgetData<#struct_name> for #widget_name<U, G>
+                where
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
+                {
+                    #[inline]
+                    fn default_data(&mut self) -> &mut #reui::base::Observed<#struct_name> {
+                        &mut self.data
+                    }
+                }
+
+                impl<U, G> Drop for #widget_name<U, G>
+                where
+                    U: #reui::base::UpdateAuxiliary,
+                    G: #reui::base::GraphicalAuxiliary,
+                {
+                    fn drop(&mut self) {
+                        use #reui::reclutch::prelude::*;
+                        self.drop_event.emit_owned(#reui::base::DropEvent);
+                    }
+                }
             }
         }
-        .into()
+            .into()
     }
 }
 

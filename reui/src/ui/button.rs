@@ -4,10 +4,11 @@ use {
     crate::{
         base::{self, Repaintable, Resizable},
         draw::{self, state, HasTheme},
+        geom::*,
         pipe, ui,
     },
     reclutch::{
-        display::{Color, CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Point, Rect},
+        display::{Color, CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Rect},
         event::RcEventQueue,
         prelude::*,
     },
@@ -20,16 +21,16 @@ use {
 pub enum ButtonEvent {
     /// Emitted when the checkbox is pressed.
     #[event_key(press)]
-    Press(Point),
+    Press(AbsolutePoint),
     /// Emitted when the checkbox is released.
     #[event_key(release)]
-    Release(Point),
+    Release(AbsolutePoint),
     /// Emitted when the mouse enters the checkbox boundaries.
     #[event_key(begin_hover)]
-    BeginHover(Point),
+    BeginHover(AbsolutePoint),
     /// Emitted when the mouse leaves the checkbox boundaries.
     #[event_key(end_hover)]
-    EndHover(Point),
+    EndHover(AbsolutePoint),
     /// Emitted when focus is gained.
     #[event_key(focus)]
     Focus,
@@ -47,8 +48,8 @@ pub enum ButtonEvent {
 #[widget_transform_callback(on_transform)]
 pub struct ButtonWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     pub event_queue: RcEventQueue<ButtonEvent>,
 
@@ -56,9 +57,10 @@ where
     pipe: Option<pipe::Pipeline<Self, U>>,
     interaction: state::InteractionState,
     painter: Box<dyn draw::Painter<state::ButtonState>>,
+    parent_position: AbsolutePoint,
 
     #[widget_rect]
-    rect: Rect,
+    rect: RelativeRect,
     #[widget_visibility]
     visibility: base::Visibility,
     #[repaint_target]
@@ -73,8 +75,8 @@ where
 
 impl<U, G> ui::InteractiveWidget for ButtonWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline(always)]
     fn interaction(&mut self) -> &mut state::InteractionState {
@@ -82,7 +84,7 @@ where
     }
 
     #[inline]
-    fn mouse_bounds(&self) -> Rect {
+    fn mouse_bounds(&self) -> RelativeRect {
         self.painter.mouse_hint(self.rect)
     }
 
@@ -117,8 +119,8 @@ pub struct Button {
 
 impl<U, G> ui::WidgetDataTarget<U, G> for Button
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type Target = ButtonWidget<U, G>;
 }
@@ -144,8 +146,8 @@ impl Button {
         _g_aux: &mut G,
     ) -> ButtonWidget<U, G>
     where
-        U: base::UpdateAuxiliary + 'static,
-        G: base::GraphicalAuxiliary + 'static,
+        U: base::UpdateAuxiliary,
+        G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
 
@@ -165,13 +167,15 @@ impl Button {
         );
 
         let painter = theme.button();
-        let rect = Rect::new(
+        let rect = RelativeRect::new(
             Default::default(),
-            painter.size_hint(state::ButtonState {
-                rect: Default::default(),
-                data: data.clone(),
-                interaction: state::InteractionState::empty(),
-            }),
+            painter
+                .size_hint(state::ButtonState {
+                    rect: Default::default(),
+                    data: data.clone(),
+                    interaction: state::InteractionState::empty(),
+                })
+                .cast_unit(),
         );
 
         ButtonWidget {
@@ -180,6 +184,7 @@ impl Button {
             pipe: pipe.into(),
             interaction: state::InteractionState::empty(),
             painter,
+            parent_position: Default::default(),
             rect,
             visibility: Default::default(),
             command_group: Default::default(),
@@ -192,17 +197,17 @@ impl Button {
 
 impl<U, G> ButtonWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     fn on_transform(&mut self) {
         self.repaint();
-        self.layout.notify(self.rect);
+        self.layout.notify(self.abs_rect());
     }
 
-    fn derive_state(&self, tracer: &base::AdditiveTracer) -> state::ButtonState {
+    fn derive_state(&self) -> state::ButtonState {
         state::ButtonState {
-            rect: tracer.absolute_bounds(self.rect),
+            rect: self.abs_rect(),
             data: self.data.clone(),
             interaction: self.interaction,
         }
@@ -211,8 +216,8 @@ where
 
 impl<U, G> Widget for ButtonWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type UpdateAux = U;
     type GraphicalAux = G;
@@ -220,7 +225,7 @@ where
 
     #[inline]
     fn bounds(&self) -> Rect {
-        self.painter.paint_hint(self.rect)
+        self.painter.paint_hint(self.rect).cast_unit()
     }
 
     fn update(&mut self, aux: &mut U) {
@@ -229,22 +234,47 @@ where
         self.pipe = Some(pipe);
 
         if let Some(rect) = self.layout.receive() {
-            self.rect = rect;
+            self.set_ctxt_rect(rect);
             self.command_group.repaint();
         }
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
-        let button_state = self.derive_state(aux.tracer());
+        let button_state = self.derive_state();
         let painter = &mut self.painter;
         self.command_group.push_with(display, || painter.draw(button_state), None, None);
     }
 }
 
+impl<U, G> ui::Bindable<U> for ButtonWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn perform_bind(&mut self, _aux: &mut U) {
+        self.repaint();
+    }
+}
+
+impl<U, G> StoresParentPosition for ButtonWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
+        self.parent_position = parent_pos;
+        self.on_transform();
+    }
+
+    fn parent_position(&self) -> AbsolutePoint {
+        self.parent_position
+    }
+}
+
 impl<U, G> HasTheme for ButtonWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline]
     fn theme(&mut self) -> &mut dyn draw::Themed {
@@ -252,14 +282,14 @@ where
     }
 
     fn resize_from_theme(&mut self) {
-        self.set_size(self.painter.size_hint(self.derive_state(&Default::default())));
+        self.set_size(self.painter.size_hint(self.derive_state()));
     }
 }
 
 impl<U, G> ui::DefaultEventQueue<ButtonEvent> for ButtonWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline]
     fn default_event_queue(&self) -> &RcEventQueue<ButtonEvent> {
@@ -269,8 +299,8 @@ where
 
 impl<U, G> ui::DefaultWidgetData<Button> for ButtonWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline]
     fn default_data(&mut self) -> &mut base::Observed<Button> {
@@ -280,8 +310,8 @@ where
 
 impl<U, G> Drop for ButtonWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     fn drop(&mut self) {
         self.drop_event.emit_owned(base::DropEvent);

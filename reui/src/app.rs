@@ -1,5 +1,5 @@
 use {
-    crate::{base, draw, error::AppError},
+    crate::{base, draw, error::AppError, geom::*},
     glutin::{
         event::{self, Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
@@ -44,13 +44,9 @@ where
             size: (opts.window_size.width as _, opts.window_size.height as _),
         })?;
 
-    let mut u_aux = UAux {
-        window_queue: RcEventQueue::new(),
-        cursor: Default::default(),
-        tracer: Default::default(),
-    };
+    let mut u_aux = UAux { window_queue: RcEventQueue::new(), cursor: Default::default() };
 
-    let mut g_aux = GAux { scale: hidpi_factor as _, tracer: Default::default() };
+    let mut g_aux = GAux { scale: hidpi_factor as _ };
 
     let theme = theme(&mut g_aux, &mut display);
     let root = root(&mut u_aux, &mut g_aux, &theme);
@@ -209,10 +205,10 @@ where
                     let position = Point::new(position.x as _, position.y as _);
                     let modifiers = convert_modifiers(modifiers);
 
-                    u_aux.cursor = position;
+                    u_aux.cursor = position.cast_unit();
 
                     u_aux.window_queue.emit_owned(base::WindowEvent::MouseMove(
-                        base::ConsumableEvent::new((position, modifiers)),
+                        base::ConsumableEvent::new((position.cast_unit(), modifiers)),
                     ));
                 }
                 Event::WindowEvent {
@@ -282,8 +278,7 @@ where
 /// Rudimentary update auxiliary.
 pub struct UAux {
     pub window_queue: RcEventQueue<base::WindowEvent>,
-    pub cursor: Point,
-    tracer: base::AdditiveTracer,
+    pub cursor: AbsolutePoint,
 }
 
 impl base::UpdateAuxiliary for UAux {
@@ -296,27 +291,16 @@ impl base::UpdateAuxiliary for UAux {
     fn window_queue_mut(&mut self) -> &mut RcEventQueue<base::WindowEvent> {
         &mut self.window_queue
     }
-
-    #[inline]
-    fn tracer(&mut self) -> &mut base::AdditiveTracer {
-        &mut self.tracer
-    }
 }
 
 /// Rudimentary graphical auxiliary.
 pub struct GAux {
     pub scale: f32,
-    tracer: base::AdditiveTracer,
 }
 
 impl base::GraphicalAuxiliary for GAux {
     #[inline]
     fn scaling(&self) -> f32 {
         self.scale
-    }
-
-    #[inline]
-    fn tracer(&mut self) -> &mut base::AdditiveTracer {
-        &mut self.tracer
     }
 }

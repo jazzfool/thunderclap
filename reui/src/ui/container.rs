@@ -2,6 +2,7 @@ use {
     crate::{
         base::{self, WidgetChildren},
         draw,
+        geom::*,
     },
     reclutch::{
         display::{DisplayCommand, Rect},
@@ -21,7 +22,7 @@ lazy_widget! {
 /// Container which dynamically stores widgets.
 /// If you don't need access to children past their creation then you can bundle them up in this.
 /// Those children will still be rendered and receive updates.
-#[derive(Movable)]
+#[derive(Movable, Resizable)]
 #[reui_crate(crate)]
 pub struct ContainerWidget<U, G>
 where
@@ -41,8 +42,10 @@ where
     themed: draw::PhantomThemed,
     visibility: base::Visibility,
     drop_event: RcEventQueue<base::DropEvent>,
+    parent_position: AbsolutePoint,
+
     #[widget_rect]
-    rect: Rect,
+    rect: RelativeRect,
 
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
@@ -67,6 +70,8 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> ContainerWidget<U, G
             themed: Default::default(),
             visibility: Default::default(),
             drop_event: Default::default(),
+            parent_position: Default::default(),
+
             rect: Default::default(),
 
             phantom_u: Default::default(),
@@ -93,15 +98,16 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> Widget for Container
         base::invoke_update(self, aux);
 
         // FIXME(jazzfool): only do this when a child's position changes.
-        let mut rect: Option<Rect> = None;
+        let mut rect: Option<AbsoluteRect> = None;
         for child in self.children() {
             if let Some(ref mut rect) = rect {
-                *rect = rect.union(&child.bounds());
+                *rect = rect.union(&child.abs_bounds());
             } else {
-                rect = Some(child.bounds());
+                rect = Some(child.abs_bounds());
             }
         }
-        self.rect = rect.unwrap_or_default();
+
+        self.set_ctxt_rect(rect.unwrap_or_default());
     }
 }
 
@@ -126,5 +132,19 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> WidgetChildren
         >,
     > {
         self.children.iter_mut().map(|child| child.as_mut() as _).collect()
+    }
+}
+
+impl<U, G> StoresParentPosition for ContainerWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
+        self.parent_position = parent_pos;
+    }
+
+    fn parent_position(&self) -> AbsolutePoint {
+        self.parent_position
     }
 }

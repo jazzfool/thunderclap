@@ -3,7 +3,7 @@
 pub mod state;
 
 use {
-    crate::base,
+    crate::{base, geom::*},
     reclutch::display::{Color, DisplayCommand, FontInfo, Rect, ResourceReference, Size},
 };
 
@@ -30,9 +30,9 @@ pub trait Painter<T> {
     /// Returns a stylistic size based on the state.
     fn size_hint(&self, state: T) -> Size;
     /// Returns the paint boundaries based on the inner bounds.
-    fn paint_hint(&self, rect: Rect) -> Rect;
+    fn paint_hint(&self, rect: RelativeRect) -> RelativeRect;
     /// Returns the mouse boundaries based on the inner bounds.
-    fn mouse_hint(&self, rect: Rect) -> Rect;
+    fn mouse_hint(&self, rect: RelativeRect) -> RelativeRect;
     /// Returns a list of display commands which visualize `state`.
     fn draw(&mut self, state: T) -> Vec<DisplayCommand>;
 }

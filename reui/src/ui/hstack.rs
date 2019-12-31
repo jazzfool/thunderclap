@@ -1,9 +1,14 @@
 use {
     super::Align,
-    crate::{base, draw, ui},
+    crate::{
+        base::{self, Resizable},
+        draw,
+        geom::*,
+        ui,
+    },
     indexmap::IndexMap,
     reclutch::{
-        display::{self, DisplayCommand, Rect},
+        display::{self, DisplayCommand, Rect, Size},
         event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
         prelude::*,
     },
@@ -41,10 +46,10 @@ impl HStackItem {
 #[derive(Debug)]
 struct ChildData {
     data: HStackItem,
-    evq: BidirSingleEventQueue<Rect, Rect>,
+    evq: BidirSingleEventQueue<AbsoluteRect, AbsoluteRect>,
     drop_listener: RcEventListener<base::DropEvent>,
-    rect: Rect,
-    original_rect: Rect,
+    rect: AbsoluteRect,
+    original_rect: AbsoluteRect,
     id: u64,
 }
 
@@ -73,9 +78,10 @@ where
     themed: draw::PhantomThemed,
     drop_event: RcEventQueue<base::DropEvent>,
     visibility: base::Visibility,
+    parent_position: AbsolutePoint,
 
     #[widget_rect]
-    rect: Rect,
+    rect: RelativeRect,
     #[widget_layout]
     layout: base::WidgetLayoutEvents,
 
@@ -92,8 +98,8 @@ pub struct HStack {
 
 impl<U, G> ui::WidgetDataTarget<U, G> for HStack
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type Target = HStackWidget<U, G>;
 }
@@ -110,8 +116,8 @@ impl HStack {
         _g_aux: &mut G,
     ) -> HStackWidget<U, G>
     where
-        U: base::UpdateAuxiliary + 'static,
-        G: base::GraphicalAuxiliary + 'static,
+        U: base::UpdateAuxiliary,
+        G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
 
@@ -124,6 +130,7 @@ impl HStack {
             themed: Default::default(),
             drop_event: Default::default(),
             visibility: Default::default(),
+            parent_position: Default::default(),
 
             rect: Default::default(),
             layout: Default::default(),
@@ -136,37 +143,32 @@ impl HStack {
 
 impl<U, G> HStackWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     fn resize_to_fit(&mut self) {
-        let mut max_rect: Option<Rect> = None;
+        let mut max_size = Size::zero();
         for (_, child) in &self.rects {
-            if let Some(ref mut max_rect) = max_rect {
-                *max_rect = max_rect.union(&child.rect);
-            } else {
-                max_rect = child.rect.into();
+            let size: Size = child.rect.size.cast_unit();
+            max_size.width += size.width + child.data.left_margin + child.data.right_margin;
+            if size.height > max_size.height {
+                max_size.height = size.height;
             }
         }
 
-        if let Some(rect) = max_rect {
-            self.rect = rect;
-            self.layout.notify(self.rect);
-            use base::Repaintable;
-            self.repaint();
-        }
+        self.set_size(max_size);
     }
 
     fn on_transform(&mut self) {
         self.dirty = true;
-        self.layout.notify(self.rect);
+        self.layout.notify(self.abs_rect());
     }
 }
 
 impl<U, G> base::Layout for HStackWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type PushData = Option<HStackItem>;
 
@@ -180,7 +182,7 @@ where
 
         child.listen_to_layout(base::WidgetLayoutEventsInner { id, evq: evq.secondary() });
 
-        let rect = child.rect();
+        let rect = child.abs_rect();
 
         self.rects.insert(
             id,
@@ -205,7 +207,7 @@ where
         if let Some(data) = child.layout_id().and_then(|id| self.rects.remove(&id)) {
             child.listen_to_layout(None);
             if restore_original {
-                child.set_rect(data.original_rect);
+                child.set_ctxt_rect(data.original_rect);
             }
         }
     }
@@ -213,20 +215,20 @@ where
 
 impl<U, G> Widget for HStackWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type UpdateAux = U;
     type GraphicalAux = G;
     type DisplayObject = DisplayCommand;
 
     fn bounds(&self) -> Rect {
-        self.rect
+        self.rect.cast_unit()
     }
 
     fn update(&mut self, _aux: &mut U) {
         if let Some(rect) = self.layout.receive() {
-            self.rect = rect;
+            self.set_ctxt_rect(rect);
             self.dirty = true;
         }
 
@@ -252,19 +254,23 @@ where
 
         if self.dirty {
             self.resize_to_fit();
-            let mut advance = self.rect.origin.x;
+            let abs_rect = self.abs_rect();
+            let mut advance = abs_rect.origin.x;
+            let mut max_height = 0.0;
             for (_, data) in &mut self.rects {
                 advance += data.data.left_margin;
 
                 let mut rect = data.rect;
                 rect.origin.x = advance;
                 rect.origin.y = match data.data.alignment {
-                    Align::Begin => self.rect.origin.y,
-                    Align::Middle => display::center_vertically(rect, self.rect).y,
-                    Align::End => self.rect.origin.y + self.rect.size.height - rect.size.height,
+                    Align::Begin => abs_rect.origin.y,
+                    Align::Middle => {
+                        display::center_vertically(rect.cast_unit(), abs_rect.cast_unit()).y
+                    }
+                    Align::End => abs_rect.origin.y + abs_rect.size.height - rect.size.height,
                     Align::Stretch => {
-                        rect.size.height = self.rect.size.height;
-                        self.rect.origin.y
+                        rect.size.height = abs_rect.size.height;
+                        abs_rect.origin.y
                     }
                 };
 
@@ -272,6 +278,10 @@ where
                 data.rect = rect;
 
                 advance += rect.size.width + data.data.right_margin;
+
+                if data.rect.size.height > max_height {
+                    max_height = data.rect.size.height;
+                }
             }
 
             self.dirty = false;
@@ -281,11 +291,27 @@ where
 
 impl<U, G> ui::DefaultWidgetData<HStack> for HStackWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline]
     fn default_data(&mut self) -> &mut base::Observed<HStack> {
         &mut self.data
+    }
+}
+
+impl<U, G> StoresParentPosition for HStackWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
+        self.parent_position = parent_pos;
+        self.on_transform();
+    }
+
+    #[inline(always)]
+    fn parent_position(&self) -> AbsolutePoint {
+        self.parent_position
     }
 }

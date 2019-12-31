@@ -1,9 +1,14 @@
 use {
     super::Align,
-    crate::{base, draw, ui},
+    crate::{
+        base::{self, Resizable},
+        draw,
+        geom::*,
+        ui,
+    },
     indexmap::IndexMap,
     reclutch::{
-        display::{self, DisplayCommand, Rect},
+        display::{self, DisplayCommand, Rect, Size},
         event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
         prelude::*,
     },
@@ -41,10 +46,10 @@ impl VStackItem {
 #[derive(Debug)]
 struct ChildData {
     data: VStackItem,
-    evq: BidirSingleEventQueue<Rect, Rect>,
+    evq: BidirSingleEventQueue<AbsoluteRect, AbsoluteRect>,
     drop_listener: RcEventListener<base::DropEvent>,
-    rect: Rect,
-    original_rect: Rect,
+    rect: AbsoluteRect,
+    original_rect: AbsoluteRect,
     id: u64,
 }
 
@@ -73,9 +78,10 @@ where
     visibility: base::Visibility,
     themed: draw::PhantomThemed,
     drop_event: RcEventQueue<base::DropEvent>,
+    parent_position: AbsolutePoint,
 
     #[widget_rect]
-    rect: Rect,
+    rect: RelativeRect,
     #[widget_layout]
     layout: base::WidgetLayoutEvents,
 
@@ -92,8 +98,8 @@ pub struct VStack {
 
 impl<U, G> ui::WidgetDataTarget<U, G> for VStack
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type Target = VStackWidget<U, G>;
 }
@@ -110,8 +116,8 @@ impl VStack {
         _g_aux: &mut G,
     ) -> VStackWidget<U, G>
     where
-        U: base::UpdateAuxiliary + 'static,
-        G: base::GraphicalAuxiliary + 'static,
+        U: base::UpdateAuxiliary,
+        G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
 
@@ -124,6 +130,7 @@ impl VStack {
             visibility: Default::default(),
             themed: Default::default(),
             drop_event: Default::default(),
+            parent_position: Default::default(),
 
             rect: Default::default(),
             layout: Default::default(),
@@ -136,37 +143,32 @@ impl VStack {
 
 impl<U, G> VStackWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     fn resize_to_fit(&mut self) {
-        let mut max_rect: Option<Rect> = None;
+        let mut max_size = Size::zero();
         for (_, child) in &self.rects {
-            if let Some(ref mut max_rect) = max_rect {
-                *max_rect = max_rect.union(&child.rect);
-            } else {
-                max_rect = child.rect.into();
+            let size: Size = child.rect.size.cast_unit();
+            max_size.height += size.height + child.data.top_margin + child.data.bottom_margin;
+            if size.width > max_size.width {
+                max_size.width = size.width;
             }
         }
 
-        if let Some(rect) = max_rect {
-            self.rect = rect;
-            self.layout.notify(self.rect);
-            use base::Repaintable;
-            self.repaint();
-        }
+        self.set_size(max_size);
     }
 
     fn on_transform(&mut self) {
         self.dirty = true;
-        self.layout.notify(self.rect);
+        self.layout.notify(self.abs_rect());
     }
 }
 
 impl<U, G> base::Layout for VStackWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type PushData = Option<VStackItem>;
 
@@ -180,7 +182,7 @@ where
 
         child.listen_to_layout(base::WidgetLayoutEventsInner { id, evq: evq.secondary() });
 
-        let rect = child.rect();
+        let rect = child.abs_rect();
 
         self.rects.insert(
             id,
@@ -205,7 +207,7 @@ where
         if let Some(data) = child.layout_id().and_then(|id| self.rects.remove(&id)) {
             child.listen_to_layout(None);
             if restore_original {
-                child.set_rect(data.original_rect);
+                child.set_ctxt_rect(data.original_rect);
             }
         }
     }
@@ -221,12 +223,12 @@ where
     type DisplayObject = DisplayCommand;
 
     fn bounds(&self) -> Rect {
-        self.rect
+        self.rect.cast_unit()
     }
 
     fn update(&mut self, _aux: &mut U) {
         if let Some(rect) = self.layout.receive() {
-            self.rect = rect;
+            self.set_ctxt_rect(rect);
             self.dirty = true;
         }
 
@@ -252,19 +254,22 @@ where
 
         if self.dirty {
             self.resize_to_fit();
-            let mut advance = self.rect.origin.y;
+            let abs_rect = self.abs_rect();
+            let mut advance = abs_rect.origin.y;
             for (_, data) in &mut self.rects {
                 advance += data.data.top_margin;
 
                 let mut rect = data.rect;
                 rect.origin.y = advance;
                 rect.origin.x = match data.data.alignment {
-                    Align::Begin => self.rect.origin.x,
-                    Align::Middle => display::center_horizontally(rect, self.rect).x,
-                    Align::End => self.rect.origin.x + self.rect.size.width - rect.size.width,
+                    Align::Begin => abs_rect.origin.x,
+                    Align::Middle => {
+                        display::center_horizontally(rect.cast_unit(), abs_rect.cast_unit()).x
+                    }
+                    Align::End => abs_rect.origin.x + abs_rect.size.width - rect.size.width,
                     Align::Stretch => {
-                        rect.size.width = self.rect.size.width;
-                        self.rect.origin.x
+                        rect.size.width = abs_rect.size.width;
+                        abs_rect.origin.x
                     }
                 };
 
@@ -281,11 +286,26 @@ where
 
 impl<U, G> ui::DefaultWidgetData<VStack> for VStackWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline]
     fn default_data(&mut self) -> &mut base::Observed<VStack> {
         &mut self.data
+    }
+}
+
+impl<U, G> StoresParentPosition for VStackWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
+        self.parent_position = parent_pos;
+        self.on_transform();
+    }
+
+    fn parent_position(&self) -> AbsolutePoint {
+        self.parent_position
     }
 }

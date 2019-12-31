@@ -11,9 +11,9 @@ pub mod vstack;
 pub use {button::*, checkbox::*, container::*, hstack::*, label::*, text_area::*, vstack::*};
 
 use {
-    crate::{base, draw::state, pipe},
+    crate::{base, draw::state, geom::*, pipe},
     reclutch::{
-        display::{Point, Rect},
+        display::{DisplayText, Point, Rect},
         event::RcEventQueue,
     },
 };
@@ -83,30 +83,30 @@ impl Default for Align {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum InteractionEvent {
-    Pressed(Point),
-    Released(Point),
-    BeginHover(Point),
-    EndHover(Point),
+    Pressed(AbsolutePoint),
+    Released(AbsolutePoint),
+    BeginHover(AbsolutePoint),
+    EndHover(AbsolutePoint),
     Focus,
     Blur,
 }
 
-pub trait InteractiveWidget {
+pub trait InteractiveWidget: ContextuallyRectangular {
     fn interaction(&mut self) -> &mut state::InteractionState;
-    fn mouse_bounds(&self) -> Rect;
+    fn mouse_bounds(&self) -> RelativeRect;
     fn disabled(&self) -> bool;
     fn on_interaction_event(&mut self, event: InteractionEvent);
 }
 
 pub trait WidgetDataTarget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type Target: base::WidgetChildren;
 }
 
-pub trait DefaultEventQueue<E: pipe::Event> {
+pub trait DefaultEventQueue<E> {
     fn default_event_queue(&self) -> &RcEventQueue<E>;
 }
 
@@ -114,10 +114,17 @@ pub trait DefaultWidgetData<D> {
     fn default_data(&mut self) -> &mut base::Observed<D>;
 }
 
+pub trait Bindable<U>
+where
+    U: base::UpdateAuxiliary,
+{
+    fn perform_bind(&mut self, aux: &mut U);
+}
+
 /// Generates an unbound terminal which handles basic interactivity.
 /// This simply means it will appropriately modify a `state::InteractionState` and emit events
 /// when interactivity changes occur.
-pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary + 'static>(
+pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary>(
 ) -> pipe::UnboundTerminal<W, U, base::WindowEvent> {
     unbound_terminal! {
         W as obj,
@@ -125,7 +132,7 @@ pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary
         base::WindowEvent as event,
 
         mouse_press {
-            let bounds = aux.tracer().absolute_bounds(obj.mouse_bounds());
+            let bounds = obj.abs_convert_rect(obj.mouse_bounds());
             if let Some((pos, _, _)) = event.with(|(pos, button, _)| {
                 !obj.disabled()
                     && *button == base::MouseButton::Left
@@ -150,7 +157,7 @@ pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary
         }
 
         mouse_move {
-            let bounds = aux.tracer().absolute_bounds(obj.mouse_bounds());
+            let bounds = obj.abs_convert_rect(obj.mouse_bounds());
             if let Some((pos, _)) = event.with(|(pos, _)| bounds.contains(*pos)) {
                 if !obj.interaction().contains(state::InteractionState::HOVERED) {
                     obj.interaction().insert(state::InteractionState::HOVERED);
@@ -163,8 +170,16 @@ pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary
         }
 
         clear_focus {
+            let was_focused = obj.interaction().contains(state::InteractionState::FOCUSED);
             obj.interaction().remove(state::InteractionState::FOCUSED);
-            obj.on_interaction_event(InteractionEvent::Blur);
+            if was_focused {
+                obj.on_interaction_event(InteractionEvent::Blur);
+            }
         }
     }
+}
+
+#[inline(always)]
+pub fn txt(s: &str) -> DisplayText {
+    DisplayText::Simple(s.into())
 }

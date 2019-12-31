@@ -21,6 +21,7 @@ pub mod draw;
 pub mod error;
 #[macro_use]
 pub mod pipe;
+pub mod geom;
 pub mod ui;
 
 #[cfg(feature = "app")]

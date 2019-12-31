@@ -189,10 +189,10 @@ Assume `<a/b>` means "interchangeable", since these two derives are almost ident
 #[widget_transform_callback(on_transform)]
 struct MyWidget {
     #[widget_rect]
-    rect: Rect
+    rect: RelativeRect
     // -- OR --
     #[widget_<position/size>]
-    x: <Point/Size>,
+    x: <RelativePoint/Size>,
 }
 ```
 
@@ -200,7 +200,7 @@ Expands to...
 
 ```rust
 impl reui::base::<Movable/Resizable> for MyWidget {
-    fn set_<position/size>(&mut self, <position/size>: reui::reclutch::display::<Point/Size>) {
+    fn set_<position/size>(&mut self, <position/size>: reui::reclutch::display::<RelativePoint/Size>) {
         self.rect.<origin/size> = <position/size>;
         // -- OR --
         self.x = <position/size>;
@@ -210,7 +210,7 @@ impl reui::base::<Movable/Resizable> for MyWidget {
     }
 
     #[inline]
-    fn <position/size>(&self) -> reui::reclutch::display::<Point/Size> {
+    fn <position/size>(&self) -> reui::reclutch::display::<RelativePoint/Size> {
         self.rect.<origin/size>
         // -- OR --
         self.x

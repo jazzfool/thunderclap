@@ -1,5 +1,5 @@
 use {
-    crate::draw,
+    crate::{draw, geom::*},
     reclutch::{
         display::{
             Color, CommandGroup, DisplayClip, DisplayCommand, GraphicsDisplay, Point, Rect, Size,
@@ -13,6 +13,7 @@ use {
         cell::RefCell,
         collections::{HashMap, HashSet},
         rc::Rc,
+        sync::Mutex,
     },
 };
 
@@ -225,7 +226,9 @@ macro_rules! lazy_propagate {
 /// #[widget_children_trait(reui::base::WidgetChildren)]
 /// struct MyWidget;
 /// ```
-pub trait WidgetChildren: Widget + draw::HasTheme + Repaintable + HasVisibility + Movable {
+pub trait WidgetChildren:
+    Widget + draw::HasTheme + Repaintable + HasVisibility + ContextuallyMovable
+{
     /// Returns a list of all the children as a vector of immutable `dyn WidgetChildren`.
     fn children(
         &self,
@@ -262,9 +265,9 @@ pub trait Repaintable: Widget {
 /// Implemented by widgets that can be moved/positioned.
 pub trait Movable: Widget {
     /// Changes the current position of the widget.
-    fn set_position(&mut self, position: Point);
+    fn set_position(&mut self, position: RelativePoint);
     /// Returns the current position of the widget.
-    fn position(&self) -> Point;
+    fn position(&self) -> RelativePoint;
 }
 
 /// Implemented by widgets that can be resized.
@@ -284,12 +287,12 @@ pub trait Rectangular: Widget + Movable + Resizable {
     ///
     /// If `Rectangular` is a blanket implementation, then this simply becomes
     /// `set_position()` and `set_size()`.
-    fn set_rect(&mut self, rect: Rect);
+    fn set_rect(&mut self, rect: RelativeRect);
     /// Returns the rectangular bounds.
     ///
     /// If `Rectangular` is a blanket implementation, then this is simply a constructor
     /// for `Rect` based on the values returned from `position()` and `size()`.
-    fn rect(&self) -> Rect;
+    fn rect(&self) -> RelativeRect;
 }
 
 impl<T> Rectangular for T
@@ -297,14 +300,14 @@ where
     T: Widget + Movable + Resizable,
 {
     #[inline]
-    fn set_rect(&mut self, rect: Rect) {
+    fn set_rect(&mut self, rect: RelativeRect) {
         self.set_position(rect.origin);
-        self.set_size(rect.size);
+        self.set_size(rect.size.cast_unit());
     }
 
     #[inline]
-    fn rect(&self) -> Rect {
-        Rect::new(self.position(), self.size())
+    fn rect(&self) -> RelativeRect {
+        RelativeRect::new(self.position(), self.size().cast_unit())
     }
 }
 
@@ -341,8 +344,6 @@ pub trait UpdateAuxiliary: 'static {
     fn window_queue(&self) -> &RcEventQueue<WindowEvent>;
     /// Returns the queue where window events (`WindowEvent`) are emitted, mutably.
     fn window_queue_mut(&mut self) -> &mut RcEventQueue<WindowEvent>;
-    /// Returns a mutable widget tracer.
-    fn tracer(&mut self) -> &mut AdditiveTracer;
 }
 
 /// Trait required for any type passed as the `GraphicalAux` type (seen as `G` in the widget type parameters)
@@ -350,28 +351,6 @@ pub trait UpdateAuxiliary: 'static {
 pub trait GraphicalAuxiliary: 'static {
     /// Returns the HiDPI scaling factor.
     fn scaling(&self) -> f32;
-    /// Returns a mutable widget tracer.
-    fn tracer(&mut self) -> &mut AdditiveTracer;
-}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub struct AdditiveTracer {
-    offset: Vector,
-}
-
-impl AdditiveTracer {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn absolute(&self, position: Point) -> Point {
-        position + self.offset
-    }
-
-    pub fn absolute_bounds(&self, mut rect: Rect) -> Rect {
-        rect.origin = self.absolute(rect.origin);
-        rect
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -440,15 +419,15 @@ impl<T> Clone for ConsumableEvent<T> {
 pub enum WindowEvent {
     /// The user pressed a mouse button.
     #[event_key(mouse_press)]
-    MousePress(ConsumableEvent<(Point, MouseButton, KeyModifiers)>),
+    MousePress(ConsumableEvent<(AbsolutePoint, MouseButton, KeyModifiers)>),
     /// The user released a mouse button.
     /// This event complements `MousePress`, which means it realistically can only
     /// be emitted after `MousePress` has been emitted.
     #[event_key(mouse_release)]
-    MouseRelease(ConsumableEvent<(Point, MouseButton, KeyModifiers)>),
+    MouseRelease(ConsumableEvent<(AbsolutePoint, MouseButton, KeyModifiers)>),
     /// The user moved the cursor.
     #[event_key(mouse_move)]
-    MouseMove(ConsumableEvent<(Point, KeyModifiers)>),
+    MouseMove(ConsumableEvent<(AbsolutePoint, KeyModifiers)>),
     /// Emitted when a text input is received.
     #[event_key(text_input)]
     TextInput(ConsumableEvent<char>),
@@ -655,7 +634,7 @@ pub enum KeyInput {
 #[derive(Debug)]
 pub struct WidgetLayoutEventsInner {
     pub id: u64,
-    pub evq: reclutch::event::bidir_single::Secondary<Rect, Rect>,
+    pub evq: reclutch::event::bidir_single::Secondary<AbsoluteRect, AbsoluteRect>,
 }
 
 /// Helper layout over `WidgetLayoutEventsInner`; optionally stores information about a parent layout.
@@ -683,20 +662,20 @@ impl WidgetLayoutEvents {
     }
 
     /// Notifies the layout that the widget rectangle has been updated from the widget side.
-    pub fn notify(&mut self, rect: Rect) {
+    pub fn notify(&mut self, rect: AbsoluteRect) {
         if let Some(inner) = &mut self.0 {
             inner.evq.emit_owned(rect);
         }
     }
 
     /// Returns the most up-to-date widget rectangle from the layout.
-    pub fn receive(&mut self) -> Option<Rect> {
+    pub fn receive(&mut self) -> Option<AbsoluteRect> {
         self.0.as_mut().and_then(|inner| inner.evq.retrieve_newest())
     }
 }
 
 /// Widget that is capable of listening to layout events.
-pub trait LayableWidget: WidgetChildren + Rectangular + DropNotifier {
+pub trait LayableWidget: WidgetChildren + ContextuallyRectangular + DropNotifier {
     fn listen_to_layout(&mut self, layout: impl Into<Option<WidgetLayoutEventsInner>>);
     fn layout_id(&self) -> Option<u64>;
 }
@@ -795,24 +774,21 @@ pub fn invoke_update<U: UpdateAuxiliary, G>(
     >,
     aux: &mut U,
 ) {
-    let position = widget.position();
-    aux.tracer().offset += position.to_vector();
     // Iterate in reverse because most visually forefront widgets should get events first.
     for child in widget.children_mut().into_iter().rev() {
-        if child.visibility() != Visibility::Static || child.visibility() != Visibility::None {
+        if child.visibility() != Visibility::Static && child.visibility() != Visibility::None {
             child.update(aux);
         }
     }
-    aux.tracer().offset -= position.to_vector();
 }
 
 lazy_static::lazy_static! {
     // Frame counter used by `invoke_draw`, resets back to 0 after 60 frames.
     // This is used to only clean up `CLIP_LIST` every 60 frames.
-    static ref DRAW_COUNTER: std::sync::Mutex<u8> = std::sync::Mutex::new(0);
+    static ref DRAW_COUNTER: Mutex<u8> = Mutex::new(0);
     // Map of pre/post command groups loosely linked to a widget by using the memory address as a unique identifier.
-    static ref CLIP_LIST: std::sync::Mutex<HashMap<usize, (CommandGroup, CommandGroup)>> =
-        std::sync::Mutex::new(HashMap::new());
+    static ref CLIP_LIST: Mutex<HashMap<usize, (CommandGroup, CommandGroup)>> =
+        Mutex::new(HashMap::new());
 }
 
 fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
@@ -826,18 +802,21 @@ fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
     clip_list: &mut HashMap<usize, (CommandGroup, CommandGroup)>,
     checked: &mut Option<HashSet<usize>>,
 ) {
-    if widget.visibility() != Visibility::Invisible || widget.visibility() != Visibility::None {
+    if widget.visibility() != Visibility::Invisible && widget.visibility() != Visibility::None {
         let id = widget as *const _ as *const usize as _;
         let (clip, restore) =
             clip_list.entry(id).or_insert_with(|| (CommandGroup::new(), CommandGroup::new()));
-        let clip_rect = aux.tracer().absolute_bounds(widget.bounds());
+        let clip_rect = widget.abs_bounds();
         clip.repaint();
         restore.repaint();
         clip.push(
             display,
             &[
                 DisplayCommand::Save,
-                DisplayCommand::Clip(DisplayClip::Rectangle { rect: clip_rect, antialias: true }),
+                DisplayCommand::Clip(DisplayClip::Rectangle {
+                    rect: clip_rect.cast_unit(),
+                    antialias: true,
+                }),
                 DisplayCommand::Save,
             ],
             false,
@@ -853,12 +832,9 @@ fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
         }
     }
 
-    let position = widget.position();
-    aux.tracer().offset += position.to_vector();
     for child in widget.children_mut() {
         invoke_draw_impl(child, display, aux, clip_list, checked);
     }
-    aux.tracer().offset -= position.to_vector();
 }
 
 /// Recursively invokes `draw`.

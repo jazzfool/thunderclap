@@ -2,6 +2,7 @@ use {
     crate::{
         base::{self, Repaintable},
         draw::{self, state},
+        geom::*,
         pipe, ui,
     },
     reclutch::{
@@ -91,9 +92,10 @@ where
     pipe: Option<pipe::Pipeline<Self, U>>,
     painter: Box<dyn draw::Painter<state::TextAreaState>>,
     interaction: state::InteractionState,
+    parent_position: AbsolutePoint,
 
     #[widget_rect]
-    rect: Rect,
+    rect: RelativeRect,
     #[widget_visibility]
     visibility: base::Visibility,
     #[repaint_target]
@@ -117,7 +119,7 @@ where
     }
 
     #[inline]
-    fn mouse_bounds(&self) -> Rect {
+    fn mouse_bounds(&self) -> RelativeRect {
         self.painter.mouse_hint(self.rect)
     }
 
@@ -242,13 +244,15 @@ impl TextArea {
         pipe = pipe.add(text_area_terminal::<TextAreaWidget<U, G>, U>().bind(u_aux.window_queue()));
 
         let painter = theme.text_area();
-        let rect = Rect::new(
+        let rect = RelativeRect::new(
             Default::default(),
-            painter.size_hint(state::TextAreaState {
-                rect: Default::default(),
-                data: data.clone(),
-                interaction: state::InteractionState::empty(),
-            }),
+            painter
+                .size_hint(state::TextAreaState {
+                    rect: Default::default(),
+                    data: data.clone(),
+                    interaction: state::InteractionState::empty(),
+                })
+                .cast_unit(),
         );
 
         TextAreaWidget {
@@ -258,6 +262,7 @@ impl TextArea {
             pipe: pipe.into(),
             painter: theme.text_area(),
             interaction: state::InteractionState::empty(),
+            parent_position: Default::default(),
 
             rect,
             visibility: Default::default(),
@@ -277,12 +282,12 @@ where
 {
     fn on_transform(&mut self) {
         self.repaint();
-        self.layout.notify(self.rect);
+        self.layout.notify(self.abs_rect());
     }
 
     fn derive_state(&self) -> state::TextAreaState {
         state::TextAreaState {
-            rect: self.rect,
+            rect: self.abs_rect(),
             data: self.data.clone(),
             interaction: self.interaction,
         }
@@ -299,7 +304,7 @@ where
     type DisplayObject = DisplayCommand;
 
     fn bounds(&self) -> Rect {
-        self.rect
+        self.rect.cast_unit()
     }
 
     fn update(&mut self, aux: &mut U) {
@@ -308,7 +313,7 @@ where
         self.pipe = Some(pipe);
 
         if let Some(rect) = self.layout.receive() {
-            self.rect = rect;
+            self.set_ctxt_rect(rect);
             self.command_group.repaint();
         }
     }
@@ -317,6 +322,21 @@ where
         let state = self.derive_state();
         let painter = &mut self.painter;
         self.command_group.push_with(display, || painter.draw(state), None, None);
+    }
+}
+
+impl<U, G> StoresParentPosition for TextAreaWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
+        self.parent_position = parent_pos;
+        self.on_transform();
+    }
+
+    fn parent_position(&self) -> AbsolutePoint {
+        self.parent_position
     }
 }
 
