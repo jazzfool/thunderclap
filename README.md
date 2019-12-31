@@ -1,45 +1,56 @@
-<p align="center">
-    <img src=".media/reui.png" width="150px"/>
-</p>
+# Thunderclap
 
-<h2 align="center">Rust UI Toolkit</h2>
-<h3 align="center">Designed for anything from a quick and dirty GUI to a completely custom application.</h3>
+A Rust toolkit to write decomposable and fast user interfaces. It is:
+
+- **Event-driven:** Thunderclap builds efficient abstractions over the Reclutch event system to avoid unnecessary computations.
+- **Simple:** Thunderclap provides a suite of widgets alongside various infrastructures to simplify writing your own widgets.
+- **Customizable:** There isn't a single line of hard-coded widget rendering; trivial widgets are fully parameterized and non-trivial widgets delegate to a provided theme.
 
 <img align="right" src=".media/showcase.png" width="200px"/>
 
-## Features
-- Completely event-driven.
-- Flutter/SwiftUI layout syntax without the need for diffing.
-- 100% themable. 
+## Overview
 
-## "Rooftop" Syntax
+Thunderclap aims to take the traditional widget hierarchy model from bulletproof libraries (e.g. Qt) and combine it with the cutting-edge simplicity of modern toolkits (e.g. Flutter).
+To accomplish this it provides four primary high-level components:
+- An update pipeline system which combines closures with event queues.
+- A widget library that fill the need for boilerplate UI components.
+- A theme API with a verbose typography and color scheme protocol.
+- A macro to emulate a declarative UI syntax for widget creation.
 
-### Click [here](https://github.com/jazzfool/reui/wiki/Making-a-counter) to see how the code below works.
+## Example
+
+There's also [an in-depth overview of the code below](https://github.com/jazzfool/thunderclap/wiki/Making-a-counter).
 
 ```rust
-use reui::{
+use thunderclap::{
     app, base,
     themes::Primer,
     ui::{Button, Label, VStack},
 };
 
 rooftop! {
-    struct Counter: () // <-- output event
-    {
+    // The empty tuple can be replaced with an event so that this widget can emit events.
+    struct Counter: () {
         fn build(
+            // Declare our state with a default value
             count: i32 = 0,
         ) {
+            // Display the widgets in a vertical list
             VStack() {
                 Label(
-                    text=bind(format!("Count: {}", bind.count).into()), // <-- runtime bindings
-                    wrap=false, // <-- properties
+                    // Bind the text in order to keep it up-to-date.
+                    text=bind(format!("Count: {}", bind.count).into()),
+                    // We don't want to wrap the text.
+                    wrap=false,
                 ),
                 Button(text="Count Up")
-                    @press { // <-- event handling
+                    @press {
+                        // Increment the count when this button is pressed.
                         widget.data.count += 1;
                     },
                 Button(text="Count Down")
                     @press {
+                        // Then decrement when this button is pressed.
                         widget.data.count -= 1;
                     },
             }
@@ -49,12 +60,14 @@ rooftop! {
 
 fn main() {
     let app = app::create(
-        |_, display| Primer::new(display).unwrap(), // <-- create our theme
+        // This closure creates a theme to use
+        |_, display| Primer::new(display).unwrap(),
         |u_aux, g_aux, theme| {
             Counter {
-                count: 5, // <-- we want to start counting from 5 instead of 0
+                // Perhaps we want to start counting from 5 instead of 5
+                count: 5,
                 ..Counter::from_theme(theme)
-            }.construct(theme, u_aux, g_aux) // <-- create the root widget
+            }.construct(theme, u_aux, g_aux)
         },
         app::AppOptions {
             name: "Counter App".into(),
@@ -64,10 +77,6 @@ fn main() {
     app.start(|_| None);
 }
 ```
-
-### Lack of control
-
-Although the Flutter/SwiftUI inspired syntax of the `rooftop!` macro is very useful for cobbling together something quickly, some applications need finer control. Thankfully, all the code that the `rooftop!` macro generates is regular Rust code that you could also write by hand (and in fact the core widgets are written by hand this way). The code uses pipelines to simplify event queue handling (`reui::pipe::Pipeline`), all of which is equivalent to manually iterating over and matching events. You can peel away any of these abstractions and build something that still works with everything else.
 
 ---
 
@@ -89,7 +98,7 @@ Although the Flutter/SwiftUI inspired syntax of the `rooftop!` macro is very use
 
 ## License
 
-Reui is licensed under either
+Thunderclap is licensed under either
 
 - [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 - [MIT](http://opensource.org/licenses/MIT)

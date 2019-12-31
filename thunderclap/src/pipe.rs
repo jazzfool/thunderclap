@@ -204,7 +204,7 @@ mod tests {
         use reclutch::event::RcEventQueue;
 
         #[derive(PipelineEvent, Clone)]
-        #[reui_crate(crate)]
+        #[thunderclap_crate(crate)]
         enum TestEvent {
             #[event_key(count_up)]
             CountUp,

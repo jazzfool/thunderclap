@@ -29,7 +29,7 @@ pub enum TextAlign {
     WidgetChildren, LayableWidget, HasVisibility, Repaintable, Movable, Resizable, DropNotifier,
 )]
 #[widget_children_trait(base::WidgetChildren)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 #[widget_transform_callback(on_transform)]
 pub struct LabelWidget<U, G>
 where

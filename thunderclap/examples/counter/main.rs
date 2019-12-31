@@ -1,4 +1,4 @@
-use reui::{
+use thunderclap::{
     app, base,
     prelude::*,
     reclutch::display::Color,
@@ -9,7 +9,7 @@ use reui::{
 #[macro_use]
 extern crate reclutch;
 #[macro_use]
-extern crate reui;
+extern crate thunderclap;
 
 rooftop! {
     struct Counter: () {

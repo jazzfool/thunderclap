@@ -17,7 +17,7 @@ use {
 
 /// Events emitted by a button.
 #[derive(PipelineEvent, Debug, Clone, Copy, PartialEq)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 pub enum ButtonEvent {
     /// Emitted when the checkbox is pressed.
     #[event_key(press)]
@@ -44,7 +44,7 @@ pub enum ButtonEvent {
     WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
 )]
 #[widget_children_trait(base::WidgetChildren)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 #[widget_transform_callback(on_transform)]
 pub struct ButtonWidget<U, G>
 where

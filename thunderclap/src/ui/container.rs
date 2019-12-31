@@ -23,7 +23,7 @@ lazy_widget! {
 /// If you don't need access to children past their creation then you can bundle them up in this.
 /// Those children will still be rendered and receive updates.
 #[derive(Movable, Resizable)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 pub struct ContainerWidget<U, G>
 where
     U: base::UpdateAuxiliary,

@@ -6,9 +6,9 @@ pub extern crate reclutch;
 
 #[allow(unused_imports)]
 #[macro_use]
-extern crate reui_derive;
+extern crate thunderclap_macros;
 
-pub use reui_derive::{
+pub use thunderclap_macros::{
     rooftop, DropNotifier, HasVisibility, LayableWidget, Movable, PipelineEvent, Repaintable,
     Resizable,
 };
@@ -30,5 +30,8 @@ pub mod app;
 pub mod themes;
 
 pub mod prelude {
-    pub use crate::base::{Layout, Movable, Rectangular, Repaintable, Resizable, WidgetChildren};
+    pub use crate::{
+        base::{Layout, Movable, Rectangular, Repaintable, Resizable, WidgetChildren},
+        geom::{ContextuallyMovable, ContextuallyRectangular},
+    };
 }

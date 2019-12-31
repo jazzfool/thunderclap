@@ -14,7 +14,7 @@ use {
 };
 
 #[derive(PipelineEvent, Debug, Clone, PartialEq)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 pub enum TextAreaEvent {
     /// The text area gained focus.
     #[event_key(focus)]
@@ -79,7 +79,7 @@ pub trait LogicalTextArea {
     WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
 )]
 #[widget_children_trait(base::WidgetChildren)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 #[widget_transform_callback(on_transform)]
 pub struct TextAreaWidget<U, G>
 where

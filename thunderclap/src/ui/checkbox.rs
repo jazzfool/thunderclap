@@ -15,7 +15,7 @@ use {
 
 /// Events emitted by a checkbox.
 #[derive(PipelineEvent, Debug, Clone, Copy, PartialEq)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 pub enum CheckboxEvent {
     /// Emitted when the checkbox is pressed.
     #[event_key(press)]
@@ -48,7 +48,7 @@ pub enum CheckboxEvent {
     WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
 )]
 #[widget_children_trait(base::WidgetChildren)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 #[widget_transform_callback(on_transform)]
 pub struct CheckboxWidget<U, G>
 where

@@ -1,4 +1,4 @@
-//! The main part of Reui; a widget toolkit built atop Reclutch.
+//! The main part of Thunderclap; a widget toolkit built atop Reclutch.
 
 pub mod button;
 pub mod checkbox;
@@ -29,7 +29,7 @@ use {
 ///     }
 /// }
 /// ```
-/// Where `layout` implements `reui::base::Layout`, `layout_data` is of type `<layout as Layout>::PushData` and `widget_1`/`widget_2` implement `Layable`.
+/// Where `layout` implements `thunderclap::base::Layout`, `layout_data` is of type `<layout as Layout>::PushData` and `widget_1`/`widget_2` implement `Layable`.
 /// The above is equivalent to:
 /// ```ignore
 /// layout.push(layout_data, &mut widget_1);

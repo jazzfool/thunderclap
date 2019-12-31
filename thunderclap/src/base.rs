@@ -37,7 +37,7 @@ use {
 /// }
 /// ```
 ///
-/// This macro can also implement for generic widgets. Generic widgets within Reui follow a strict pattern:
+/// This macro can also implement for generic widgets. Generic widgets within Thunderclap follow a strict pattern:
 /// ```ignore
 /// // The name of the generics (U and G) are important.
 /// struct GenericWidget<U: UpdateAuxiliary, G: GraphicalAuxiliary> { /* ... */ }
@@ -223,7 +223,7 @@ macro_rules! lazy_propagate {
 /// ```ignore
 /// use reclutch::WidgetChildren;
 /// #[derive(WidgetChildren)]
-/// #[widget_children_trait(reui::base::WidgetChildren)]
+/// #[widget_children_trait(thunderclap::base::WidgetChildren)]
 /// struct MyWidget;
 /// ```
 pub trait WidgetChildren:
@@ -338,7 +338,7 @@ pub trait HasVisibility {
 }
 
 /// Trait required for any type passed as the `UpdateAux` type (seen as `U` in the widget type parameters)
-/// with accessors required for usage within Reui-implemented widgets.
+/// with accessors required for usage within Thunderclap-implemented widgets.
 pub trait UpdateAuxiliary: 'static {
     /// Returns the queue where window events (`WindowEvent`) are emitted, immutably.
     fn window_queue(&self) -> &RcEventQueue<WindowEvent>;
@@ -347,7 +347,7 @@ pub trait UpdateAuxiliary: 'static {
 }
 
 /// Trait required for any type passed as the `GraphicalAux` type (seen as `G` in the widget type parameters)
-/// with accessors required for usage within Reui-implemented widgets.
+/// with accessors required for usage within Thunderclap-implemented widgets.
 pub trait GraphicalAuxiliary: 'static {
     /// Returns the HiDPI scaling factor.
     fn scaling(&self) -> f32;
@@ -415,7 +415,7 @@ impl<T> Clone for ConsumableEvent<T> {
 
 /// An event related to the window, e.g. input.
 #[derive(PipelineEvent, Debug, Clone, PartialEq)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 pub enum WindowEvent {
     /// The user pressed a mouse button.
     #[event_key(mouse_press)]
@@ -693,7 +693,7 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
 
 /// Empty event indicating `Observed` data has changed.
 #[derive(PipelineEvent, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 #[event_key(drop)]
 pub struct DropEvent;
 
@@ -704,7 +704,7 @@ pub trait DropNotifier: Widget {
 
 /// Empty event indicating `Observed` data has changed.
 #[derive(PipelineEvent, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[reui_crate(crate)]
+#[thunderclap_crate(crate)]
 #[event_key(change)]
 pub struct ObservedEvent;
 
