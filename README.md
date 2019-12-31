@@ -64,7 +64,7 @@ fn main() {
         |_, display| Primer::new(display).unwrap(),
         |u_aux, g_aux, theme| {
             Counter {
-                // Perhaps we want to start counting from 5 instead of 5
+                // Perhaps we want to start counting from 5 instead of 0
                 count: 5,
                 ..Counter::from_theme(theme)
             }.construct(theme, u_aux, g_aux)

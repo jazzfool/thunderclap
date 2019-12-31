@@ -1,16 +1,16 @@
 # `derive`
 
-All of these derives accept a `reui_crate` attribute to specify the name of the Reui crate;
+All of these derives accept a `thunderclap_crate` attribute to specify the name of the Thunderclap crate;
 
 ```rust
-use reui as alternative_reui;
+use thunderclap as alternative_thunderclap;
 
-#[derive(SomeReuiDerive)]
-#[reui_crate(alternative_reui)] // <--
+#[derive(SomeThunderclapDerive)]
+#[thunderclap_crate(alternative_thunderclap)] // <--
 struct Foo // ...
 ```
 
-Realistically, there's no need to use this. This mainly used within Reui so that internal types can `derive` where the only handle to the crate root is `crate::`.
+Realistically, there's no need to use this. This mainly used within Thunderclap so that internal types can `derive` where the only handle to the crate root is `crate::`.
 
 ## `PipelineEvent`
 
@@ -31,7 +31,7 @@ enum MyEvent {
 
 Which resolves down to:
 ```rust
-impl reui::pipe::Event for MyEvent {
+impl thunderclap::pipe::Event for MyEvent {
     fn get_key(&self) -> &'static str {
         match self {
             MyEvent::Stop => "stop",
@@ -69,9 +69,9 @@ struct MyWidget {
 Expands to...
 
 ```rust
-impl reui::base::LayableWidget for MyWidget {
+impl thunderclap::base::LayableWidget for MyWidget {
     #[inline]
-    fn listen_to_layout(&mut self, layout: impl Into<Option<reui::base::WidgetLayoutEventsInner>>) {
+    fn listen_to_layout(&mut self, layout: impl Into<Option<thunderclap::base::WidgetLayoutEventsInner>>) {
         self.layout.update(layout);
     }
 
@@ -95,9 +95,9 @@ struct MyWidget {
 Expands to...
 
 ```rust
-impl reui::base::DropNotifier for MyWidget {
+impl thunderclap::base::DropNotifier for MyWidget {
     #[inline(always)]
-    fn drop_event(&self) -> &reui::reclutch::event::RcEventQueue<reui::base::DropEvent> {
+    fn drop_event(&self) -> &thunderclap::reclutch::event::RcEventQueue<thunderclap::base::DropEvent> {
         &self.drop_event
     }
 }
@@ -127,14 +127,14 @@ struct MyWidget {
 Expands to...
 
 ```rust
-impl reui::base::HasVisibility {
+impl thunderclap::base::HasVisibility {
     #[inline]
-    fn set_visibility(&mut self, visibility: reui::base::Visibility) {
+    fn set_visibility(&mut self, visibility: thunderclap::base::Visibility) {
         self.visibility = visibility;
     }
 
     #[inline]
-    fn visibility(&self) -> reui::base::Visibility {
+    fn visibility(&self) -> thunderclap::base::Visibility {
         self.visibility
     }
 }
@@ -162,14 +162,14 @@ struct MyWidget {
 Expands to...
 
 ```rust
-impl reui::base::Repaintable for MyWidget {
+impl thunderclap::base::Repaintable for MyWidget {
     #[inline]
     fn repaint(&mut self) {
         self.a.repaint();
         self.b.repaint();
         self.c.repaint();
 
-        for child in reui::base::WidgetChildren::children_mut(self) {
+        for child in thunderclap::base::WidgetChildren::children_mut(self) {
             child.repaint();
         }
     }
@@ -199,18 +199,18 @@ struct MyWidget {
 Expands to...
 
 ```rust
-impl reui::base::<Movable/Resizable> for MyWidget {
-    fn set_<position/size>(&mut self, <position/size>: reui::reclutch::display::<RelativePoint/Size>) {
+impl thunderclap::base::<Movable/Resizable> for MyWidget {
+    fn set_<position/size>(&mut self, <position/size>: thunderclap::reclutch::display::<RelativePoint/Size>) {
         self.rect.<origin/size> = <position/size>;
         // -- OR --
         self.x = <position/size>;
 
-        reui::base::Repaintable::repaint(self);
+        thunderclap::base::Repaintable::repaint(self);
         self.on_transform();
     }
 
     #[inline]
-    fn <position/size>(&self) -> reui::reclutch::display::<RelativePoint/Size> {
+    fn <position/size>(&self) -> thunderclap::reclutch::display::<RelativePoint/Size> {
         self.rect.<origin/size>
         // -- OR --
         self.x
