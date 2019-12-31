@@ -68,7 +68,7 @@ fn main() {
 
 ### Lack of control
 
-Although the Flutter/SwiftUI inspired syntax of the `rooftop!` macro is very useful for cobbling together something quickly, some applications need finer control. Thankfully, all the code that the `rooftop!` macro generates is regular Rust code. The code uses pipelines to simplify event queue handling (`reui::pipe::Pipeline`), all of which is equivalent to manually iterating over and matching events. You can peel away any of these abstractions and build something that still works with everything else.
+Although the Flutter/SwiftUI inspired syntax of the `rooftop!` macro is very useful for cobbling together something quickly, some applications need finer control. Thankfully, all the code that the `rooftop!` macro generates is regular Rust code that you could also write by hand (and in fact the core widgets are written by hand this way). The code uses pipelines to simplify event queue handling (`reui::pipe::Pipeline`), all of which is equivalent to manually iterating over and matching events. You can peel away any of these abstractions and build something that still works with everything else.
 
 ---
 
