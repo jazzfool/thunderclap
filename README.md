@@ -11,8 +11,7 @@ A Rust toolkit to write decomposable and fast user interfaces. It is:
 ## Overview
 
 Thunderclap aims to take the traditional widget hierarchy model from bulletproof libraries (e.g. Qt) and combine it with the cutting-edge simplicity of modern toolkits (e.g. Flutter).
-To accomplish this it provides four primary high-level components:
-- An update pipeline system which combines closures with event queues.
+To accomplish this it provides three primary high-level components:
 - A widget library that fills the need for boilerplate UI components.
 - A theme API with a verbose typography and color scheme protocol.
 - A macro to emulate a declarative UI syntax for widget creation.
