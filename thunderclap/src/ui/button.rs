@@ -5,19 +5,19 @@ use {
         base::{self, Repaintable, Resizable},
         draw::{self, state, HasTheme},
         geom::*,
-        pipe, ui,
+        ui,
     },
     reclutch::{
         display::{Color, CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Rect},
         event::RcEventQueue,
         prelude::*,
+        verbgraph as vg,
     },
     std::marker::PhantomData,
 };
 
 /// Events emitted by a button.
-#[derive(PipelineEvent, Debug, Clone, Copy, PartialEq)]
-#[thunderclap_crate(crate)]
+#[derive(Event, Debug, Clone, Copy, PartialEq)]
 pub enum ButtonEvent {
     /// Emitted when the checkbox is pressed.
     #[event_key(press)]
@@ -41,7 +41,14 @@ pub enum ButtonEvent {
 
 /// Focus-able button widget.
 #[derive(
-    WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
+    WidgetChildren,
+    LayableWidget,
+    DropNotifier,
+    HasVisibility,
+    Repaintable,
+    Movable,
+    Resizable,
+    OperatesVerbGraph,
 )]
 #[widget_children_trait(base::WidgetChildren)]
 #[thunderclap_crate(crate)]
@@ -54,7 +61,7 @@ where
     pub event_queue: RcEventQueue<ButtonEvent>,
 
     pub data: base::Observed<Button>,
-    pipe: Option<pipe::Pipeline<Self, U>>,
+    graph: vg::OptionVerbGraph<Self, U>,
     interaction: state::InteractionState,
     painter: Box<dyn draw::Painter<state::ButtonState>>,
     parent_position: AbsolutePoint,
@@ -151,19 +158,20 @@ impl Button {
     {
         let data = base::Observed::new(self);
 
-        let mut pipe = pipeline! {
+        let mut graph = vg::verbgraph! {
             ButtonWidget<U, G> as obj,
             U as _aux,
-            _ev in &data.on_change => {
-                change {
+            "bind" => _ev in &data.on_change => {
+                change => {
                     obj.resize_from_theme();
                     obj.command_group.repaint();
                 }
             }
         };
 
-        pipe = pipe.add(
-            ui::basic_interaction_terminal::<ButtonWidget<U, G>, U>().bind(u_aux.window_queue()),
+        graph = graph.add(
+            "interaction",
+            ui::basic_interaction_handler::<ButtonWidget<U, G>, U>().bind(u_aux.window_queue()),
         );
 
         let painter = theme.button();
@@ -181,7 +189,7 @@ impl Button {
         ButtonWidget {
             event_queue: Default::default(),
             data,
-            pipe: pipe.into(),
+            graph: graph.into(),
             interaction: state::InteractionState::empty(),
             painter,
             parent_position: Default::default(),
@@ -214,6 +222,16 @@ where
     }
 }
 
+impl<U, G> vg::HasVerbGraph for ButtonWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
+        &mut self.graph
+    }
+}
+
 impl<U, G> Widget for ButtonWidget<U, G>
 where
     U: base::UpdateAuxiliary,
@@ -229,9 +247,9 @@ where
     }
 
     fn update(&mut self, aux: &mut U) {
-        let mut pipe = self.pipe.take().unwrap();
-        pipe.update(self, aux);
-        self.pipe = Some(pipe);
+        let mut graph = self.graph.take().unwrap();
+        graph.update_all(self, aux);
+        self.graph = Some(graph);
 
         if let Some(rect) = self.layout.receive() {
             self.set_ctxt_rect(rect);
@@ -242,17 +260,13 @@ where
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
         let button_state = self.derive_state();
         let painter = &mut self.painter;
-        self.command_group.push_with(display, || painter.draw(button_state), None, None);
-    }
-}
-
-impl<U, G> ui::Bindable<U> for ButtonWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn perform_bind(&mut self, _aux: &mut U) {
-        self.repaint();
+        self.command_group.push_with(
+            display,
+            || painter.draw(button_state),
+            Default::default(),
+            None,
+            None,
+        );
     }
 }
 

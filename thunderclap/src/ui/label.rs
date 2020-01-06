@@ -3,7 +3,7 @@ use {
         base::{self, Repaintable},
         draw,
         geom::*,
-        pipe, ui,
+        ui,
     },
     reclutch::{
         display::{
@@ -12,6 +12,7 @@ use {
         },
         event::RcEventQueue,
         prelude::*,
+        verbgraph as vg,
     },
     std::marker::PhantomData,
 };
@@ -26,7 +27,14 @@ pub enum TextAlign {
 
 /// Label widget which displays text wrapped and clipped within a rectangle.
 #[derive(
-    WidgetChildren, LayableWidget, HasVisibility, Repaintable, Movable, Resizable, DropNotifier,
+    WidgetChildren,
+    LayableWidget,
+    HasVisibility,
+    Repaintable,
+    Movable,
+    Resizable,
+    DropNotifier,
+    OperatesVerbGraph,
 )]
 #[widget_children_trait(base::WidgetChildren)]
 #[thunderclap_crate(crate)]
@@ -38,7 +46,7 @@ where
 {
     pub data: base::Observed<Label>,
 
-    pipe: Option<pipe::Pipeline<Self, U>>,
+    graph: vg::OptionVerbGraph<Self, U>,
     text_items: Vec<TextDisplayItem>,
     previous_rect: RelativeRect,
     dirty: bool,
@@ -99,12 +107,13 @@ impl Label {
     {
         let data = base::Observed::new(self);
 
-        let pipe = pipeline! {
+        let graph = vg::verbgraph! {
             LabelWidget<U, G> as obj,
             U as _aux,
-            _ev in &data.on_change => {
-                change {
+            "bind" => _ev in &data.on_change => {
+                change => {
                     obj.update_text_items();
+                    obj.repaint();
                 }
             }
         };
@@ -112,7 +121,7 @@ impl Label {
         let mut label = LabelWidget {
             data,
 
-            pipe: pipe.into(),
+            graph: graph.into(),
             text_items: Vec::new(),
             previous_rect: Default::default(),
             dirty: true,
@@ -205,6 +214,16 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
     }
 }
 
+impl<U, G> vg::HasVerbGraph for LabelWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
+        &mut self.graph
+    }
+}
+
 impl<U, G> Widget for LabelWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -230,9 +249,9 @@ where
             self.update_text_items();
         }
 
-        let mut pipe = self.pipe.take().unwrap();
-        pipe.update(self, aux);
-        self.pipe = Some(pipe);
+        let mut graph = self.graph.take().unwrap();
+        graph.update_all(self, aux);
+        self.graph = Some(graph);
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
@@ -241,17 +260,7 @@ where
         for text_item in &self.text_items {
             builder.push_text(text_item.clone(), None);
         }
-        self.command_group.push(display, &builder.build(), None, None);
-    }
-}
-
-impl<U, G> ui::Bindable<U> for LabelWidget<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    fn perform_bind(&mut self, _aux: &mut U) {
-        self.update_text_items();
+        self.command_group.push(display, &builder.build(), Default::default(), None, None);
     }
 }
 

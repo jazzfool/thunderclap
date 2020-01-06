@@ -1,5 +1,4 @@
 use {
-    super::Align,
     crate::{
         base::{self, Resizable},
         draw,
@@ -8,7 +7,8 @@ use {
     },
     indexmap::IndexMap,
     reclutch::{
-        display::{self, DisplayCommand, Rect, Size},
+        display::{DisplayCommand, Rect, Size, Vector},
+        euclid::SideOffsets2D,
         event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
         prelude::*,
         verbgraph as vg,
@@ -16,69 +16,41 @@ use {
     std::marker::PhantomData,
 };
 
-/// Information about how a `HStack` child should be layed out.
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub struct HStackItem {
-    /// The margin given between the previous widget (or left of container) and the left side of the child.
-    pub left_margin: f32,
-    /// The margin given between the next widget and right side of the child.
-    pub right_margin: f32,
-    /// How the child should be vertically aligned within the `HStack`.
-    pub alignment: Align,
-}
-
-impl HStackItem {
-    /// Sets the `top_margin` value.
-    pub fn left_margin(self, left_margin: f32) -> HStackItem {
-        HStackItem { left_margin, ..self }
-    }
-
-    /// Sets the `right_margin` value.
-    pub fn right_margin(self, right_margin: f32) -> HStackItem {
-        HStackItem { right_margin, ..self }
-    }
-
-    /// Sets the `align` value.
-    pub fn align(self, alignment: Align) -> HStackItem {
-        HStackItem { alignment, ..self }
-    }
-}
-
 #[derive(Debug)]
 struct ChildData {
-    data: HStackItem,
     evq: BidirSingleEventQueue<AbsoluteRect, AbsoluteRect>,
     drop_listener: RcEventListener<base::DropEvent>,
     rect: AbsoluteRect,
     original_rect: AbsoluteRect,
+    distance_from_tl: Vector,
     id: u64,
 }
 
 lazy_widget! {
-    generic HStackWidget,
+    generic MarginsWidget,
     visibility: visibility,
     theme: themed,
     drop_event: drop_event
 }
 
-/// Abstract layout widget which arranges children in a horizontal list, possibly with left/right margins and vertical alignment (see `HStackData`).
+/// Abstract layout widget which places margins around it's children.
 #[derive(WidgetChildren, LayableWidget, Movable, Resizable, OperatesVerbGraph)]
 #[widget_children_trait(base::WidgetChildren)]
 #[thunderclap_crate(crate)]
 #[widget_transform_callback(on_transform)]
-pub struct HStackWidget<U, G>
+pub struct MarginsWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    pub data: base::Observed<HStack>,
+    pub data: base::Observed<Margins>,
 
     rects: IndexMap<u64, ChildData>,
     next_rect_id: u64,
     dirty: bool,
+    visibility: base::Visibility,
     themed: draw::PhantomThemed,
     drop_event: RcEventQueue<base::DropEvent>,
-    visibility: base::Visibility,
     parent_position: AbsolutePoint,
 
     #[widget_rect]
@@ -91,24 +63,24 @@ where
     phantom_g: PhantomData<G>,
 }
 
+pub type SideMargins = SideOffsets2D<f32, AbsoluteUnit>;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HStack {
-    pub left_margin: f32,
-    pub right_margin: f32,
-    pub alignment: Align,
+pub struct Margins {
+    pub margins: SideMargins,
 }
 
-impl<U, G> ui::WidgetDataTarget<U, G> for HStack
+impl<U, G> ui::WidgetDataTarget<U, G> for Margins
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    type Target = HStackWidget<U, G>;
+    type Target = MarginsWidget<U, G>;
 }
 
-impl HStack {
+impl Margins {
     pub fn from_theme(_theme: &dyn draw::Theme) -> Self {
-        HStack { left_margin: 0.0, right_margin: 0.0, alignment: Align::Begin }
+        Margins { margins: Default::default() }
     }
 
     pub fn construct<U, G>(
@@ -116,22 +88,22 @@ impl HStack {
         _theme: &dyn draw::Theme,
         _u_aux: &mut U,
         _g_aux: &mut G,
-    ) -> HStackWidget<U, G>
+    ) -> MarginsWidget<U, G>
     where
         U: base::UpdateAuxiliary,
         G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
 
-        HStackWidget {
+        MarginsWidget {
             data,
 
             rects: IndexMap::new(),
             next_rect_id: 0,
             dirty: true,
+            visibility: Default::default(),
             themed: Default::default(),
             drop_event: Default::default(),
-            visibility: Default::default(),
             parent_position: Default::default(),
 
             rect: Default::default(),
@@ -144,22 +116,24 @@ impl HStack {
     }
 }
 
-impl<U, G> HStackWidget<U, G>
+impl<U, G> MarginsWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
     fn resize_to_fit(&mut self) {
-        let mut max_size = Size::zero();
+        let mut max_rect = AbsoluteRect::default();
         for (_, child) in &self.rects {
-            let size: Size = child.rect.size.cast_unit();
-            max_size.width += size.width + child.data.left_margin + child.data.right_margin;
-            if size.height > max_size.height {
-                max_size.height = size.height;
-            }
+            max_rect = max_rect.union(&child.rect);
         }
 
-        self.set_size(max_size);
+        self.set_size(
+            max_rect.size.cast_unit()
+                + Size::new(
+                    self.data.margins.left + self.data.margins.right,
+                    self.data.margins.top + self.data.margins.bottom,
+                ),
+        );
     }
 
     fn on_transform(&mut self) {
@@ -168,7 +142,7 @@ where
     }
 }
 
-impl<U, G> vg::HasVerbGraph for HStackWidget<U, G>
+impl<U, G> vg::HasVerbGraph for MarginsWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
@@ -178,14 +152,14 @@ where
     }
 }
 
-impl<U, G> base::Layout for HStackWidget<U, G>
+impl<U, G> base::Layout for MarginsWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    type PushData = HStackItem;
+    type PushData = ();
 
-    fn push(&mut self, data: Option<HStackItem>, child: &mut impl base::LayableWidget) {
+    fn push(&mut self, _data: Option<()>, child: &mut impl base::LayableWidget) {
         self.dirty = true;
 
         let id = self.next_rect_id;
@@ -200,15 +174,11 @@ where
         self.rects.insert(
             id,
             ChildData {
-                data: data.unwrap_or(HStackItem {
-                    left_margin: self.data.left_margin,
-                    right_margin: self.data.right_margin,
-                    alignment: self.data.alignment,
-                }),
                 evq,
                 drop_listener: child.drop_event().listen(),
                 rect,
                 original_rect: rect,
+                distance_from_tl: (rect.origin - self.abs_rect().origin).cast_unit(),
                 id,
             },
         );
@@ -226,10 +196,10 @@ where
     }
 }
 
-impl<U, G> Widget for HStackWidget<U, G>
+impl<U, G> Widget for MarginsWidget<U, G>
 where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
+    U: base::UpdateAuxiliary + 'static,
+    G: base::GraphicalAuxiliary + 'static,
 {
     type UpdateAux = U;
     type GraphicalAux = G;
@@ -246,18 +216,19 @@ where
         }
 
         {
+            let abs_rect = self.abs_rect().inner_rect(self.data.margins);
             let mut removals = Vec::new();
-            let dirty = &mut self.dirty;
             for (_, data) in &mut self.rects {
                 if !data.drop_listener.peek().is_empty() {
                     removals.push(data.id);
-                    *dirty = true;
+                    self.dirty = true;
                     continue;
                 }
 
                 if let Some(new_ev) = data.evq.retrieve_newest() {
-                    *dirty = true;
+                    self.dirty = true;
                     data.rect = new_ev;
+                    data.distance_from_tl = (new_ev.origin - abs_rect.origin).cast_unit();
                 }
             }
             for removal in removals {
@@ -268,33 +239,13 @@ where
         if self.dirty {
             self.resize_to_fit();
             let abs_rect = self.abs_rect();
-            let mut advance = abs_rect.origin.x;
-            let mut max_height = 0.0;
             for (_, data) in &mut self.rects {
-                advance += data.data.left_margin;
-
                 let mut rect = data.rect;
-                rect.origin.x = advance;
-                rect.origin.y = match data.data.alignment {
-                    Align::Begin => abs_rect.origin.y,
-                    Align::Middle => {
-                        display::center_vertically(rect.cast_unit(), abs_rect.cast_unit()).y
-                    }
-                    Align::End => abs_rect.origin.y + abs_rect.size.height - rect.size.height,
-                    Align::Stretch => {
-                        rect.size.height = abs_rect.size.height;
-                        abs_rect.origin.y
-                    }
-                };
-
+                rect.origin = abs_rect.origin
+                    + data.distance_from_tl.cast_unit()
+                    + Vector::new(self.data.margins.left, self.data.margins.top).cast_unit();
                 data.evq.emit_owned(rect);
                 data.rect = rect;
-
-                advance += rect.size.width + data.data.right_margin;
-
-                if data.rect.size.height > max_height {
-                    max_height = data.rect.size.height;
-                }
             }
 
             self.dirty = false;
@@ -302,18 +253,18 @@ where
     }
 }
 
-impl<U, G> ui::DefaultWidgetData<HStack> for HStackWidget<U, G>
+impl<U, G> ui::DefaultWidgetData<Margins> for MarginsWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
     #[inline]
-    fn default_data(&mut self) -> &mut base::Observed<HStack> {
+    fn default_data(&mut self) -> &mut base::Observed<Margins> {
         &mut self.data
     }
 }
 
-impl<U, G> StoresParentPosition for HStackWidget<U, G>
+impl<U, G> StoresParentPosition for MarginsWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
@@ -323,7 +274,6 @@ where
         self.on_transform();
     }
 
-    #[inline(always)]
     fn parent_position(&self) -> AbsolutePoint {
         self.parent_position
     }

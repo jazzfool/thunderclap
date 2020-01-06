@@ -5,14 +5,21 @@ pub mod checkbox;
 pub mod container;
 pub mod hstack;
 pub mod label;
+pub mod margins;
 pub mod text_area;
 pub mod vstack;
 
-pub use {button::*, checkbox::*, container::*, hstack::*, label::*, text_area::*, vstack::*};
+pub use {
+    button::*, checkbox::*, container::*, hstack::*, label::*, margins::*, text_area::*, vstack::*,
+};
 
 use {
-    crate::{base, draw::state, geom::*, pipe},
-    reclutch::{display::DisplayText, event::RcEventQueue},
+    crate::{base, draw::state, geom::*},
+    reclutch::{
+        display,
+        event::RcEventQueue,
+        verbgraph::{unbound_queue_handler, UnboundQueueHandler},
+    },
 };
 
 /// Simply pushes a list of widgets, each with specified layout data, into a layout, then returns a mutable reference to the layout.
@@ -111,24 +118,17 @@ pub trait DefaultWidgetData<D> {
     fn default_data(&mut self) -> &mut base::Observed<D>;
 }
 
-pub trait Bindable<U>
-where
-    U: base::UpdateAuxiliary,
-{
-    fn perform_bind(&mut self, aux: &mut U);
-}
-
 /// Generates an unbound terminal which handles basic interactivity.
 /// This simply means it will appropriately modify a `state::InteractionState` and emit events
 /// when interactivity changes occur.
-pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary>(
-) -> pipe::UnboundTerminal<W, U, base::WindowEvent> {
-    unbound_terminal! {
+pub fn basic_interaction_handler<W: InteractiveWidget, U: base::UpdateAuxiliary>(
+) -> UnboundQueueHandler<W, U, base::WindowEvent> {
+    unbound_queue_handler! {
         W as obj,
         U as aux,
         base::WindowEvent as event,
 
-        mouse_press {
+        mouse_press => {
             let bounds = obj.abs_convert_rect(obj.mouse_bounds());
             if let Some((pos, _, _)) = event.with(|(pos, button, _)| {
                 !obj.disabled()
@@ -140,7 +140,7 @@ pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary
             }
         }
 
-        mouse_release {
+        mouse_release => {
             if let Some((pos, _, _)) = event.with(|(_, button, _)| {
                 !obj.disabled()
                     && *button == base::MouseButton::Left
@@ -153,7 +153,7 @@ pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary
             }
         }
 
-        mouse_move {
+        mouse_move => {
             let bounds = obj.abs_convert_rect(obj.mouse_bounds());
             if let Some((pos, _)) = event.with(|(pos, _)| bounds.contains(*pos)) {
                 if !obj.interaction().contains(state::InteractionState::HOVERED) {
@@ -166,7 +166,7 @@ pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary
             }
         }
 
-        clear_focus {
+        clear_focus => {
             let was_focused = obj.interaction().contains(state::InteractionState::FOCUSED);
             obj.interaction().remove(state::InteractionState::FOCUSED);
             if was_focused {
@@ -177,6 +177,6 @@ pub fn basic_interaction_terminal<W: InteractiveWidget, U: base::UpdateAuxiliary
 }
 
 #[inline(always)]
-pub fn txt(s: &str) -> DisplayText {
-    DisplayText::Simple(s.into())
+pub fn txt(s: &str) -> display::DisplayText {
+    display::DisplayText::Simple(s.into())
 }

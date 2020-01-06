@@ -11,6 +11,7 @@ use {
         display::{self, DisplayCommand, Rect, Size},
         event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
         prelude::*,
+        verbgraph as vg,
     },
     std::marker::PhantomData,
 };
@@ -61,7 +62,7 @@ lazy_widget! {
 }
 
 /// Abstract layout widget which arranges children in a vertical list, possibly with top/bottom margins and horizontal alignment (see `VStackData`).
-#[derive(WidgetChildren, LayableWidget, Movable, Resizable, Debug)]
+#[derive(WidgetChildren, LayableWidget, Movable, Resizable, OperatesVerbGraph)]
 #[widget_children_trait(base::WidgetChildren)]
 #[thunderclap_crate(crate)]
 #[widget_transform_callback(on_transform)]
@@ -85,6 +86,7 @@ where
     #[widget_layout]
     layout: base::WidgetLayoutEvents,
 
+    graph: vg::OptionVerbGraph<Self, U>,
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
 }
@@ -135,6 +137,7 @@ impl VStack {
             rect: Default::default(),
             layout: Default::default(),
 
+            graph: None,
             phantom_u: Default::default(),
             phantom_g: Default::default(),
         }
@@ -165,14 +168,24 @@ where
     }
 }
 
+impl<U, G> reclutch::verbgraph::HasVerbGraph for VStackWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
+        &mut self.graph
+    }
+}
+
 impl<U, G> base::Layout for VStackWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    type PushData = Option<VStackItem>;
+    type PushData = VStackItem;
 
-    fn push(&mut self, data: Self::PushData, child: &mut impl base::LayableWidget) {
+    fn push(&mut self, data: Option<VStackItem>, child: &mut impl base::LayableWidget) {
         self.dirty = true;
 
         let id = self.next_rect_id;

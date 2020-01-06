@@ -109,7 +109,6 @@ fn parse_view(
     input: syn::parse::ParseStream,
     bindings: &mut Vec<proc_macro2::TokenStream>,
     terminals: &mut Vec<proc_macro2::TokenStream>,
-    bind_propagation: &mut Vec<proc_macro2::TokenStream>,
     count: &mut u64,
 ) -> syn::Result<(WidgetNode, bool)> {
     let type_name = input.parse::<syn::Ident>()?;
@@ -134,9 +133,6 @@ fn parse_view(
                     widget.#var_name.default_data().#var = #value;
                 }
             });
-            bind_propagation.push(quote! {
-                self.#var_name.perform_bind(aux);
-            });
         }
     }
 
@@ -149,7 +145,7 @@ fn parse_view(
             let event_name = input.parse::<syn::Ident>()?;
             let handler_body = input.parse::<syn::Block>()?;
             events.push(quote! {
-                #event_name {
+                #event_name => {
                     { #handler_body }
                 }
             });
@@ -162,7 +158,7 @@ fn parse_view(
         terminals.push(
             {
                 quote! {
-                    event in #var_name.default_event_queue() => {
+                    std::stringify!(#var_name) => event in #var_name.default_event_queue() => {
                         #(#events)*
                     }
                 }
@@ -181,8 +177,7 @@ fn parse_view(
             if children_parse.is_empty() {
                 parse_child = false;
             } else {
-                let (node, found_comma) =
-                    parse_view(&children_parse, bindings, terminals, bind_propagation, count)?;
+                let (node, found_comma) = parse_view(&children_parse, bindings, terminals, count)?;
                 children.push(node);
                 parse_child = found_comma;
             }
@@ -237,7 +232,6 @@ pub(crate) struct RooftopData {
     widget_tree_root: WidgetNode,
     bindings: Vec<proc_macro2::TokenStream>,
     terminals: Vec<proc_macro2::TokenStream>,
-    bind_propagation: Vec<proc_macro2::TokenStream>,
     functions: Vec<(syn::Ident, syn::Block)>,
 }
 
@@ -273,16 +267,8 @@ impl syn::parse::Parse for RooftopData {
 
         let mut bindings = Vec::new();
         let mut terminals = Vec::new();
-        let mut bind_propagation = Vec::new();
         let mut count = 0;
-        let widget_tree_root = parse_view(
-            &view_body,
-            &mut bindings,
-            &mut terminals,
-            &mut bind_propagation,
-            &mut count,
-        )?
-        .0;
+        let widget_tree_root = parse_view(&view_body, &mut bindings, &mut terminals, &mut count)?.0;
 
         Ok(RooftopData {
             struct_name,
@@ -292,7 +278,6 @@ impl syn::parse::Parse for RooftopData {
             widget_tree_root,
             bindings,
             terminals,
-            bind_propagation,
             functions: other_functions,
         })
     }
@@ -387,13 +372,12 @@ impl RooftopData {
 
         let bindings = &self.bindings;
         let terminals = &self.terminals;
-        let bind_propagation = &self.bind_propagation;
 
-        let build_pipeline =
-            find_pseudo_function("build_pipeline", &self.functions).unwrap_or(quote! { { pipe } });
-        let before_pipeline = find_pseudo_function("before_pipeline", &self.functions)
+        let build_graph =
+            find_pseudo_function("build_graph", &self.functions).unwrap_or(quote! { { graph } });
+        let before_graph = find_pseudo_function("before_graph", &self.functions)
             .unwrap_or(proc_macro2::TokenStream::new());
-        let after_pipeline = find_pseudo_function("after_pipeline", &self.functions)
+        let after_graph = find_pseudo_function("after_graph", &self.functions)
             .unwrap_or(proc_macro2::TokenStream::new());
         let draw = find_pseudo_function("draw", &self.functions).unwrap_or(quote! { &[] });
 
@@ -423,25 +407,23 @@ impl RooftopData {
                         #define_layout;
 
                         use #crate_name::ui::DefaultEventQueue;
-                        let mut pipe = pipeline! {
+                        let mut graph = #crate_name::reclutch::verbgraph::verbgraph! {
                             #widget_name<U, G> as widget,
                             U as aux,
+                            "bind" => event in &data.on_change => {
+                                change => {
+                                    use #crate_name::{ui::DefaultWidgetData, base::WidgetChildren};
+                                    let bind = &mut widget.data;
+                                    #(#bindings)*
+                                    for child in &mut widget.children_mut() {
+                                        child.require_update(aux, "bind");
+                                    }
+                                }
+                            }
                             #(#terminals)*
                         };
 
-                        pipe = #build_pipeline;
-
-                        let mut bind_pipe = pipeline! {
-                            #widget_name<U, G> as widget,
-                            U as aux,
-                            event in &data.on_change => {
-                                change {
-                                    use #crate_name::ui::DefaultWidgetData;
-                                    let bind = &mut widget.data;
-                                    #(#bindings)*
-                                }
-                            }
-                        };
+                        graph = #build_graph;
 
                         // emits false positive event to apply bindings
                         data.get_mut();
@@ -449,8 +431,7 @@ impl RooftopData {
                         let mut output_widget = #widget_name {
                             event_queue: Default::default(),
                             data,
-                            pipe: pipe.into(),
-                            bind_pipe: bind_pipe.into(),
+                            graph: graph.into(),
                             parent_position: Default::default(),
 
                             visibility: Default::default(),
@@ -489,6 +470,7 @@ impl RooftopData {
                     DropNotifier,
                     HasVisibility,
                     Repaintable,
+                    OperatesVerbGraph,
                 )]
                 #[widget_children_trait(base::WidgetChildren)]
                 #[thunderclap_crate(#crate_name)]
@@ -499,8 +481,7 @@ impl RooftopData {
                 {
                     pub event_queue: #crate_name::reclutch::event::RcEventQueue<#output_event>,
                     pub data: #crate_name::base::Observed<#struct_name>,
-                    pipe: Option<#crate_name::pipe::Pipeline<Self, U>>,
-                    bind_pipe: Option<#crate_name::pipe::Pipeline<Self, U>>,
+                    graph: #crate_name::reclutch::verbgraph::OptionVerbGraph<Self, U>,
                     parent_position: #crate_name::geom::AbsolutePoint,
 
                     #[widget_visibility]
@@ -530,6 +511,16 @@ impl RooftopData {
                     }
                 }
 
+                impl<U, G> #crate_name::reclutch::verbgraph::HasVerbGraph for #widget_name<U, G>
+                where
+                    U: base::UpdateAuxiliary,
+                    G: base::GraphicalAuxiliary,
+                {
+                    fn verb_graph(&mut self) -> &mut #crate_name::reclutch::verbgraph::OptionVerbGraph<Self, U> {
+                        &mut self.graph
+                    }
+                }
+
                 impl<U, G> #crate_name::reclutch::widget::Widget for #widget_name<U, G>
                 where
                     U: #crate_name::base::UpdateAuxiliary,
@@ -547,40 +538,20 @@ impl RooftopData {
                     fn update(&mut self, aux: &mut U) {
                         #crate_name::base::invoke_update(self, aux);
 
-                        #before_pipeline
-                        let mut pipe = self.pipe.take().unwrap();
-                        pipe.update(self, aux);
-                        self.pipe = Some(pipe);
-                        #after_pipeline
+                        #before_graph
+                        let mut graph = self.graph.take().unwrap();
+                        graph.update_all(self, aux);
+                        self.graph = Some(graph);
+                        #after_graph
                         if let Some(rect) = self.layout.receive() {
                             use #crate_name::geom::ContextuallyRectangular;
                             self.#root_name.set_ctxt_rect(rect);
                             self.command_group.repaint();
                         }
-
-                        {
-                            use #crate_name::ui::Bindable;
-                            self.perform_bind(aux);
-                        }
                     }
 
                     fn draw(&mut self, display: &mut dyn #crate_name::reclutch::display::GraphicsDisplay, aux: &mut G) {
-                        self.command_group.push(display, { #draw }, None, None);
-                    }
-                }
-
-                impl<U, G> #crate_name::ui::Bindable<U> for #widget_name<U, G>
-                where
-                    U: #crate_name::base::UpdateAuxiliary,
-                    G: #crate_name::base::GraphicalAuxiliary,
-                {
-                    #[inline]
-                    fn perform_bind(&mut self, aux: &mut U) {
-                        let mut bind_pipe = self.bind_pipe.take().unwrap();
-                        bind_pipe.update(self, aux);
-                        self.bind_pipe = Some(bind_pipe);
-
-                        #(#bind_propagation)*
+                        self.command_group.push(display, { #draw }, Default::default(), None, None);
                     }
                 }
 

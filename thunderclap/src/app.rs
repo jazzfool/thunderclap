@@ -8,7 +8,7 @@ use {
     },
     reclutch::{
         display::{
-            skia, Color, CommandGroup, DisplayCommand, GraphicsDisplay, Point, Size, Vector,
+            self, skia, Color, CommandGroup, DisplayCommand, GraphicsDisplay, Point, Size, Vector,
         },
         event::RcEventQueue,
         prelude::*,
@@ -158,6 +158,7 @@ where
             *control_flow = ControlFlow::Wait;
 
             match event {
+                Event::EventsCleared => context.window().request_redraw(),
                 Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
                     if display.size().0 != size.width as _ || display.size().1 != size.height as _ {
                         display.resize((size.width as _, size.height as _)).unwrap();
@@ -170,13 +171,20 @@ where
                             DisplayCommand::Clear(background),
                             DisplayCommand::Scale(Vector::new(g_aux.scale, g_aux.scale)),
                         ],
+                        display::ZOrder(std::i32::MIN),
                         false,
                         None,
                     );
 
                     base::invoke_draw(&mut root, &mut display, &mut g_aux);
 
-                    command_group_post.push(&mut display, &[DisplayCommand::Restore], false, None);
+                    command_group_post.push(
+                        &mut display,
+                        &[DisplayCommand::Restore],
+                        display::ZOrder(std::i32::MAX),
+                        false,
+                        None,
+                    );
 
                     display.present(None).unwrap();
 
@@ -270,7 +278,6 @@ where
             }
 
             root.update(&mut u_aux);
-            context.window().request_redraw();
         })
     }
 }

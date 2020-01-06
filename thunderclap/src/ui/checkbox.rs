@@ -3,19 +3,19 @@ use {
         base::{self, Repaintable, Resizable},
         draw::{self, state},
         geom::*,
-        pipe, ui,
+        ui,
     },
     reclutch::{
         display::{Color, CommandGroup, DisplayCommand, GraphicsDisplay, Rect},
         event::RcEventQueue,
         prelude::*,
+        verbgraph as vg,
     },
     std::marker::PhantomData,
 };
 
 /// Events emitted by a checkbox.
-#[derive(PipelineEvent, Debug, Clone, Copy, PartialEq)]
-#[thunderclap_crate(crate)]
+#[derive(Event, Debug, Clone, Copy, PartialEq)]
 pub enum CheckboxEvent {
     /// Emitted when the checkbox is pressed.
     #[event_key(press)]
@@ -45,7 +45,14 @@ pub enum CheckboxEvent {
 
 /// Checkbox widget; useful for boolean input.
 #[derive(
-    WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
+    WidgetChildren,
+    LayableWidget,
+    DropNotifier,
+    HasVisibility,
+    Repaintable,
+    Movable,
+    Resizable,
+    OperatesVerbGraph,
 )]
 #[widget_children_trait(base::WidgetChildren)]
 #[thunderclap_crate(crate)]
@@ -58,7 +65,7 @@ where
     pub event_queue: RcEventQueue<CheckboxEvent>,
     pub data: base::Observed<Checkbox>,
 
-    pipe: Option<pipe::Pipeline<Self, U>>,
+    graph: vg::OptionVerbGraph<Self, U>,
     painter: Box<dyn draw::Painter<state::CheckboxState>>,
     parent_position: AbsolutePoint,
 
@@ -163,14 +170,15 @@ impl Checkbox {
     {
         let data = base::Observed::new(self);
 
-        let mut pipe = pipeline! {
+        let mut graph = vg::verbgraph! {
             CheckboxWidget<U, G> as obj,
             U as _aux,
-            _ev in &data.on_change => { change { obj.command_group.repaint(); } }
+            "bind" => _ev in &data.on_change => { change => { obj.command_group.repaint(); } }
         };
 
-        pipe = pipe.add(
-            ui::basic_interaction_terminal::<CheckboxWidget<U, G>, U>().bind(u_aux.window_queue()),
+        graph = graph.add(
+            "handler",
+            ui::basic_interaction_handler::<CheckboxWidget<U, G>, U>().bind(u_aux.window_queue()),
         );
 
         let painter = theme.checkbox();
@@ -189,7 +197,7 @@ impl Checkbox {
             event_queue: Default::default(),
             data,
 
-            pipe: pipe.into(),
+            graph: graph.into(),
             painter,
             parent_position: Default::default(),
 
@@ -224,6 +232,16 @@ where
     }
 }
 
+impl<U, G> vg::HasVerbGraph for CheckboxWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
+        &mut self.graph
+    }
+}
+
 impl<U, G> Widget for CheckboxWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -240,9 +258,9 @@ where
     fn update(&mut self, aux: &mut U) {
         let was_focused = self.interaction.contains(state::InteractionState::FOCUSED);
 
-        let mut pipe = self.pipe.take().unwrap();
-        pipe.update(self, aux);
-        self.pipe = Some(pipe);
+        let mut graph = self.graph.take().unwrap();
+        graph.update_all(self, aux);
+        self.graph = Some(graph);
 
         if was_focused != self.interaction.contains(state::InteractionState::FOCUSED) {
             self.command_group.repaint();
@@ -262,7 +280,13 @@ where
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
         let state = self.derive_state();
         let painter = &mut self.painter;
-        self.command_group.push_with(display, || painter.draw(state), None, None);
+        self.command_group.push_with(
+            display,
+            || painter.draw(state),
+            Default::default(),
+            None,
+            None,
+        );
     }
 }
 

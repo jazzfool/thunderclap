@@ -3,18 +3,18 @@ use {
         base::{self, Repaintable},
         draw::{self, state},
         geom::*,
-        pipe, ui,
+        ui,
     },
     reclutch::{
         display::{Color, CommandGroup, DisplayCommand, GraphicsDisplay, Rect},
         event::RcEventQueue,
         prelude::*,
+        verbgraph as vg,
     },
     std::marker::PhantomData,
 };
 
-#[derive(PipelineEvent, Debug, Clone, PartialEq)]
-#[thunderclap_crate(crate)]
+#[derive(Event, Debug, Clone, PartialEq)]
 pub enum TextAreaEvent {
     /// The text area gained focus.
     #[event_key(focus)]
@@ -27,17 +27,17 @@ pub enum TextAreaEvent {
     UserModify(String),
 }
 
-pub fn text_area_terminal<T, U>() -> pipe::UnboundTerminal<T, U, base::WindowEvent>
+pub fn text_area_handler<T, U>() -> vg::UnboundQueueHandler<T, U, base::WindowEvent>
 where
     T: LogicalTextArea + ui::InteractiveWidget,
     U: base::UpdateAuxiliary + 'static,
 {
-    unbound_terminal! {
+    vg::unbound_queue_handler! {
         T as obj,
         U as _aux,
         base::WindowEvent as event,
 
-        text_input {
+        text_input => {
             if let Some(&c) = event.with(|_| obj.interaction().contains(state::InteractionState::FOCUSED)) {
                 if c.is_ascii_graphic() || c.is_ascii_whitespace() {
                     obj.push_char(c);
@@ -45,7 +45,7 @@ where
             }
         }
 
-        key_press {
+        key_press => {
             if let Some((key, _)) = event.with(|_| obj.interaction().contains(state::InteractionState::FOCUSED)) {
                 match key {
                     base::KeyInput::Back => {
@@ -76,7 +76,14 @@ pub trait LogicalTextArea {
 }
 
 #[derive(
-    WidgetChildren, LayableWidget, DropNotifier, HasVisibility, Repaintable, Movable, Resizable,
+    WidgetChildren,
+    LayableWidget,
+    DropNotifier,
+    HasVisibility,
+    Repaintable,
+    Movable,
+    Resizable,
+    OperatesVerbGraph,
 )]
 #[widget_children_trait(base::WidgetChildren)]
 #[thunderclap_crate(crate)]
@@ -89,7 +96,7 @@ where
     pub event_queue: RcEventQueue<TextAreaEvent>,
     pub data: base::Observed<TextArea>,
 
-    pipe: Option<pipe::Pipeline<Self, U>>,
+    graph: vg::OptionVerbGraph<Self, U>,
     painter: Box<dyn draw::Painter<state::TextAreaState>>,
     interaction: state::InteractionState,
     parent_position: AbsolutePoint,
@@ -232,16 +239,20 @@ impl TextArea {
     {
         let data = base::Observed::new(self);
 
-        let mut pipe = pipeline! {
+        let mut graph = vg::verbgraph! {
             TextAreaWidget<U, G> as obj,
             U as _aux,
-            _ev in &data.on_change => { change { obj.repaint(); } }
+            "bind" => _ev in &data.on_change => { change => { obj.repaint(); } }
         };
 
-        pipe = pipe.add(
-            ui::basic_interaction_terminal::<TextAreaWidget<U, G>, U>().bind(u_aux.window_queue()),
+        graph = graph.add(
+            "interaction",
+            ui::basic_interaction_handler::<TextAreaWidget<U, G>, U>().bind(u_aux.window_queue()),
         );
-        pipe = pipe.add(text_area_terminal::<TextAreaWidget<U, G>, U>().bind(u_aux.window_queue()));
+        graph = graph.add(
+            "text_area",
+            text_area_handler::<TextAreaWidget<U, G>, U>().bind(u_aux.window_queue()),
+        );
 
         let painter = theme.text_area();
         let rect = RelativeRect::new(
@@ -259,7 +270,7 @@ impl TextArea {
             event_queue: Default::default(),
             data,
 
-            pipe: pipe.into(),
+            graph: graph.into(),
             painter: theme.text_area(),
             interaction: state::InteractionState::empty(),
             parent_position: Default::default(),
@@ -294,6 +305,16 @@ where
     }
 }
 
+impl<U, G> vg::HasVerbGraph for TextAreaWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
+        &mut self.graph
+    }
+}
+
 impl<U, G> Widget for TextAreaWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
@@ -308,9 +329,9 @@ where
     }
 
     fn update(&mut self, aux: &mut U) {
-        let mut pipe = self.pipe.take().unwrap();
-        pipe.update(self, aux);
-        self.pipe = Some(pipe);
+        let mut graph = self.graph.take().unwrap();
+        graph.update_all(self, aux);
+        self.graph = Some(graph);
 
         if let Some(rect) = self.layout.receive() {
             self.set_ctxt_rect(rect);
@@ -321,7 +342,13 @@ where
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
         let state = self.derive_state();
         let painter = &mut self.painter;
-        self.command_group.push_with(display, || painter.draw(state), None, None);
+        self.command_group.push_with(
+            display,
+            || painter.draw(state),
+            Default::default(),
+            None,
+            None,
+        );
     }
 }
 

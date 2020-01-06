@@ -4,7 +4,7 @@ use {
         draw,
         geom::*,
     },
-    reclutch::{display::DisplayCommand, event::RcEventQueue, prelude::*},
+    reclutch::{display::DisplayCommand, event::RcEventQueue, prelude::*, verbgraph as vg},
     std::marker::PhantomData,
 };
 
@@ -18,7 +18,7 @@ lazy_widget! {
 /// Container which dynamically stores widgets.
 /// If you don't need access to children past their creation then you can bundle them up in this.
 /// Those children will still be rendered and receive updates.
-#[derive(Movable, Resizable)]
+#[derive(Movable, Resizable, OperatesVerbGraph)]
 #[thunderclap_crate(crate)]
 pub struct ContainerWidget<U, G>
 where
@@ -43,6 +43,7 @@ where
     #[widget_rect]
     rect: RelativeRect,
 
+    graph: vg::OptionVerbGraph<Self, U>,
     phantom_u: PhantomData<U>,
     phantom_g: PhantomData<G>,
 }
@@ -70,6 +71,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> ContainerWidget<U, G
 
             rect: Default::default(),
 
+            graph: None,
             phantom_u: Default::default(),
             phantom_g: Default::default(),
         }
@@ -82,6 +84,16 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> ContainerWidget<U, G
             + 'static,
     ) {
         self.children.push(Box::new(child));
+    }
+}
+
+impl<U, G> vg::HasVerbGraph for ContainerWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
+        &mut self.graph
     }
 }
 

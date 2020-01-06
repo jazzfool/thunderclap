@@ -11,6 +11,8 @@ repository = "https://github.com/jazzfool/thunderclap"
 [features]
 app = ["glutin", "reclutch/skia"]
 default-themes = []
+core-widgets = []
+extra-widgets = ["core-widgets"]
 
 [dependencies]
 reclutch = { git = "https://github.com/jazzfool/reclutch" }
@@ -21,8 +23,9 @@ indexmap = "1.3"
 thiserror = "1.0"
 paste = "0.1"
 lazy_static = "1.4"
+ambassador = "0.2"
 
-glutin = { version = "0.22.0-alpha5", optional = true }
+glutin = { version = "0.22.0-alpha6", optional = true }
 
 [[example]]
 name = "counter"

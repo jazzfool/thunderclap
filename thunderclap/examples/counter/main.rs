@@ -2,7 +2,7 @@ use thunderclap::{
     app, base,
     reclutch::display::Color,
     themes::Primer,
-    ui::{self, Button, HStack, Label, VStack},
+    ui::{self, Button, HStack, Label, Margins, SideMargins, VStack},
 };
 
 #[macro_use]
@@ -16,31 +16,29 @@ rooftop! {
             count: i32 = 0,
             btn_color: Color = theme.data().scheme.control_outset,
         ) {
-           VStack(top_margin=5.0) {
-                Label(
-                    text=bind(format!("Count: {}", bind.count).into()),
-                    wrap=false,
-                ),
-                HStack(left_margin=5.0) {
-                    Button(
-                        text=ui::txt("Count Up"),
-                        background=bind(bind.btn_color)
-                    )
-                        @press {
-                            widget.data.count += 1;
-                        },
-                    Button(
-                        text=ui::txt("Count Down"),
-                        background=bind(bind.btn_color)
-                    )
-                        @press {
-                            widget.data.count -= 1;
-                        },
-                },
-                Label(
-                    text=bind(format!("Count: {}", bind.count).into()),
-                    wrap=false,
-                ),
+            Margins(margins=SideMargins::new_all_same(10.0)) {
+                VStack(bottom_margin=5.0) {
+                    Label(
+                        text=bind(format!("Count: {}", bind.count).into()),
+                        wrap=false,
+                    ),
+                    HStack(left_margin=5.0) {
+                        Button(
+                            text=ui::txt("Count Up"),
+                            background=bind(bind.btn_color)
+                        )
+                            @press {
+                                widget.data.count += 1;
+                            },
+                        Button(
+                            text=ui::txt("Count Down"),
+                            background=bind(bind.btn_color)
+                        )
+                            @press {
+                                widget.data.count -= 1;
+                            },
+                    },
+                }
             }
         }
     }

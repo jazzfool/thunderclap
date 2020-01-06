@@ -9,8 +9,7 @@ pub extern crate reclutch;
 extern crate thunderclap_macros;
 
 pub use thunderclap_macros::{
-    rooftop, DropNotifier, HasVisibility, LayableWidget, Movable, PipelineEvent, Repaintable,
-    Resizable,
+    rooftop, DropNotifier, HasVisibility, LayableWidget, Movable, Repaintable, Resizable,
 };
 
 pub use paste;
@@ -19,8 +18,6 @@ pub use paste;
 pub mod base;
 pub mod draw;
 pub mod error;
-#[macro_use]
-pub mod pipe;
 pub mod geom;
 pub mod ui;
 

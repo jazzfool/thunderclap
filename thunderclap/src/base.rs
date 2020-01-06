@@ -4,6 +4,7 @@ use {
         display::{Color, CommandGroup, DisplayClip, DisplayCommand, GraphicsDisplay, Rect, Size},
         event::RcEventQueue,
         prelude::*,
+        verbgraph,
         widget::Widget,
     },
     std::{
@@ -224,7 +225,12 @@ macro_rules! lazy_propagate {
 /// struct MyWidget;
 /// ```
 pub trait WidgetChildren:
-    Widget + draw::HasTheme + Repaintable + HasVisibility + ContextuallyMovable
+    Widget
+    + draw::HasTheme
+    + Repaintable
+    + HasVisibility
+    + ContextuallyMovable
+    + verbgraph::OperatesVerbGraph
 {
     /// Returns a list of all the children as a vector of immutable `dyn WidgetChildren`.
     fn children(
@@ -411,8 +417,7 @@ impl<T> Clone for ConsumableEvent<T> {
 }
 
 /// An event related to the window, e.g. input.
-#[derive(PipelineEvent, Debug, Clone, PartialEq)]
-#[thunderclap_crate(crate)]
+#[derive(Event, Debug, Clone, PartialEq)]
 pub enum WindowEvent {
     /// The user pressed a mouse button.
     #[event_key(mouse_press)]
@@ -682,15 +687,14 @@ pub trait Layout: WidgetChildren + Rectangular + Sized {
     type PushData;
 
     /// "Registers" a widget to the layout.
-    fn push(&mut self, data: Self::PushData, child: &mut impl LayableWidget);
+    fn push(&mut self, data: Option<Self::PushData>, child: &mut impl LayableWidget);
 
     /// De-registers a widget from the layout, optionally restoring the original widget rectangle.
     fn remove(&mut self, child: &mut impl LayableWidget, restore_original: bool);
 }
 
 /// Empty event indicating `Observed` data has changed.
-#[derive(PipelineEvent, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[thunderclap_crate(crate)]
+#[derive(Event, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[event_key(drop)]
 pub struct DropEvent;
 
@@ -700,8 +704,7 @@ pub trait DropNotifier: Widget {
 }
 
 /// Empty event indicating `Observed` data has changed.
-#[derive(PipelineEvent, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[thunderclap_crate(crate)]
+#[derive(Event, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[event_key(change)]
 pub struct ObservedEvent;
 
@@ -816,13 +819,20 @@ fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
                 }),
                 DisplayCommand::Save,
             ],
+            Default::default(),
             false,
             None,
         );
 
         widget.draw(display, aux);
 
-        restore.push(display, &[DisplayCommand::Restore, DisplayCommand::Restore], false, None);
+        restore.push(
+            display,
+            &[DisplayCommand::Restore, DisplayCommand::Restore],
+            Default::default(),
+            false,
+            None,
+        );
 
         if let Some(ref mut checked) = *checked {
             checked.insert(id);
