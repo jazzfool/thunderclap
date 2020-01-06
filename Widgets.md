@@ -125,3 +125,23 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **`Layable....`** ❌
 - **Outgoing Event Queues:**
     - *None*
+
+### Margins - `reui::ui::Margins`
+
+*Adds margins around the boundaries of it's children as a whole.*
+
+- **`Themed.....`** ❌
+- **`Focusable..`** ❌
+- **`Layable....`** ✔️
+- **Outgoing Event Queues:**
+    - *None*
+
+### Max Fill - `reui::ui::MaxFill`
+
+*Computes the rectangle fitting all it's children, then resizes all it's children to said rectangle.*
+
+- **`Themed.....`** ❌
+- **`Focusable..`** ❌
+- **`Layable....`** ✔️
+- **Outgoing Event Queues:**
+    - *None*

@@ -2,7 +2,7 @@ use thunderclap::{
     app, base,
     reclutch::display::Color,
     themes::Primer,
-    ui::{self, Button, HStack, Label, Margins, SideMargins, VStack},
+    ui::{self, Button, HStack, Label, Margins, SideMargins, TextArea, VStack},
 };
 
 #[macro_use]
@@ -38,7 +38,10 @@ rooftop! {
                                 widget.data.count -= 1;
                             },
                     },
-                }
+                    TextArea(
+                        placeholder="placeholder text!".into(),
+                    ),
+                },
             }
         }
     }

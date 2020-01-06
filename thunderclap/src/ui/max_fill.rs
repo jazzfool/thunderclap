@@ -1,5 +1,4 @@
 use {
-    super::Align,
     crate::{
         base::{self, Resizable},
         draw,
@@ -8,7 +7,7 @@ use {
     },
     indexmap::IndexMap,
     reclutch::{
-        display::{self, DisplayCommand, Rect, Size},
+        display::{DisplayCommand, Rect},
         event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
         prelude::*,
         verbgraph as vg,
@@ -16,37 +15,7 @@ use {
     std::marker::PhantomData,
 };
 
-/// Information about how a `VStack` child should be layed out.
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub struct VStackItem {
-    /// The margin given between the above widget (or top of container) and the top of the child.
-    pub top_margin: f32,
-    /// The margin given between the below widget and bottom side of the child.
-    pub bottom_margin: f32,
-    /// How the child should be horizontally aligned within the `VStack`.
-    pub alignment: Align,
-}
-
-impl VStackItem {
-    /// Sets the `top_margin` value.
-    pub fn top_margin(self, top_margin: f32) -> VStackItem {
-        VStackItem { top_margin, ..self }
-    }
-
-    /// Sets the `bottom_margin` value.
-    pub fn bottom_margin(self, bottom_margin: f32) -> VStackItem {
-        VStackItem { bottom_margin, ..self }
-    }
-
-    /// Sets the `align` value.
-    pub fn align(self, alignment: Align) -> VStackItem {
-        VStackItem { alignment, ..self }
-    }
-}
-
-#[derive(Debug)]
 struct ChildData {
-    data: VStackItem,
     evq: BidirSingleEventQueue<AbsoluteRect, AbsoluteRect>,
     drop_listener: RcEventListener<base::DropEvent>,
     rect: AbsoluteRect,
@@ -55,23 +24,23 @@ struct ChildData {
 }
 
 lazy_widget! {
-    generic VStackWidget,
+    generic MaxFillWidget,
     visibility: visibility,
     theme: themed,
     drop_event: drop_event
 }
 
-/// Abstract layout widget which arranges children in a vertical list, possibly with top/bottom margins and horizontal alignment (see `VStackData`).
+/// Abstract layout widget which finds resizes itself to fit all it's children, then changes all it's children's rectangles to it's own.
 #[derive(WidgetChildren, LayableWidget, Movable, Resizable, OperatesVerbGraph)]
 #[widget_children_trait(base::WidgetChildren)]
 #[thunderclap_crate(crate)]
 #[widget_transform_callback(on_transform)]
-pub struct VStackWidget<U, G>
+pub struct MaxFillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    pub data: base::Observed<VStack>,
+    pub data: base::Observed<MaxFill>,
 
     rects: IndexMap<u64, ChildData>,
     next_rect_id: u64,
@@ -92,23 +61,19 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct VStack {
-    pub top_margin: f32,
-    pub bottom_margin: f32,
-    pub alignment: Align,
-}
+pub struct MaxFill {}
 
-impl<U, G> ui::WidgetDataTarget<U, G> for VStack
+impl<U, G> ui::WidgetDataTarget<U, G> for MaxFill
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    type Target = VStackWidget<U, G>;
+    type Target = MaxFillWidget<U, G>;
 }
 
-impl VStack {
+impl MaxFill {
     pub fn from_theme(_theme: &dyn draw::Theme) -> Self {
-        VStack { top_margin: 0.0, bottom_margin: 0.0, alignment: Align::Begin }
+        MaxFill {}
     }
 
     pub fn construct<U, G>(
@@ -116,14 +81,14 @@ impl VStack {
         _theme: &dyn draw::Theme,
         _u_aux: &mut U,
         _g_aux: &mut G,
-    ) -> VStackWidget<U, G>
+    ) -> MaxFillWidget<U, G>
     where
         U: base::UpdateAuxiliary,
         G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
 
-        VStackWidget {
+        MaxFillWidget {
             data,
 
             rects: IndexMap::new(),
@@ -144,22 +109,18 @@ impl VStack {
     }
 }
 
-impl<U, G> VStackWidget<U, G>
+impl<U, G> MaxFillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
     fn resize_to_fit(&mut self) {
-        let mut max_size = Size::zero();
+        let mut max_rect = AbsoluteRect::default();
         for (_, child) in &self.rects {
-            let size: Size = child.rect.size.cast_unit();
-            max_size.height += size.height + child.data.top_margin + child.data.bottom_margin;
-            if size.width > max_size.width {
-                max_size.width = size.width;
-            }
+            max_rect = max_rect.union(&child.rect);
         }
 
-        self.set_size(max_size);
+        self.set_size(max_rect.size.cast_unit());
     }
 
     fn on_transform(&mut self) {
@@ -168,7 +129,7 @@ where
     }
 }
 
-impl<U, G> vg::HasVerbGraph for VStackWidget<U, G>
+impl<U, G> vg::HasVerbGraph for MaxFillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
@@ -178,14 +139,14 @@ where
     }
 }
 
-impl<U, G> base::Layout for VStackWidget<U, G>
+impl<U, G> base::Layout for MaxFillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    type PushData = VStackItem;
+    type PushData = ();
 
-    fn push(&mut self, data: Option<VStackItem>, child: &mut impl base::LayableWidget) {
+    fn push(&mut self, _data: Option<()>, child: &mut impl base::LayableWidget) {
         self.dirty = true;
 
         let id = self.next_rect_id;
@@ -200,11 +161,6 @@ where
         self.rects.insert(
             id,
             ChildData {
-                data: data.unwrap_or(VStackItem {
-                    top_margin: self.data.top_margin,
-                    bottom_margin: self.data.bottom_margin,
-                    alignment: self.data.alignment,
-                }),
                 evq,
                 drop_listener: child.drop_event().listen(),
                 rect,
@@ -226,7 +182,7 @@ where
     }
 }
 
-impl<U, G> Widget for VStackWidget<U, G>
+impl<U, G> Widget for MaxFillWidget<U, G>
 where
     U: base::UpdateAuxiliary + 'static,
     G: base::GraphicalAuxiliary + 'static,
@@ -255,9 +211,8 @@ where
                     continue;
                 }
 
-                if let Some(new_ev) = data.evq.retrieve_newest() {
+                if let Some(_) = data.evq.retrieve_newest() {
                     *dirty = true;
-                    data.rect = new_ev;
                 }
             }
             for removal in removals {
@@ -268,28 +223,9 @@ where
         if self.dirty {
             self.resize_to_fit();
             let abs_rect = self.abs_rect();
-            let mut advance = abs_rect.origin.y;
             for (_, data) in &mut self.rects {
-                advance += data.data.top_margin;
-
-                let mut rect = data.rect;
-                rect.origin.y = advance;
-                rect.origin.x = match data.data.alignment {
-                    Align::Begin => abs_rect.origin.x,
-                    Align::Middle => {
-                        display::center_horizontally(rect.cast_unit(), abs_rect.cast_unit()).x
-                    }
-                    Align::End => abs_rect.origin.x + abs_rect.size.width - rect.size.width,
-                    Align::Stretch => {
-                        rect.size.width = abs_rect.size.width;
-                        abs_rect.origin.x
-                    }
-                };
-
-                data.evq.emit_owned(rect);
-                data.rect = rect;
-
-                advance += rect.size.height + data.data.bottom_margin;
+                data.evq.emit_owned(abs_rect);
+                data.rect = abs_rect;
             }
 
             self.dirty = false;
@@ -297,18 +233,18 @@ where
     }
 }
 
-impl<U, G> ui::DefaultWidgetData<VStack> for VStackWidget<U, G>
+impl<U, G> ui::DefaultWidgetData<MaxFill> for MaxFillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
     #[inline]
-    fn default_data(&mut self) -> &mut base::Observed<VStack> {
+    fn default_data(&mut self) -> &mut base::Observed<MaxFill> {
         &mut self.data
     }
 }
 
-impl<U, G> StoresParentPosition for VStackWidget<U, G>
+impl<U, G> StoresParentPosition for MaxFillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,

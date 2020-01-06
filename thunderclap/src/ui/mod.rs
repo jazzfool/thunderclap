@@ -6,11 +6,13 @@ pub mod container;
 pub mod hstack;
 pub mod label;
 pub mod margins;
+pub mod max_fill;
 pub mod text_area;
 pub mod vstack;
 
 pub use {
-    button::*, checkbox::*, container::*, hstack::*, label::*, margins::*, text_area::*, vstack::*,
+    button::*, checkbox::*, container::*, hstack::*, label::*, margins::*, max_fill::*,
+    text_area::*, vstack::*,
 };
 
 use {

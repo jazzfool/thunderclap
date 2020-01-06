@@ -94,6 +94,8 @@ fn main() {
 - Checkbox
 - Horizontal Stack
 - Text area
+- Margins
+- Max Fill
 
 ## License
 
