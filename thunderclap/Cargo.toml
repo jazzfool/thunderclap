@@ -9,6 +9,7 @@ homepage = "https://github.com/jazzfool/thunderclap"
 repository = "https://github.com/jazzfool/thunderclap"
 
 [features]
+default = ["core-widgets", "default-themes"]
 app = ["glutin", "reclutch/skia"]
 default-themes = []
 core-widgets = []
@@ -29,4 +30,4 @@ glutin = { version = "0.22.0-alpha6", optional = true }
 
 [[example]]
 name = "counter"
-required-features = ["app", "default-themes"]
+required-features = ["app", "default-themes", "core-widgets"]

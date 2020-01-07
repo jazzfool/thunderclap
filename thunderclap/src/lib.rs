@@ -19,6 +19,7 @@ pub mod base;
 pub mod draw;
 pub mod error;
 pub mod geom;
+#[cfg(feature = "core-widgets")]
 pub mod ui;
 
 #[cfg(feature = "app")]
