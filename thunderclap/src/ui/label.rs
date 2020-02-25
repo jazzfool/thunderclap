@@ -161,56 +161,52 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
     }
 
     fn update_text_items(&mut self) {
-        let (text_items, bounds) = {
-            let font = self.data.typeface.typeface.pick(self.data.typeface.style);
+        let font = self.data.typeface.typeface.pick(self.data.typeface.style);
 
-            let mut text = TextDisplayItem {
-                text: self.data.text.clone(),
-                font: font.0,
-                font_info: font.1.clone(),
-                size: self.data.typeface.size,
-                bottom_left: Default::default(),
-                color: self.data.color.into(),
-            };
-
-            text.set_top_left(self.abs_rect().origin.cast_unit());
-
-            let metrics = font.1.font.metrics();
-            let mut text_items = if self.data.wrap {
-                text.linebreak(
-                    self.abs_rect().cast_unit(),
-                    (metrics.ascent + metrics.line_gap) / metrics.units_per_em as f32
-                        * self.data.typeface.size,
-                    true,
-                )
-                .unwrap()
-            } else {
-                vec![text]
-            };
-
-            let mut total_bounds: Option<AbsoluteRect> = None;
-            for text_item in &mut text_items {
-                let bounds = text_item.bounds().unwrap().cast_unit();
-                if let Some(ref mut total_bounds) = total_bounds {
-                    *total_bounds = total_bounds.union(&bounds);
-                } else {
-                    total_bounds = Some(bounds);
-                }
-                let left = match self.data.align {
-                    TextAlign::Left => text_item.bottom_left.x,
-                    TextAlign::Middle => {
-                        center_horizontally(bounds.cast_unit(), self.abs_rect().cast_unit()).x
-                    }
-                    TextAlign::Right => self.abs_rect().max_x() - bounds.size.width,
-                };
-                text_item.bottom_left.x = left;
-            }
-
-            (text_items, total_bounds.unwrap_or_default())
+        let mut text = TextDisplayItem {
+            text: self.data.text.clone(),
+            font: font.0,
+            font_info: font.1.clone(),
+            size: self.data.typeface.size,
+            bottom_left: Default::default(),
+            color: self.data.color.into(),
         };
 
+        text.set_top_left(self.abs_rect().origin.cast_unit());
+
+        let metrics = font.1.font.metrics();
+        let mut text_items = if self.data.wrap {
+            text.linebreak(
+                self.abs_rect().cast_unit(),
+                (metrics.ascent + metrics.line_gap) / metrics.units_per_em as f32
+                    * self.data.typeface.size,
+                true,
+            )
+            .unwrap()
+        } else {
+            vec![text]
+        };
+
+        let mut total_bounds: Option<AbsoluteRect> = None;
+        for text_item in &mut text_items {
+            let bounds = text_item.bounds().unwrap().cast_unit();
+            if let Some(ref mut total_bounds) = total_bounds {
+                *total_bounds = total_bounds.union(&bounds);
+            } else {
+                total_bounds = Some(bounds);
+            }
+            let left = match self.data.align {
+                TextAlign::Left => text_item.bottom_left.x,
+                TextAlign::Middle => {
+                    center_horizontally(bounds.cast_unit(), self.abs_rect().cast_unit()).x
+                }
+                TextAlign::Right => self.abs_rect().max_x() - bounds.size.width,
+            };
+            text_item.bottom_left.x = left;
+        }
+
         self.text_items = text_items;
-        self.set_ctxt_rect(bounds);
+        self.set_ctxt_rect(total_bounds.unwrap_or_default());
     }
 }
 

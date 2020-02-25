@@ -356,6 +356,24 @@ pub trait GraphicalAuxiliary: 'static {
     fn scaling(&self) -> f32;
 }
 
+/// Propagates `update` to the children of a widget.
+pub fn invoke_update<U: UpdateAuxiliary, G>(
+    widget: &mut dyn WidgetChildren<
+        UpdateAux = U,
+        GraphicalAux = G,
+        DisplayObject = DisplayCommand,
+    >,
+    aux: &mut U,
+) {
+    // Iterate in reverse because most visually forefront widgets should get events first.
+    for child in widget.children_mut().into_iter().rev() {
+        match child.visibility() {
+            Visibility::Static | Visibility::None => {}
+            _ => child.update(aux),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 struct ConsumableEventInner<T> {
     marker: RefCell<bool>,
@@ -763,23 +781,6 @@ macro_rules! observe {
     ($($x:ident),*) => {
         $(let $x = $crate::base::Observed::new($x);)*
     };
-}
-
-/// Propagates `update` to the children of a widget.
-pub fn invoke_update<U: UpdateAuxiliary, G>(
-    widget: &mut dyn WidgetChildren<
-        UpdateAux = U,
-        GraphicalAux = G,
-        DisplayObject = DisplayCommand,
-    >,
-    aux: &mut U,
-) {
-    // Iterate in reverse because most visually forefront widgets should get events first.
-    for child in widget.children_mut().into_iter().rev() {
-        if child.visibility() != Visibility::Static && child.visibility() != Visibility::None {
-            child.update(aux);
-        }
-    }
 }
 
 lazy_static::lazy_static! {

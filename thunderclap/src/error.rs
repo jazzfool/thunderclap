@@ -1,4 +1,4 @@
-#[cfg(feature = "app")]
+#[allow(unused_imports)]
 use {reclutch::error, thiserror::Error};
 
 #[cfg(feature = "app")]
