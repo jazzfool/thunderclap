@@ -177,7 +177,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
         let metrics = font.1.font.metrics();
         let mut text_items = if self.data.wrap {
             text.linebreak(
-                self.abs_rect().cast_unit(),
+                self.abs_rect().width,
                 (metrics.ascent + metrics.line_gap) / metrics.units_per_em as f32
                     * self.data.typeface.size,
                 true,
