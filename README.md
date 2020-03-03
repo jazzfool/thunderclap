@@ -90,6 +90,13 @@ fn main() {
 - Margins
 - Max Fill
 
+## Project State
+
+I'm currently very busy with my studies and don't have much free time to work on this.
+I've made a lot of careless core design decisions in the API that I'm in the process of fixing, but it's difficult given that I've already written a lot of high-level widget code.
+On an optimistic note, looking past some of the admittedly ugly macro/`base` code, the front-facing API is, in my opinion, one of the more intuitive ones compared to other Rust GUI libraries.
+Once I fix the issues in the foundational code (which I'm approaching the end of refactoring), I can start working on the high-level widget library again. I don't plan on this project dying.
+
 ## License
 
 Thunderclap is licensed under either
