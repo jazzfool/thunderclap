@@ -1,4 +1,4 @@
-#[cfg(any(feature = "app", feature = "default-themes"))]
+#[allow(unused_imports)]
 use {reclutch::error, thiserror::Error};
 
 #[cfg(feature = "app")]
