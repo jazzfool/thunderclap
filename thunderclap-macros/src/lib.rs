@@ -1,8 +1,9 @@
 extern crate proc_macro;
 
 mod rooftop;
+mod widget;
 
-use {proc_macro::TokenStream, quote::quote, rooftop::RooftopData};
+use {proc_macro::TokenStream, quote::quote, rooftop::RooftopData, widget::WidgetImpls};
 
 fn find_crate_name(attrs: &[syn::Attribute]) -> Option<syn::Ident> {
     for attr in attrs {
@@ -38,7 +39,7 @@ fn impl_layable_widget_macro(ast: syn::DeriveInput) -> TokenStream {
     match &ast.data {
         syn::Data::Struct(ref data) => {
             let crate_name = find_crate_name(&ast.attrs)
-                .unwrap_or(syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
+                .unwrap_or_else(|| syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
             let mut layout_ident = None;
             let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
             let name = &ast.ident;
@@ -114,7 +115,7 @@ fn impl_drop_notifier_macro(ast: syn::DeriveInput) -> TokenStream {
     match &ast.data {
         syn::Data::Struct(ref data) => {
             let crate_name = find_crate_name(&ast.attrs)
-                .unwrap_or(syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
+                .unwrap_or_else(|| syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
             let mut drop_event_ident = None;
             let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
             let name = &ast.ident;
@@ -187,7 +188,7 @@ fn impl_has_visibility_macro(ast: syn::DeriveInput) -> TokenStream {
     match &ast.data {
         syn::Data::Struct(ref data) => {
             let crate_name = find_crate_name(&ast.attrs)
-                .unwrap_or(syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
+                .unwrap_or_else(|| syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
             let mut vis_ident = None;
             let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
             let name = &ast.ident;
@@ -265,7 +266,7 @@ fn impl_repaintable_macro(ast: syn::DeriveInput) -> TokenStream {
     match &ast.data {
         syn::Data::Struct(ref data) => {
             let crate_name = find_crate_name(&ast.attrs)
-                .unwrap_or(syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
+                .unwrap_or_else(|| syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
             let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
             let name = &ast.ident;
 
@@ -339,7 +340,7 @@ fn impl_movable_macro(ast: syn::DeriveInput) -> TokenStream {
     match &ast.data {
         syn::Data::Struct(ref data) => {
             let crate_name = find_crate_name(&ast.attrs)
-                .unwrap_or(syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
+                .unwrap_or_else(|| syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
             let mut assignment = None;
             let mut return_val = None;
             let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
@@ -480,7 +481,7 @@ fn impl_resizable_macro(ast: syn::DeriveInput) -> TokenStream {
     match &ast.data {
         syn::Data::Struct(ref data) => {
             let crate_name = find_crate_name(&ast.attrs)
-                .unwrap_or(syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
+                .unwrap_or_else(|| syn::Ident::new("thunderclap", proc_macro2::Span::call_site()));
             let mut assignment = None;
             let mut return_val = None;
             let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
@@ -578,4 +579,88 @@ fn chk_attrs_is_size(attrs: &[syn::Attribute]) -> bool {
 pub fn rooftop(stream: TokenStream) -> TokenStream {
     let data = syn::parse_macro_input!(stream as RooftopData);
     data.compile()
+}
+
+/// Declares and implements a widget skeleton.
+/// 90% of the plain widget code is boilerplate and cumbersome to write, therefore violating the DRY rule.
+/// As such, this macro was created.
+///
+/// # Example
+///
+/// ## Declaring and implementing
+/// ```ignore
+/// widget! {
+///     impl MyWidget {
+///         // Every line in this block is optional
+///
+///         WidgetChildren, // Derive thunderclap::base::WidgetChildren
+///         LayableWidget, // Derive thunderclap::base::LayableWidget, widget layouts field
+///         DropNotifier, // Derive thunderclap::base::DropNotifier, implement Drop, drop event queue
+///         HasVisibility, // Derive thunderclap::base::HasVisibility, visibility field
+///         Repaintable, // Derive thunderclap::base::Repaintable
+///         Rectangular, // Derive thunderclap::base::{Resizable, Movable}, widget rectangle field
+///         OperatesVerbGraph, // Derive reclutch::verbgraph::OperatesVerbGraph, OptionVerbGraph field
+///         StoresParentPosition, // Implement thunderclap::geom::StoresParentPosition, parent position field
+///
+///         EventQueue<MyEvent>, // Implement thunderclap::ui::DefaultEventQueue, event queue
+///         State<MyWidgetState>, // Implement thunderclap::ui::DefaultWidgetData, observed state field
+///         Painter<StylishPainter>, // Implement thunderclap::draw::HasTheme, painter field
+///
+///         [ // Miscellaneous fields, supporting visibility and attributes.
+///             #[some_attribute]
+///             pub public_name: String,
+///             private_name: String,
+///         ],
+///     }
+/// }
+/// ```
+///
+/// ## Creating
+/// ```ignore
+/// let my_widget = widget! {
+///     // NOTE: Only works in the same module where `MyWidget` was declared.
+///     Default MyWidget {
+///         // Every line in this block is optional.
+///
+///         LayableWidget,
+///         DropNotifier,
+///         HasVisibility,
+///         Rectangular = Rect::default(),
+///         OperatesVerbGraph = VerbGraph::default(),
+///         StoresParentPosition,
+///
+///         EventQueue,
+///         State = Observed::new(MyWidgetState { something: 2, }),
+///         Painter = theme.stylish_painter(),
+///
+///         [
+///             public_name = "Michael Scott".into(),
+///             private_name = "Michael Scarn".into(),
+///         ],
+///     }
+/// };
+/// ```
+///
+/// ## Max
+/// It's common for widgets to be functionally exhaustive (i.e. implementing all the widgets traits).
+/// Therefore, you can replace the first example with simply
+/// ```ignore
+/// widget! {
+///     impl MyWidget::MAX {
+///         EventQueue<MyEvent>,
+///         State<MyWidgetState>,
+///         Painter<StylishPainter>,
+///
+///         [
+///             #[some_attribute]
+///             pub public_name: String,
+///             private_name: String,
+///         ],
+///     }
+/// }
+/// ```
+#[proc_macro]
+pub fn widget(stream: TokenStream) -> TokenStream {
+    let data = syn::parse_macro_input!(stream as WidgetImpls);
+    data.compile().into()
 }

@@ -1,17 +1,15 @@
 use {
     crate::{
-        base::{self, Repaintable, Resizable},
+        base::{self, Repaintable},
         draw::{self, state},
         geom::*,
         ui,
     },
     reclutch::{
-        display::{Color, CommandGroup, DisplayCommand, GraphicsDisplay, Rect},
-        event::RcEventQueue,
+        display::{Color, DisplayCommand, GraphicsDisplay, Rect},
         prelude::*,
         verbgraph as vg,
     },
-    std::marker::PhantomData,
 };
 
 /// Events emitted by a checkbox.
@@ -43,51 +41,10 @@ pub enum CheckboxEvent {
     Blur,
 }
 
-/// Checkbox widget; useful for boolean input.
-#[derive(
-    WidgetChildren,
-    LayableWidget,
-    DropNotifier,
-    HasVisibility,
-    Repaintable,
-    Movable,
-    Resizable,
-    OperatesVerbGraph,
-)]
-#[widget_children_trait(base::WidgetChildren)]
-#[thunderclap_crate(crate)]
-#[widget_transform_callback(on_transform)]
-pub struct CheckboxWidget<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    pub event_queue: RcEventQueue<CheckboxEvent>,
-    pub data: base::Observed<Checkbox>,
-
-    graph: vg::OptionVerbGraph<Self, U>,
-    painter: Box<dyn draw::Painter<state::CheckboxState>>,
-    parent_position: AbsolutePoint,
-
-    #[widget_rect]
-    rect: RelativeRect,
-    #[repaint_target]
-    command_group: CommandGroup,
-    #[widget_layout]
-    layout: base::WidgetLayoutEvents,
-    #[widget_visibility]
-    visibility: base::Visibility,
-    interaction: state::InteractionState,
-    #[widget_drop_event]
-    drop_event: RcEventQueue<base::DropEvent>,
-
-    phantom_g: PhantomData<G>,
-}
-
 impl<U, G> ui::InteractiveWidget for CheckboxWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline(always)]
     fn interaction(&mut self) -> &mut state::InteractionState {
@@ -145,8 +102,20 @@ pub struct Checkbox {
     pub disabled: bool,
 }
 
-impl Checkbox {
-    pub fn from_theme(theme: &dyn draw::Theme) -> Self {
+impl<U, G> ui::WidgetDataTarget<U, G> for Checkbox
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    type Target = CheckboxWidget<U, G>;
+}
+
+impl<U, G> ui::WidgetConstructor<U, G> for Checkbox
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn from_theme(theme: &dyn draw::Theme) -> Self {
         let data = theme.data();
         Checkbox {
             foreground: data.scheme.over_control_inset,
@@ -158,16 +127,12 @@ impl Checkbox {
         }
     }
 
-    pub fn construct<U, G>(
+    fn construct(
         self,
         theme: &dyn draw::Theme,
         u_aux: &mut U,
         _g_aux: &mut G,
-    ) -> CheckboxWidget<U, G>
-    where
-        U: base::UpdateAuxiliary + 'static,
-        G: base::GraphicalAuxiliary + 'static,
-    {
+    ) -> CheckboxWidget<U, G> {
         let data = base::Observed::new(self);
 
         let mut graph = vg::verbgraph! {
@@ -187,42 +152,31 @@ impl Checkbox {
             painter
                 .size_hint(state::CheckboxState {
                     rect: Default::default(),
-                    data: data.clone(),
+                    data: *data,
                     interaction: state::InteractionState::empty(),
                 })
                 .cast_unit(),
         );
 
-        CheckboxWidget {
-            event_queue: Default::default(),
-            data,
+        CheckboxWidgetBuilder {
+            rect,
 
             graph: graph.into(),
+
+            data,
             painter,
-            parent_position: Default::default(),
 
-            rect,
-            command_group: Default::default(),
-            layout: Default::default(),
-            visibility: Default::default(),
             interaction: state::InteractionState::empty(),
-            drop_event: Default::default(),
-
-            phantom_g: Default::default(),
         }
+        .build()
     }
 }
 
-impl<U, G> CheckboxWidget<U, G>
+impl<U, G> ui::core::CoreWidget<state::CheckboxState> for CheckboxWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
-    fn on_transform(&mut self) {
-        self.repaint();
-        self.layout.notify(self.abs_rect());
-    }
-
     fn derive_state(&self) -> state::CheckboxState {
         state::CheckboxState {
             rect: self.abs_rect(),
@@ -230,22 +184,32 @@ where
             interaction: self.interaction,
         }
     }
+
+    fn on_transform(&mut self) {
+        self.repaint();
+        self.layout.notify(self.abs_rect());
+    }
 }
 
-impl<U, G> vg::HasVerbGraph for CheckboxWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
-        &mut self.graph
+use crate as thunderclap;
+crate::widget! {
+    pub struct CheckboxWidget {
+        widget::MAX,
+
+        <CheckboxEvent> EventQueue,
+        <Checkbox> State,
+        <state::CheckboxState> Painter,
+
+        {
+            interaction: state::InteractionState,
+        },
     }
 }
 
 impl<U, G> Widget for CheckboxWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type UpdateAux = U;
     type GraphicalAux = G;
@@ -287,45 +251,5 @@ where
             None,
             None,
         );
-    }
-}
-
-impl<U, G> StoresParentPosition for CheckboxWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
-        self.parent_position = parent_pos;
-        self.on_transform();
-    }
-
-    fn parent_position(&self) -> AbsolutePoint {
-        self.parent_position
-    }
-}
-
-impl<U, G> draw::HasTheme for CheckboxWidget<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn theme(&mut self) -> &mut dyn draw::Themed {
-        &mut self.painter
-    }
-
-    fn resize_from_theme(&mut self) {
-        self.set_size(self.painter.size_hint(self.derive_state()));
-    }
-}
-
-impl<U, G> Drop for CheckboxWidget<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    fn drop(&mut self) {
-        self.drop_event.emit_owned(base::DropEvent);
     }
 }

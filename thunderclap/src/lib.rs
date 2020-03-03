@@ -1,4 +1,4 @@
-//! Reui aims to be a large widget toolkit for Reclutch.
+//! Thunderclap aims to be a large widget toolkit for Reclutch.
 //! Beyond this, it also defines a framework to create widgets from.
 
 #[macro_use]
@@ -9,7 +9,7 @@ pub extern crate reclutch;
 extern crate thunderclap_macros;
 
 pub use thunderclap_macros::{
-    rooftop, DropNotifier, HasVisibility, LayableWidget, Movable, Repaintable, Resizable,
+    rooftop, widget, DropNotifier, HasVisibility, LayableWidget, Movable, Repaintable, Resizable,
 };
 
 pub use paste;

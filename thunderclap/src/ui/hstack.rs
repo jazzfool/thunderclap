@@ -54,43 +54,6 @@ struct ChildData {
     id: u64,
 }
 
-lazy_widget! {
-    generic HStackWidget,
-    visibility: visibility,
-    theme: themed,
-    drop_event: drop_event
-}
-
-/// Abstract layout widget which arranges children in a horizontal list, possibly with left/right margins and vertical alignment (see `HStackData`).
-#[derive(WidgetChildren, LayableWidget, Movable, Resizable, OperatesVerbGraph)]
-#[widget_children_trait(base::WidgetChildren)]
-#[thunderclap_crate(crate)]
-#[widget_transform_callback(on_transform)]
-pub struct HStackWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    pub data: base::Observed<HStack>,
-
-    rects: IndexMap<u64, ChildData>,
-    next_rect_id: u64,
-    dirty: bool,
-    themed: draw::PhantomThemed,
-    drop_event: RcEventQueue<base::DropEvent>,
-    visibility: base::Visibility,
-    parent_position: AbsolutePoint,
-
-    #[widget_rect]
-    rect: RelativeRect,
-    #[widget_layout]
-    layout: base::WidgetLayoutEvents,
-
-    graph: vg::OptionVerbGraph<Self, U>,
-    phantom_u: PhantomData<U>,
-    phantom_g: PhantomData<G>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HStack {
     pub left_margin: f32,
@@ -106,12 +69,16 @@ where
     type Target = HStackWidget<U, G>;
 }
 
-impl HStack {
-    pub fn from_theme(_theme: &dyn draw::Theme) -> Self {
+impl<U, G> ui::WidgetConstructor<U, G> for HStack
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn from_theme(_theme: &dyn draw::Theme) -> Self {
         HStack { left_margin: 0.0, right_margin: 0.0, alignment: Align::Begin }
     }
 
-    pub fn construct<U, G>(
+    fn construct(
         self,
         _theme: &dyn draw::Theme,
         _u_aux: &mut U,
@@ -123,24 +90,47 @@ impl HStack {
     {
         let data = base::Observed::new(self);
 
-        HStackWidget {
+        HStackWidgetBuilder {
+            rect: Default::default(),
+            graph: None,
             data,
 
             rects: IndexMap::new(),
             next_rect_id: 0,
             dirty: true,
-            themed: Default::default(),
-            drop_event: Default::default(),
-            visibility: Default::default(),
-            parent_position: Default::default(),
-
-            rect: Default::default(),
-            layout: Default::default(),
-
-            graph: None,
-            phantom_u: Default::default(),
-            phantom_g: Default::default(),
         }
+        .build()
+    }
+}
+
+impl<U, G> ui::core::CoreWidget<()> for HStackWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn derive_state(&self) -> () {
+        ()
+    }
+
+    fn on_transform(&mut self) {
+        self.dirty = true;
+        self.layout.notify(self.abs_rect());
+    }
+}
+
+use crate as thunderclap;
+crate::widget! {
+    #[doc = "Abstract layout widget which arranges children in a horizontal list, possibly with left/right margins and vertical alignment (see `HStackData`)."]
+    pub struct HStackWidget {
+        widget::MAX,
+
+        <HStack> State,
+
+        {
+            rects: IndexMap<u64, ChildData>,
+            next_rect_id: u64,
+            dirty: bool,
+        },
     }
 }
 
@@ -160,21 +150,6 @@ where
         }
 
         self.set_size(max_size);
-    }
-
-    fn on_transform(&mut self) {
-        self.dirty = true;
-        self.layout.notify(self.abs_rect());
-    }
-}
-
-impl<U, G> vg::HasVerbGraph for HStackWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
-        &mut self.graph
     }
 }
 
@@ -299,32 +274,5 @@ where
 
             self.dirty = false;
         }
-    }
-}
-
-impl<U, G> ui::DefaultWidgetData<HStack> for HStackWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    #[inline]
-    fn default_data(&mut self) -> &mut base::Observed<HStack> {
-        &mut self.data
-    }
-}
-
-impl<U, G> StoresParentPosition for HStackWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
-        self.parent_position = parent_pos;
-        self.on_transform();
-    }
-
-    #[inline(always)]
-    fn parent_position(&self) -> AbsolutePoint {
-        self.parent_position
     }
 }

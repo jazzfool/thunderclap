@@ -114,6 +114,10 @@ impl draw::Theme for Primer {
         Box::new(TextAreaPainter)
     }
 
+    fn scroll_bar(&self) -> Box<dyn draw::Painter<state::ScrollBarState>> {
+        Box::new(ScrollBarPainter)
+    }
+
     fn data(&self) -> &draw::ThemeData {
         &self.data
     }
@@ -469,6 +473,78 @@ impl draw::Painter<state::TextAreaState> for TextAreaPainter {
         }
 
         builder.push_text(text_item, None);
+
+        builder.build()
+    }
+}
+
+struct ScrollBarPainter;
+
+impl draw::Painter<state::ScrollBarState> for ScrollBarPainter {
+    fn invoke(&self, theme: &dyn draw::Theme) -> Box<dyn draw::Painter<state::ScrollBarState>> {
+        theme.scroll_bar()
+    }
+
+    fn size_hint(&self, state: state::ScrollBarState) -> Size {
+        state.rect.size.cast_unit()
+    }
+
+    fn paint_hint(&self, rect: RelativeRect) -> RelativeRect {
+        rect
+    }
+
+    fn mouse_hint(&self, rect: RelativeRect) -> RelativeRect {
+        rect
+    }
+
+    fn draw(&mut self, mut state: state::ScrollBarState) -> Vec<DisplayCommand> {
+        state.rect = base::sharp_align(state.rect.cast_unit()).cast_unit();
+        state.scroll_bar = base::sharp_align(state.scroll_bar.cast_unit()).cast_unit();
+
+        let foreground = if state.interaction.contains(state::InteractionState::HOVERED) {
+            draw::strengthen(state.data.foreground, 0.2, state.data.contrast)
+        } else {
+            state.data.foreground
+        };
+
+        let border = draw::weaken(state.data.foreground, 0.4, state.data.contrast);
+
+        let mut builder = DisplayListBuilder::new();
+
+        // Background blur
+        builder.push_round_rectangle_backdrop(
+            state.rect.cast_unit(),
+            [3.5; 4],
+            Filter::Blur(10.0, 10.0),
+        );
+
+        // Scroll track (the background)
+        builder.push_round_rectangle(
+            state.rect.cast_unit(),
+            [3.5; 4],
+            GraphicsDisplayPaint::Fill(draw::with_opacity(state.data.background, 0.75).into()),
+            None,
+        );
+
+        // Border
+        builder.push_round_rectangle(
+            state.rect.cast_unit(),
+            [3.5; 4],
+            GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                thickness: 1.0 / 3.0,
+                color: border.into(),
+                ..Default::default()
+            }),
+            None,
+        );
+
+        // Scroll bar
+        builder.push_round_rectangle(
+            state.rect.cast_unit(),
+            [3.5; 4],
+            GraphicsDisplayPaint::Fill(foreground.into()),
+            None,
+        );
 
         builder.build()
     }

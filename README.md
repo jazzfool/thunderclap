@@ -12,6 +12,7 @@ A Rust toolkit to write decomposable and fast user interfaces. It is:
 
 Thunderclap aims to take the traditional widget hierarchy model from bulletproof libraries (e.g. Qt) and combine it with the cutting-edge simplicity of modern toolkits (e.g. Flutter).
 To accomplish this it provides three primary high-level components:
+
 - A widget library that fills the need for boilerplate UI components.
 - A theme API with a verbose typography and color scheme protocol.
 - A macro to emulate a declarative UI syntax for widget creation.
@@ -28,28 +29,21 @@ use thunderclap::{
 };
 
 rooftop! {
-    // The empty tuple can be replaced with an event so that this widget can emit events.
     struct Counter: () {
         fn build(
-            // Declare our state with a default value
             count: i32 = 0,
         ) {
-            // Display the widgets in a vertical list
             VStack() {
                 Label(
-                    // Bind the text in order to keep it up-to-date.
                     text=bind(format!("Count: {}", bind.count).into()),
-                    // We don't want to wrap the text.
                     wrap=false,
                 ),
                 Button(text="Count Up")
                     @press {
-                        // Increment the count when this button is pressed.
                         widget.data.count += 1;
                     },
                 Button(text="Count Down")
                     @press {
-                        // Then decrement when this button is pressed.
                         widget.data.count -= 1;
                     },
             }
@@ -59,8 +53,7 @@ rooftop! {
 
 fn main() {
     let app = app::create(
-        // This closure creates a theme to use
-        |_, display| Primer::new(display).unwrap(),
+        |_, display| Primer::new(display).unwrap(), // theme
         |u_aux, g_aux, theme| {
             Counter {
                 // Perhaps we want to start counting from 5 instead of 0

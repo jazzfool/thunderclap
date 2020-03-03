@@ -26,43 +26,6 @@ struct ChildData {
     id: u64,
 }
 
-lazy_widget! {
-    generic MarginsWidget,
-    visibility: visibility,
-    theme: themed,
-    drop_event: drop_event
-}
-
-/// Abstract layout widget which places margins around it's children.
-#[derive(WidgetChildren, LayableWidget, Movable, Resizable, OperatesVerbGraph)]
-#[widget_children_trait(base::WidgetChildren)]
-#[thunderclap_crate(crate)]
-#[widget_transform_callback(on_transform)]
-pub struct MarginsWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    pub data: base::Observed<Margins>,
-
-    rects: IndexMap<u64, ChildData>,
-    next_rect_id: u64,
-    dirty: bool,
-    visibility: base::Visibility,
-    themed: draw::PhantomThemed,
-    drop_event: RcEventQueue<base::DropEvent>,
-    parent_position: AbsolutePoint,
-
-    #[widget_rect]
-    rect: RelativeRect,
-    #[widget_layout]
-    layout: base::WidgetLayoutEvents,
-
-    graph: vg::OptionVerbGraph<Self, U>,
-    phantom_u: PhantomData<U>,
-    phantom_g: PhantomData<G>,
-}
-
 pub type SideMargins = SideOffsets2D<f32, AbsoluteUnit>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -78,12 +41,16 @@ where
     type Target = MarginsWidget<U, G>;
 }
 
-impl Margins {
-    pub fn from_theme(_theme: &dyn draw::Theme) -> Self {
+impl<U, G> ui::WidgetConstructor<U, G> for Margins
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn from_theme(_theme: &dyn draw::Theme) -> Self {
         Margins { margins: Default::default() }
     }
 
-    pub fn construct<U, G>(
+    fn construct(
         self,
         _theme: &dyn draw::Theme,
         _u_aux: &mut U,
@@ -95,24 +62,46 @@ impl Margins {
     {
         let data = base::Observed::new(self);
 
-        MarginsWidget {
+        MarginsWidgetBuilder {
+            rect: Default::default(),
+            graph: None,
             data,
 
             rects: IndexMap::new(),
             next_rect_id: 0,
             dirty: true,
-            visibility: Default::default(),
-            themed: Default::default(),
-            drop_event: Default::default(),
-            parent_position: Default::default(),
-
-            rect: Default::default(),
-            layout: Default::default(),
-
-            graph: None,
-            phantom_u: Default::default(),
-            phantom_g: Default::default(),
         }
+        .build()
+    }
+}
+
+impl<U, G> ui::core::CoreWidget<()> for MarginsWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn derive_state(&self) -> () {
+        ()
+    }
+
+    fn on_transform(&mut self) {
+        self.dirty = true;
+        self.layout.notify(self.abs_rect());
+    }
+}
+
+use crate as thunderclap;
+crate::widget! {
+    pub struct MarginsWidget {
+        widget::MAX,
+
+        <Margins> State,
+
+        {
+            rects: IndexMap<u64, ChildData>,
+            next_rect_id: u64,
+            dirty: bool,
+        },
     }
 }
 
@@ -134,21 +123,6 @@ where
                     self.data.margins.top + self.data.margins.bottom,
                 ),
         );
-    }
-
-    fn on_transform(&mut self) {
-        self.dirty = true;
-        self.layout.notify(self.abs_rect());
-    }
-}
-
-impl<U, G> vg::HasVerbGraph for MarginsWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
-        &mut self.graph
     }
 }
 
@@ -250,31 +224,5 @@ where
 
             self.dirty = false;
         }
-    }
-}
-
-impl<U, G> ui::DefaultWidgetData<Margins> for MarginsWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    #[inline]
-    fn default_data(&mut self) -> &mut base::Observed<Margins> {
-        &mut self.data
-    }
-}
-
-impl<U, G> StoresParentPosition for MarginsWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
-        self.parent_position = parent_pos;
-        self.on_transform();
-    }
-
-    fn parent_position(&self) -> AbsolutePoint {
-        self.parent_position
     }
 }

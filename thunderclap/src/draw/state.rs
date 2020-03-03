@@ -43,3 +43,10 @@ pub enum InputText {
     Normal(String),
     Placeholder(String),
 }
+
+pub struct ScrollBarState {
+    pub rect: AbsoluteRect,
+    pub data: ui::ScrollBar,
+    pub scroll_bar: AbsoluteRect,
+    pub interaction: InteractionState,
+}

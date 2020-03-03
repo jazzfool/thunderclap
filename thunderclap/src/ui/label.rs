@@ -7,8 +7,8 @@ use {
     },
     reclutch::{
         display::{
-            center_horizontally, Color, CommandGroup, DisplayCommand, DisplayListBuilder,
-            DisplayText, GraphicsDisplay, Rect, TextDisplayItem,
+            center_horizontally, Color, DisplayCommand, DisplayListBuilder, DisplayText,
+            GraphicsDisplay, Rect, TextDisplayItem,
         },
         event::RcEventQueue,
         prelude::*,
@@ -25,48 +25,6 @@ pub enum TextAlign {
     Right,
 }
 
-/// Label widget which displays text wrapped and clipped within a rectangle.
-#[derive(
-    WidgetChildren,
-    LayableWidget,
-    HasVisibility,
-    Repaintable,
-    Movable,
-    Resizable,
-    DropNotifier,
-    OperatesVerbGraph,
-)]
-#[widget_children_trait(base::WidgetChildren)]
-#[thunderclap_crate(crate)]
-#[widget_transform_callback(on_transform)]
-pub struct LabelWidget<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    pub data: base::Observed<Label>,
-
-    graph: vg::OptionVerbGraph<Self, U>,
-    text_items: Vec<TextDisplayItem>,
-    previous_rect: RelativeRect,
-    dirty: bool,
-    parent_position: AbsolutePoint,
-
-    #[widget_rect]
-    rect: RelativeRect,
-    #[repaint_target]
-    command_group: CommandGroup,
-    #[widget_layout]
-    layout: base::WidgetLayoutEvents,
-    #[widget_visibility]
-    visibility: base::Visibility,
-    #[widget_drop_event]
-    drop_event: RcEventQueue<base::DropEvent>,
-
-    themed: draw::PhantomThemed,
-    phantom_g: PhantomData<G>,
-}
-
 pub struct Label {
     pub text: DisplayText,
     pub typeface: draw::TypefaceStyle,
@@ -77,14 +35,18 @@ pub struct Label {
 
 impl<U, G> ui::WidgetDataTarget<U, G> for Label
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type Target = LabelWidget<U, G>;
 }
 
-impl Label {
-    pub fn from_theme(theme: &dyn draw::Theme) -> Self {
+impl<U, G> ui::WidgetConstructor<U, G> for Label
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn from_theme(theme: &dyn draw::Theme) -> Self {
         let data = theme.data();
         Label {
             text: "".to_string().into(),
@@ -95,7 +57,7 @@ impl Label {
         }
     }
 
-    pub fn construct<U, G>(
+    fn construct(
         self,
         _theme: &dyn draw::Theme,
         _u_aux: &mut U,
@@ -118,24 +80,16 @@ impl Label {
             }
         };
 
-        let mut label = LabelWidget {
+        let mut label = LabelWidgetBuilder {
+            rect: Default::default(),
+            graph: graph.into(),
             data,
 
-            graph: graph.into(),
             text_items: Vec::new(),
             previous_rect: Default::default(),
             dirty: true,
-            parent_position: Default::default(),
-
-            rect: Default::default(),
-            command_group: Default::default(),
-            layout: Default::default(),
-            visibility: Default::default(),
-            drop_event: Default::default(),
-
-            themed: Default::default(),
-            phantom_g: Default::default(),
-        };
+        }
+        .build();
 
         label.update_text_items();
         label.previous_rect = label.rect;
@@ -144,9 +98,15 @@ impl Label {
     }
 }
 
-impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
+impl<U, G> ui::core::CoreWidget<()> for LabelWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn derive_state(&self) {}
+
     fn on_transform(&mut self) {
-        if self.previous_rect.size.width != self.rect.size.width {
+        if (self.previous_rect.size.width - self.rect.size.width).abs() > std::f32::EPSILON {
             self.dirty = true;
         } else if self.previous_rect.origin != self.rect.origin {
             let diff = self.rect.origin - self.previous_rect.origin;
@@ -159,7 +119,24 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
         self.layout.notify(self.abs_rect());
         self.repaint();
     }
+}
 
+use crate as thunderclap;
+crate::widget! {
+    pub struct LabelWidget {
+        widget::MAX,
+
+        <Label> State,
+
+        {
+            text_items: Vec<TextDisplayItem>,
+            previous_rect: RelativeRect,
+            dirty: bool,
+        },
+    }
+}
+
+impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
     fn update_text_items(&mut self) {
         let (text_items, bounds) = {
             let font = self.data.typeface.typeface.pick(self.data.typeface.style);
@@ -178,7 +155,7 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
             let metrics = font.1.font.metrics();
             let mut text_items = if self.data.wrap {
                 text.linebreak(
-                    self.abs_rect().cast_unit(),
+                    self.abs_rect().size.width,
                     (metrics.ascent + metrics.line_gap) / metrics.units_per_em as f32
                         * self.data.typeface.size,
                     true,
@@ -211,16 +188,6 @@ impl<U: base::UpdateAuxiliary, G: base::GraphicalAuxiliary> LabelWidget<U, G> {
 
         self.text_items = text_items;
         self.set_ctxt_rect(bounds);
-    }
-}
-
-impl<U, G> vg::HasVerbGraph for LabelWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
-        &mut self.graph
     }
 }
 
@@ -261,54 +228,5 @@ where
             builder.push_text(text_item.clone(), None);
         }
         self.command_group.push(display, &builder.build(), Default::default(), None, None);
-    }
-}
-
-impl<U, G> StoresParentPosition for LabelWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
-        self.parent_position = parent_pos;
-        self.on_transform();
-    }
-
-    fn parent_position(&self) -> AbsolutePoint {
-        self.parent_position
-    }
-}
-
-impl<U, G> draw::HasTheme for LabelWidget<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn theme(&mut self) -> &mut dyn draw::Themed {
-        &mut self.themed
-    }
-
-    fn resize_from_theme(&mut self) {}
-}
-
-impl<U, G> ui::DefaultWidgetData<Label> for LabelWidget<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    #[inline]
-    fn default_data(&mut self) -> &mut base::Observed<Label> {
-        &mut self.data
-    }
-}
-
-impl<U, G> Drop for LabelWidget<U, G>
-where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
-{
-    fn drop(&mut self) {
-        self.drop_event.emit_owned(base::DropEvent);
     }
 }

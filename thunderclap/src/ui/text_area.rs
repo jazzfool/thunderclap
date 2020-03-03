@@ -117,8 +117,8 @@ where
 
 impl<U, G> ui::InteractiveWidget for TextAreaWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline(always)]
     fn interaction(&mut self) -> &mut state::InteractionState {
@@ -152,8 +152,8 @@ where
 
 impl<U, G> LogicalTextArea for TextAreaWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline(always)]
     fn event_queue(&mut self) -> &mut RcEventQueue<TextAreaEvent> {
@@ -206,14 +206,18 @@ pub struct TextArea {
 
 impl<U, G> ui::WidgetDataTarget<U, G> for TextArea
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type Target = TextAreaWidget<U, G>;
 }
 
-impl TextArea {
-    pub fn from_theme(theme: &dyn draw::Theme) -> Self {
+impl<U, G> ui::WidgetConstructor<U, G> for TextArea
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn from_theme(theme: &dyn draw::Theme) -> Self {
         let data = theme.data();
         TextArea {
             text: "".into(),
@@ -227,7 +231,7 @@ impl TextArea {
         }
     }
 
-    pub fn construct<U, G>(
+    fn construct(
         self,
         theme: &dyn draw::Theme,
         u_aux: &mut U,
@@ -288,8 +292,8 @@ impl TextArea {
 
 impl<U, G> TextAreaWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     fn on_transform(&mut self) {
         self.repaint();
@@ -317,8 +321,8 @@ where
 
 impl<U, G> Widget for TextAreaWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type UpdateAux = U;
     type GraphicalAux = G;
@@ -369,8 +373,8 @@ where
 
 impl<U, G> draw::HasTheme for TextAreaWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     fn theme(&mut self) -> &mut dyn draw::Themed {
         &mut self.painter
@@ -381,8 +385,8 @@ where
 
 impl<U, G> ui::DefaultWidgetData<TextArea> for TextAreaWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline]
     fn default_data(&mut self) -> &mut base::Observed<TextArea> {
@@ -392,8 +396,8 @@ where
 
 impl<U, G> ui::DefaultEventQueue<TextAreaEvent> for TextAreaWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     #[inline]
     fn default_event_queue(&self) -> &RcEventQueue<TextAreaEvent> {

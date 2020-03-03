@@ -7,18 +7,25 @@ pub mod hstack;
 pub mod label;
 pub mod margins;
 pub mod max_fill;
+pub mod scroll_bar;
 pub mod text_area;
 pub mod vstack;
 
+#[macro_use]
+pub mod core;
+
 pub use {
     button::*, checkbox::*, container::*, hstack::*, label::*, margins::*, max_fill::*,
-    text_area::*, vstack::*,
+    scroll_bar::*, text_area::*, vstack::*,
 };
 
 use {
-    crate::{base, draw::state, geom::*},
+    crate::{
+        base,
+        draw::{self, state},
+        geom::*,
+    },
     reclutch::{
-        display,
         event::RcEventQueue,
         verbgraph::{unbound_queue_handler, UnboundQueueHandler},
     },
@@ -120,6 +127,15 @@ pub trait DefaultWidgetData<D> {
     fn default_data(&mut self) -> &mut base::Observed<D>;
 }
 
+pub trait WidgetConstructor<U, G>: WidgetDataTarget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn from_theme(theme: &dyn draw::Theme) -> Self;
+    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U, g_aux: &mut G) -> Self::Target;
+}
+
 /// Generates an unbound terminal which handles basic interactivity.
 /// This simply means it will appropriately modify a `state::InteractionState` and emit events
 /// when interactivity changes occur.
@@ -176,9 +192,4 @@ pub fn basic_interaction_handler<W: InteractiveWidget, U: base::UpdateAuxiliary>
             }
         }
     }
-}
-
-#[inline(always)]
-pub fn txt(s: &str) -> display::DisplayText {
-    display::DisplayText::Simple(s.into())
 }

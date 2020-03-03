@@ -2,18 +2,17 @@
 
 use {
     crate::{
-        base::{self, Repaintable, Resizable},
+        base::{self, Repaintable},
         draw::{self, state, HasTheme},
         geom::*,
         ui,
     },
     reclutch::{
-        display::{Color, CommandGroup, DisplayCommand, DisplayText, GraphicsDisplay, Rect},
-        event::RcEventQueue,
+        display::{Color, DisplayCommand, DisplayText, GraphicsDisplay, Rect},
         prelude::*,
         verbgraph as vg,
+        widget::Widget,
     },
-    std::marker::PhantomData,
 };
 
 /// Events emitted by a button.
@@ -37,47 +36,6 @@ pub enum ButtonEvent {
     /// Emitted when focus is lost.
     #[event_key(blur)]
     Blur,
-}
-
-/// Focus-able button widget.
-#[derive(
-    WidgetChildren,
-    LayableWidget,
-    DropNotifier,
-    HasVisibility,
-    Repaintable,
-    Movable,
-    Resizable,
-    OperatesVerbGraph,
-)]
-#[widget_children_trait(base::WidgetChildren)]
-#[thunderclap_crate(crate)]
-#[widget_transform_callback(on_transform)]
-pub struct ButtonWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    pub event_queue: RcEventQueue<ButtonEvent>,
-
-    pub data: base::Observed<Button>,
-    graph: vg::OptionVerbGraph<Self, U>,
-    interaction: state::InteractionState,
-    painter: Box<dyn draw::Painter<state::ButtonState>>,
-    parent_position: AbsolutePoint,
-
-    #[widget_rect]
-    rect: RelativeRect,
-    #[widget_visibility]
-    visibility: base::Visibility,
-    #[repaint_target]
-    command_group: CommandGroup,
-    #[widget_layout]
-    layout: base::WidgetLayoutEvents,
-    #[widget_drop_event]
-    drop_event: RcEventQueue<base::DropEvent>,
-
-    phantom_g: PhantomData<G>,
 }
 
 impl<U, G> ui::InteractiveWidget for ButtonWidget<U, G>
@@ -132,8 +90,12 @@ where
     type Target = ButtonWidget<U, G>;
 }
 
-impl Button {
-    pub fn from_theme(theme: &dyn draw::Theme) -> Self {
+impl<U, G> ui::WidgetConstructor<U, G> for Button
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    fn from_theme(theme: &dyn draw::Theme) -> Self {
         let data = theme.data();
         Button {
             text: "".to_string().into(),
@@ -146,12 +108,7 @@ impl Button {
         }
     }
 
-    pub fn construct<U, G>(
-        self,
-        theme: &dyn draw::Theme,
-        u_aux: &mut U,
-        _g_aux: &mut G,
-    ) -> ButtonWidget<U, G>
+    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U, _g_aux: &mut G) -> ButtonWidget<U, G>
     where
         U: base::UpdateAuxiliary,
         G: base::GraphicalAuxiliary,
@@ -186,33 +143,24 @@ impl Button {
                 .cast_unit(),
         );
 
-        ButtonWidget {
-            event_queue: Default::default(),
-            data,
-            graph: graph.into(),
-            interaction: state::InteractionState::empty(),
-            painter,
-            parent_position: Default::default(),
+        ButtonWidgetBuilder {
             rect,
-            visibility: Default::default(),
-            command_group: Default::default(),
-            layout: Default::default(),
-            drop_event: Default::default(),
-            phantom_g: Default::default(),
+            graph: graph.into(),
+
+            data,
+            painter,
+
+            interaction: state::InteractionState::empty(),
         }
+        .build()
     }
 }
 
-impl<U, G> ButtonWidget<U, G>
+impl<U, G> ui::core::CoreWidget<state::ButtonState> for ButtonWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    fn on_transform(&mut self) {
-        self.repaint();
-        self.layout.notify(self.abs_rect());
-    }
-
     fn derive_state(&self) -> state::ButtonState {
         state::ButtonState {
             rect: self.abs_rect(),
@@ -220,15 +168,25 @@ where
             interaction: self.interaction,
         }
     }
+
+    fn on_transform(&mut self) {
+        self.repaint();
+        self.layout.notify(self.abs_rect());
+    }
 }
 
-impl<U, G> vg::HasVerbGraph for ButtonWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn verb_graph(&mut self) -> &mut vg::OptionVerbGraph<Self, U> {
-        &mut self.graph
+use crate as thunderclap;
+crate::widget! {
+    pub struct ButtonWidget {
+        widget::MAX,
+
+        <ButtonEvent> EventQueue,
+        <Button> State,
+        <state::ButtonState> Painter,
+
+        {
+            interaction: state::InteractionState,
+        },
     }
 }
 
@@ -267,67 +225,5 @@ where
             None,
             None,
         );
-    }
-}
-
-impl<U, G> StoresParentPosition for ButtonWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn set_parent_position(&mut self, parent_pos: AbsolutePoint) {
-        self.parent_position = parent_pos;
-        self.on_transform();
-    }
-
-    fn parent_position(&self) -> AbsolutePoint {
-        self.parent_position
-    }
-}
-
-impl<U, G> HasTheme for ButtonWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    #[inline]
-    fn theme(&mut self) -> &mut dyn draw::Themed {
-        &mut self.painter
-    }
-
-    fn resize_from_theme(&mut self) {
-        self.set_size(self.painter.size_hint(self.derive_state()));
-    }
-}
-
-impl<U, G> ui::DefaultEventQueue<ButtonEvent> for ButtonWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    #[inline]
-    fn default_event_queue(&self) -> &RcEventQueue<ButtonEvent> {
-        &self.event_queue
-    }
-}
-
-impl<U, G> ui::DefaultWidgetData<Button> for ButtonWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    #[inline]
-    fn default_data(&mut self) -> &mut base::Observed<Button> {
-        &mut self.data
-    }
-}
-
-impl<U, G> Drop for ButtonWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn drop(&mut self) {
-        self.drop_event.emit_owned(base::DropEvent);
     }
 }

@@ -15,151 +15,6 @@ use {
     },
 };
 
-/// Naively implements `HasVisibility`, `Repaintable`, `HasTheme` and `DropEvent` (and hence `Drop`) for a widget.
-///
-/// # Example
-/// ```ignore
-/// struct LazyWidget {
-///     visibility: Visibility,
-///     themed: PhantomThemed,
-///     drop_event: RcEventQueue<()>,
-///     position: Position,
-/// }
-///
-/// lazy_widget! {
-///     LazyWidget,
-///     visibility: visibility,
-///     theme: themed,
-///     drop_event: drop_event,
-///     position: position
-/// }
-/// ```
-///
-/// This macro can also implement for generic widgets. Generic widgets within Thunderclap follow a strict pattern:
-/// ```ignore
-/// // The name of the generics (U and G) are important.
-/// struct GenericWidget<U: UpdateAuxiliary, G: GraphicalAuxiliary> { /* ... */ }
-/// ```
-/// Which then can be plugged into this macro like so:
-/// ```ignore
-/// lazy_widget! {
-///     generic GenericWidget,
-///     visibility: visibility,
-///     theme: themed,
-///     drop_event: drop_event,
-///     position: position
-/// }
-/// ```
-#[macro_export]
-macro_rules! lazy_widget {
-    ($name:ty,visibility:$vis:ident,theme:$thm:ident,drop_event:$de:ident) => {
-        impl $crate::base::HasVisibility for $name {
-            #[inline(always)]
-            fn set_visibility(&mut self, visibility: $crate::base::Visibility) {
-                self.$vis = visibility
-            }
-
-            #[inline(always)]
-            fn visibility(&self) -> $crate::base::Visibility {
-                self.$vis
-            }
-        }
-
-        impl $crate::base::Repaintable for $name {
-            #[inline]
-            fn repaint(&mut self) {
-                for child in $crate::base::WidgetChildren::children_mut(self) {
-                    child.repaint();
-                }
-            }
-        }
-
-        impl $crate::draw::HasTheme for $name {
-            #[inline(always)]
-            fn theme(&mut self) -> &mut dyn $crate::draw::Themed {
-                &mut self.$thm
-            }
-
-            #[inline(always)]
-            fn resize_from_theme(&mut self) {}
-        }
-
-        impl $crate::base::DropNotifier for $name {
-            #[inline(always)]
-            fn drop_event(
-                &self,
-            ) -> &$crate::reclutch::event::RcEventQueue<$crate::base::DropEvent> {
-                &self.$de
-            }
-        }
-
-        impl Drop for $name {
-            #[inline]
-            fn drop(&mut self) {
-                self.$de.emit_owned($crate::base::DropEvent);
-            }
-        }
-    };
-    (generic $name:tt,visibility:$vis:ident,theme:$thm:ident,drop_event:$de:ident) => {
-        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
-            $crate::base::HasVisibility for $name<U, G>
-        {
-            #[inline(always)]
-            fn set_visibility(&mut self, visibility: $crate::base::Visibility) {
-                self.$vis = visibility
-            }
-
-            #[inline(always)]
-            fn visibility(&self) -> $crate::base::Visibility {
-                self.$vis
-            }
-        }
-
-        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
-            $crate::base::Repaintable for $name<U, G>
-        {
-            #[inline]
-            fn repaint(&mut self) {
-                for child in $crate::base::WidgetChildren::children_mut(self) {
-                    child.repaint();
-                }
-            }
-        }
-
-        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
-            $crate::draw::HasTheme for $name<U, G>
-        {
-            #[inline(always)]
-            fn theme(&mut self) -> &mut dyn $crate::draw::Themed {
-                &mut self.$thm
-            }
-
-            #[inline(always)]
-            fn resize_from_theme(&mut self) {}
-        }
-
-        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary>
-            $crate::base::DropNotifier for $name<U, G>
-        {
-            #[inline(always)]
-            fn drop_event(
-                &self,
-            ) -> &$crate::reclutch::event::RcEventQueue<$crate::base::DropEvent> {
-                &self.$de
-            }
-        }
-
-        impl<U: $crate::base::UpdateAuxiliary, G: $crate::base::GraphicalAuxiliary> Drop
-            for $name<U, G>
-        {
-            #[inline]
-            fn drop(&mut self) {
-                self.$de.emit_owned($crate::base::DropEvent);
-            }
-        }
-    };
-}
-
 /// Most straight-forward implementation of `Widget`: `update` and `draw` are propagated to children.
 ///
 /// # Example
@@ -336,7 +191,9 @@ impl Default for Visibility {
 
 /// Implemented by widgets which are capable of tracking visibility.
 pub trait HasVisibility {
+    /// Changes the widget visibility.
     fn set_visibility(&mut self, visibility: Visibility);
+    /// Returns the widget visibility.
     fn visibility(&self) -> Visibility;
 }
 
@@ -465,171 +322,204 @@ pub enum MouseButton {
     Right,
 }
 
-/// Key on a keyboard.
-#[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeyInput {
-    Key1,
-    Key2,
-    Key3,
-    Key4,
-    Key5,
-    Key6,
-    Key7,
-    Key8,
-    Key9,
-    Key0,
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
-    I,
-    J,
-    K,
-    L,
-    M,
-    N,
-    O,
-    P,
-    Q,
-    R,
-    S,
-    T,
-    U,
-    V,
-    W,
-    X,
-    Y,
-    Z,
-    Escape,
-    F1,
-    F2,
-    F3,
-    F4,
-    F5,
-    F6,
-    F7,
-    F8,
-    F9,
-    F10,
-    F11,
-    F12,
-    F13,
-    F14,
-    F15,
-    F16,
-    F17,
-    F18,
-    F19,
-    F20,
-    F21,
-    F22,
-    F23,
-    F24,
-    Snapshot,
-    Scroll,
-    Pause,
-    Insert,
-    Home,
-    Delete,
-    End,
-    PageDown,
-    PageUp,
-    Left,
-    Up,
-    Right,
-    Down,
-    Back,
-    Return,
-    Space,
-    Compose,
-    Caret,
-    Numlock,
-    Numpad0,
-    Numpad1,
-    Numpad2,
-    Numpad3,
-    Numpad4,
-    Numpad5,
-    Numpad6,
-    Numpad7,
-    Numpad8,
-    Numpad9,
-    AbntC1,
-    AbntC2,
-    Add,
-    Apostrophe,
-    Apps,
-    At,
-    Ax,
-    Backslash,
-    Calculator,
-    Capital,
-    Colon,
-    Comma,
-    Convert,
-    Decimal,
-    Divide,
-    Equals,
-    Grave,
-    Kana,
-    Kanji,
-    LAlt,
-    LBracket,
-    LControl,
-    LShift,
-    LWin,
-    Mail,
-    MediaSelect,
-    MediaStop,
-    Minus,
-    Multiply,
-    Mute,
-    MyComputer,
-    NavigateForward,
-    NavigateBackward,
-    NextTrack,
-    NoConvert,
-    NumpadComma,
-    NumpadEnter,
-    NumpadEquals,
-    OEM102,
-    Period,
-    PlayPause,
-    Power,
-    PrevTrack,
-    RAlt,
-    RBracket,
-    RControl,
-    RShift,
-    RWin,
-    Semicolon,
-    Slash,
-    Sleep,
-    Stop,
-    Subtract,
-    Sysrq,
-    Tab,
-    Underline,
-    Unlabeled,
-    VolumeDown,
-    VolumeUp,
-    Wake,
-    WebBack,
-    WebFavorites,
-    WebForward,
-    WebHome,
-    WebRefresh,
-    WebSearch,
-    WebStop,
-    Yen,
-    Copy,
-    Paste,
-    Cut,
+// Previously: `std::mem::transmute::<KeyInput>(virtual_key)`.
+// Now: `virtual_key.into()`.
+// :)
+macro_rules! keyboard_enum {
+    ($name:ident as $other:ty {
+        $($v:ident),*$(,)?
+    }) => {
+        #[doc = "Key on a keyboard."]
+        #[repr(u32)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum $name {
+            $($v),*
+        }
+
+        #[cfg(feature = "app")]
+        impl From<$other> for $name {
+            fn from(other: $other) -> $name {
+                match other {
+                    $(<$other>::$v => $name::$v),*
+                }
+            }
+        }
+
+        #[cfg(feature = "app")]
+        impl Into<$other> for $name {
+            fn into(self) -> $other {
+                match self {
+                    $($name::$v => <$other>::$v),*
+                }
+            }
+        }
+    };
+}
+
+keyboard_enum! {
+    KeyInput as glutin::event::VirtualKeyCode {
+        Key1,
+        Key2,
+        Key3,
+        Key4,
+        Key5,
+        Key6,
+        Key7,
+        Key8,
+        Key9,
+        Key0,
+        A,
+        B,
+        C,
+        D,
+        E,
+        F,
+        G,
+        H,
+        I,
+        J,
+        K,
+        L,
+        M,
+        N,
+        O,
+        P,
+        Q,
+        R,
+        S,
+        T,
+        U,
+        V,
+        W,
+        X,
+        Y,
+        Z,
+        Escape,
+        F1,
+        F2,
+        F3,
+        F4,
+        F5,
+        F6,
+        F7,
+        F8,
+        F9,
+        F10,
+        F11,
+        F12,
+        F13,
+        F14,
+        F15,
+        F16,
+        F17,
+        F18,
+        F19,
+        F20,
+        F21,
+        F22,
+        F23,
+        F24,
+        Snapshot,
+        Scroll,
+        Pause,
+        Insert,
+        Home,
+        Delete,
+        End,
+        PageDown,
+        PageUp,
+        Left,
+        Up,
+        Right,
+        Down,
+        Back,
+        Return,
+        Space,
+        Compose,
+        Caret,
+        Numlock,
+        Numpad0,
+        Numpad1,
+        Numpad2,
+        Numpad3,
+        Numpad4,
+        Numpad5,
+        Numpad6,
+        Numpad7,
+        Numpad8,
+        Numpad9,
+        AbntC1,
+        AbntC2,
+        Add,
+        Apostrophe,
+        Apps,
+        At,
+        Ax,
+        Backslash,
+        Calculator,
+        Capital,
+        Colon,
+        Comma,
+        Convert,
+        Decimal,
+        Divide,
+        Equals,
+        Grave,
+        Kana,
+        Kanji,
+        LAlt,
+        LBracket,
+        LControl,
+        LShift,
+        LWin,
+        Mail,
+        MediaSelect,
+        MediaStop,
+        Minus,
+        Multiply,
+        Mute,
+        MyComputer,
+        NavigateForward,
+        NavigateBackward,
+        NextTrack,
+        NoConvert,
+        NumpadComma,
+        NumpadEnter,
+        NumpadEquals,
+        OEM102,
+        Period,
+        PlayPause,
+        Power,
+        PrevTrack,
+        RAlt,
+        RBracket,
+        RControl,
+        RShift,
+        RWin,
+        Semicolon,
+        Slash,
+        Sleep,
+        Stop,
+        Subtract,
+        Sysrq,
+        Tab,
+        Underline,
+        Unlabeled,
+        VolumeDown,
+        VolumeUp,
+        Wake,
+        WebBack,
+        WebFavorites,
+        WebForward,
+        WebHome,
+        WebRefresh,
+        WebSearch,
+        WebStop,
+        Yen,
+        Copy,
+        Paste,
+        Cut,
+    }
 }
 
 /// Information about a parent layout with a queue which receives updated rectangles.
@@ -644,6 +534,8 @@ pub struct WidgetLayoutEventsInner {
 pub struct WidgetLayoutEvents(Option<WidgetLayoutEventsInner>);
 
 impl WidgetLayoutEvents {
+    /// Creates `WidgetLayoutEvents` not connected to any layout.
+    /// This means all the getters will return `None`.
     pub fn new() -> Self {
         Default::default()
     }
@@ -803,12 +695,17 @@ fn invoke_draw_impl<U, G: GraphicalAuxiliary>(
     checked: &mut Option<HashSet<usize>>,
 ) {
     if widget.visibility() != Visibility::Invisible && widget.visibility() != Visibility::None {
+        // we're not dereferencing the pointer so it's fine... right?
+        #[allow(clippy::cast_ptr_alignment)]
         let id = widget as *const _ as *const usize as _;
         let (clip, restore) =
             clip_list.entry(id).or_insert_with(|| (CommandGroup::new(), CommandGroup::new()));
         let clip_rect = widget.abs_bounds();
         clip.repaint();
         restore.repaint();
+        // later on when partial repainting is implemented, this plays an important role in
+        // making sure it works correctly. Essentially it forces widgets to be exact and explicit
+        // in reporting their paint boundaries, otherwise it gets clipped.
         clip.push(
             display,
             &[

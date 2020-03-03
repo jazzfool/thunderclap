@@ -233,10 +233,13 @@ pub(crate) struct RooftopData {
     bindings: Vec<proc_macro2::TokenStream>,
     terminals: Vec<proc_macro2::TokenStream>,
     functions: Vec<(syn::Ident, syn::Block)>,
+    vis: Option<syn::Visibility>,
 }
 
 impl syn::parse::Parse for RooftopData {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let vis = input.parse::<syn::Visibility>().ok();
+
         input.parse::<syn::Token![struct]>()?;
         let struct_name = input.parse()?;
         input.parse::<syn::Token![:]>()?;
@@ -279,6 +282,7 @@ impl syn::parse::Parse for RooftopData {
             bindings,
             terminals,
             functions: other_functions,
+            vis,
         })
     }
 }
@@ -338,10 +342,10 @@ impl RooftopData {
                     })
                     .collect();
                 quote! {
-                    let mut #name = #type_name {
+                    let mut #name = #crate_name::ui::WidgetConstructor::<U, G>::construct(#type_name {
                         #(#assignments)*
-                        ..#type_name::from_theme(theme)
-                    }.construct(theme, u_aux, g_aux);
+                        ..<#type_name as #crate_name::ui::WidgetConstructor<U, G>>::from_theme(theme)
+                    }, theme, u_aux, g_aux);
                 }
             })
             .collect();
@@ -375,18 +379,20 @@ impl RooftopData {
 
         let build_graph =
             find_pseudo_function("build_graph", &self.functions).unwrap_or(quote! { { graph } });
-        let before_graph = find_pseudo_function("before_graph", &self.functions)
-            .unwrap_or(proc_macro2::TokenStream::new());
-        let after_graph = find_pseudo_function("after_graph", &self.functions)
-            .unwrap_or(proc_macro2::TokenStream::new());
-        let draw = find_pseudo_function("draw", &self.functions).unwrap_or(quote! { &[] });
+        let before_graph =
+            find_pseudo_function("before_graph", &self.functions).unwrap_or_default();
+        let after_graph = find_pseudo_function("after_graph", &self.functions).unwrap_or_default();
+        let draw = find_pseudo_function("draw", &self.functions).unwrap_or(quote! { vec![] });
+        let setup = find_pseudo_function("setup", &self.functions).unwrap_or_default();
 
         let define_layout = self.widget_tree_root.compile_layout();
 
         let root_name = &self.widget_tree_root.var_name;
+        let vis = self.vis;
+
         {
             quote! {
-                pub struct #struct_name {
+                #vis struct #struct_name {
                     #(#data_fields)*
                 }
 
@@ -450,9 +456,22 @@ impl RooftopData {
                             output_widget.update(u_aux);
                         }
 
+                        output_widget.widget_setup(theme, u_aux, g_aux);
+
                         output_widget
 
                         // Phew, all that parsing just to generate this
+                    }
+                }
+
+                impl<U, G> #widget_name<U, G>
+                where
+                    U: #crate_name::base::UpdateAuxiliary,
+                    G: #crate_name::base::GraphicalAuxiliary,
+                {
+                    #[doc = "Auto-generated function by `rooftop!`, called automatically."]
+                    fn widget_setup(&mut self, theme: &dyn #crate_name::draw::Theme, u_aux: &mut U, g_aux: &mut G) {
+                        #setup
                     }
                 }
 
@@ -474,10 +493,10 @@ impl RooftopData {
                 )]
                 #[widget_children_trait(base::WidgetChildren)]
                 #[thunderclap_crate(#crate_name)]
-                pub struct #widget_name<U, G>
+                #vis struct #widget_name<U, G>
                 where
-                    U: base::UpdateAuxiliary,
-                    G: base::GraphicalAuxiliary,
+                    U: #crate_name::base::UpdateAuxiliary,
+                    G: #crate_name::base::GraphicalAuxiliary,
                 {
                     pub event_queue: #crate_name::reclutch::event::RcEventQueue<#output_event>,
                     pub data: #crate_name::base::Observed<#struct_name>,
@@ -551,7 +570,7 @@ impl RooftopData {
                     }
 
                     fn draw(&mut self, display: &mut dyn #crate_name::reclutch::display::GraphicsDisplay, aux: &mut G) {
-                        self.command_group.push(display, { #draw }, Default::default(), None, None);
+                        self.command_group.push(display, &{ #draw }, Default::default(), None, None);
                     }
                 }
 
@@ -659,7 +678,7 @@ fn find_pseudo_function(
     functions: &[(syn::Ident, syn::Block)],
 ) -> Option<proc_macro2::TokenStream> {
     use quote::ToTokens;
-    let block = functions.iter().find(|func| func.0.to_string() == name)?.1.clone();
+    let block = functions.iter().find(|func| func.0 == name)?.1.clone();
     let mut tokens = proc_macro2::TokenStream::new();
     block.to_tokens(&mut tokens);
     tokens.into()

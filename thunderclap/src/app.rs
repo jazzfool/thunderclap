@@ -27,11 +27,14 @@ where
 {
     let event_loop = EventLoop::new();
 
-    let hidpi_factor = event_loop.primary_monitor().hidpi_factor();
+    let hidpi_factor = event_loop.primary_monitor().scale_factor();
 
     let wb = WindowBuilder::new().with_title(opts.name).with_inner_size(
-        glutin::dpi::PhysicalSize::new(opts.window_size.width as _, opts.window_size.width as _)
-            .to_logical(hidpi_factor),
+        glutin::dpi::PhysicalSize::new(
+            opts.window_size.width as f64,
+            opts.window_size.width as f64,
+        )
+        .to_logical::<f64>(hidpi_factor),
     );
 
     let context = ContextBuilder::new().with_vsync(true).build_windowed(wb, &event_loop).unwrap();
@@ -75,10 +78,10 @@ where
 
 fn convert_modifiers(modifiers: event::ModifiersState) -> base::KeyModifiers {
     base::KeyModifiers {
-        shift: modifiers.shift,
-        ctrl: modifiers.ctrl,
-        alt: modifiers.alt,
-        logo: modifiers.logo,
+        shift: modifiers.shift(),
+        ctrl: modifiers.ctrl(),
+        alt: modifiers.alt(),
+        logo: modifiers.logo(),
     }
 }
 
@@ -98,7 +101,7 @@ pub struct AppOptions {
 impl Default for AppOptions {
     fn default() -> Self {
         AppOptions {
-            name: "Reui App".into(),
+            name: "Thunderclap App".into(),
             warmup: 2,
             background: Color::new(1.0, 1.0, 1.0, 1.0),
             window_size: Size::new(500.0, 500.0),
@@ -106,7 +109,7 @@ impl Default for AppOptions {
     }
 }
 
-/// Reui/Reclutch based application.
+/// Thunderclap/Reclutch based application.
 pub struct App<R>
 where
     R: base::WidgetChildren<UpdateAux = UAux, GraphicalAux = GAux, DisplayObject = DisplayCommand>,
@@ -158,8 +161,8 @@ where
             *control_flow = ControlFlow::Wait;
 
             match event {
-                Event::EventsCleared => context.window().request_redraw(),
-                Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+                Event::MainEventsCleared => context.window().request_redraw(),
+                Event::RedrawRequested(..) => {
                     if display.size().0 != size.width as _ || display.size().1 != size.height as _ {
                         display.resize((size.width as _, size.height as _)).unwrap();
                     }
@@ -194,22 +197,23 @@ where
                     *control_flow = ControlFlow::Exit;
                 }
                 Event::WindowEvent {
-                    event: WindowEvent::HiDpiFactorChanged(hidpi_factor), ..
+                    event: WindowEvent::ScaleFactorChanged { scale_factor: hidpi_factor, .. },
+                    ..
                 } => {
                     g_aux.scale = hidpi_factor as _;
-                    let window_size = context.window().inner_size().to_physical(hidpi_factor);
+                    let window_size = context.window().inner_size();
                     size = Size::new(window_size.width as _, window_size.height as _);
 
                     command_group_pre.repaint();
                 }
                 Event::WindowEvent { event: WindowEvent::Resized(window_size), .. } => {
-                    let window_size = window_size.to_physical(g_aux.scale as _);
                     size = Size::new(window_size.width as _, window_size.height as _);
                 }
                 Event::WindowEvent {
                     event: WindowEvent::CursorMoved { position, modifiers, .. },
                     ..
                 } => {
+                    let position = position.to_logical::<f64>(g_aux.scale as f64);
                     let position = Point::new(position.x as _, position.y as _);
                     let modifiers = convert_modifiers(modifiers);
 
@@ -255,17 +259,19 @@ where
                         },
                     ..
                 } => {
-                    let key_input = unsafe { std::mem::transmute(virtual_keycode) };
-                    let modifiers = convert_modifiers(modifiers);
+                    if let Some(virtual_keycode) = virtual_keycode {
+                        let key_input: base::KeyInput = virtual_keycode.into();
+                        let modifiers = convert_modifiers(modifiers);
 
-                    u_aux.window_queue.emit_owned(match state {
-                        event::ElementState::Pressed => base::WindowEvent::KeyPress(
-                            base::ConsumableEvent::new((key_input, modifiers)),
-                        ),
-                        event::ElementState::Released => base::WindowEvent::KeyRelease(
-                            base::ConsumableEvent::new((key_input, modifiers)),
-                        ),
-                    });
+                        u_aux.window_queue.emit_owned(match state {
+                            event::ElementState::Pressed => base::WindowEvent::KeyPress(
+                                base::ConsumableEvent::new((key_input, modifiers)),
+                            ),
+                            event::ElementState::Released => base::WindowEvent::KeyRelease(
+                                base::ConsumableEvent::new((key_input, modifiers)),
+                            ),
+                        });
+                    }
                 }
                 Event::WindowEvent { event: WindowEvent::Focused(false), .. } => {
                     u_aux.window_queue.emit_owned(base::WindowEvent::ClearFocus);

@@ -65,6 +65,11 @@ pub fn weaken(color: Color, amount: f32, contrast: ThemeContrast) -> Color {
     }
 }
 
+/// Returns the color with a different opacity.
+pub fn with_opacity(color: Color, opacity: f32) -> Color {
+    Color::new(color.red, color.green, color.blue, opacity)
+}
+
 /// A consistent palette of colors used throughout the UI.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColorScheme {
@@ -185,6 +190,8 @@ pub trait Theme {
     fn checkbox(&self) -> Box<dyn Painter<state::CheckboxState>>;
     /// Constructs a painter for a text area.
     fn text_area(&self) -> Box<dyn Painter<state::TextAreaState>>;
+    /// Constructs a painter for a scroll bar.
+    fn scroll_bar(&self) -> Box<dyn Painter<state::ScrollBarState>>;
 
     fn data(&self) -> &ThemeData;
 }

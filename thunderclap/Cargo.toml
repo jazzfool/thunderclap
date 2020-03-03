@@ -4,7 +4,7 @@ version = "0.0.0"
 authors = ["jazzfool <saveuselon@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
-description = "Aspirational Rust GUI Toolkit"
+description = "Ambitious Rust GUI Toolkit"
 homepage = "https://github.com/jazzfool/thunderclap"
 repository = "https://github.com/jazzfool/thunderclap"
 
@@ -26,7 +26,7 @@ paste = "0.1"
 lazy_static = "1.4"
 ambassador = "0.2"
 
-glutin = { version = "0.22.0-alpha6", optional = true }
+glutin = { version = "0.22", optional = true }
 
 [[example]]
 name = "counter"

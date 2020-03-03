@@ -1,4 +1,4 @@
-#[cfg(feature = "app")]
+#[cfg(any(feature = "app", feature = "default-themes"))]
 use {reclutch::error, thiserror::Error};
 
 #[cfg(feature = "app")]

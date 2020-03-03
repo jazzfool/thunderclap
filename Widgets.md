@@ -6,7 +6,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 
 ## Component Widgets
 
-### Button - `reui::ui::Button`
+### Button - `thunderclap::ui::Button`
 
 *A button which can be pressed and focused by the user. Suitable for simple user actions.*
 
@@ -30,7 +30,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
         - `focus`: The button has gained focus.
         - `blur`: The button has lost focus.
 
-### Label - `reui::ui::Label`
+### Label - `thunderclap::ui::Label`
 
 *Aligned text wrapped in a rectangle.*
 
@@ -46,7 +46,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **Outgoing Event Queues:**
     - *None*
 
-### Checkbox - `reui::ui::Checkbox`
+### Checkbox - `thunderclap::ui::Checkbox`
 
 *Toggled checkbox. Suitable for boolean inputs.*
 
@@ -71,7 +71,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
         - `focus`: The checkbox has gained focus.
         - `blur`: The checkbox has lost focus.
 
-### Text Area - `reui::ui::TextArea`
+### Text Area - `thunderclap::ui::TextArea`
 
 *Accepts single line text input. Deliberately a visually bare-bones widget so that text input can be placed outside a textbox context. Suitable for string input.*
 
@@ -95,7 +95,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 
 ## Abstract Widgets
 
-### Vertical Stack - `reui::ui::VStack`
+### Vertical Stack - `thunderclap::ui::VStack`
 
 *Layout widget which arranges widgets vertically.*
 
@@ -105,7 +105,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **Outgoing Event Queues:**
     - *None*
 
-### Horizontal Stack - `reui::ui::HStack`
+### Horizontal Stack - `thunderclap::ui::HStack`
 
 *Layout widget which arranges widget horizontally.*
 
@@ -115,7 +115,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **Outgoing Event Queues:**
     - *None*
 
-### Container - `reui::ui::Container`
+### Container - `thunderclap::ui::Container`
 
 *Dynamically stores a list of widgets. This is useful if you don't need to access a child past initialization-time; essentially grouping it into a single child to minimize unused fields.*
 *The children will still be rendered and receive updates.*
@@ -126,7 +126,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **Outgoing Event Queues:**
     - *None*
 
-### Margins - `reui::ui::Margins`
+### Margins - `thunderclap::ui::Margins`
 
 *Adds margins around the boundaries of it's children as a whole.*
 
@@ -136,7 +136,7 @@ This is a rundown of all the widgets, giving a brief overview of each widget.
 - **Outgoing Event Queues:**
     - *None*
 
-### Max Fill - `reui::ui::MaxFill`
+### Max Fill - `thunderclap::ui::MaxFill`
 
 *Computes the rectangle fitting all it's children, then resizes all it's children to said rectangle.*
 

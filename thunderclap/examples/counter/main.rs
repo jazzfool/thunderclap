@@ -2,7 +2,7 @@ use thunderclap::{
     app, base,
     reclutch::display::Color,
     themes::Primer,
-    ui::{self, Button, HStack, Label, Margins, SideMargins, TextArea, VStack},
+    ui::{self, Button, HStack, Label, Margins, ScrollBar, SideMargins, TextArea, VStack},
 };
 
 #[macro_use]
@@ -17,6 +17,7 @@ rooftop! {
             btn_color: Color = theme.data().scheme.control_outset,
         ) {
             Margins(margins=SideMargins::new_all_same(10.0)) {
+                ScrollBar(),
                 VStack(bottom_margin=5.0) {
                     Label(
                         text=bind(format!("Count: {}", bind.count).into()),
@@ -24,14 +25,14 @@ rooftop! {
                     ),
                     HStack(left_margin=5.0) {
                         Button(
-                            text=ui::txt("Count Up"),
+                            text="Count Up".into(),
                             background=bind(bind.btn_color)
                         )
                             @press {
                                 widget.data.count += 1;
                             },
                         Button(
-                            text=ui::txt("Count Down"),
+                            text="Count Down".into(),
                             background=bind(bind.btn_color)
                         )
                             @press {
