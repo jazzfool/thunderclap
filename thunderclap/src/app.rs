@@ -23,7 +23,7 @@ where
     R: base::WidgetChildren<UpdateAux = UAux, GraphicalAux = GAux, DisplayObject = DisplayCommand>,
     T: draw::Theme,
     TF: FnOnce(&mut GAux, &mut dyn GraphicsDisplay) -> T,
-    RF: FnOnce(&mut UAux, &mut GAux, &T) -> R,
+    RF: FnOnce(&mut UAux, &T) -> R,
 {
     let event_loop = EventLoop::new();
 
@@ -47,18 +47,16 @@ where
             size: (opts.window_size.width as _, opts.window_size.height as _),
         })?;
 
-    let mut u_aux = UAux { window_queue: RcEventQueue::new(), cursor: Default::default() };
+    let g_aux = GAux { scale: hidpi_factor as _ };
+    let mut u_aux = UAux { window_queue: RcEventQueue::new(), cursor: Default::default(), g_aux };
 
-    let mut g_aux = GAux { scale: hidpi_factor as _ };
-
-    let theme = theme(&mut g_aux, &mut display);
-    let root = root(&mut u_aux, &mut g_aux, &theme);
+    let theme = theme(&mut u_aux.g_aux, &mut display);
+    let root = root(&mut u_aux, &theme);
 
     let mut app = App {
         root,
         background: opts.background,
         u_aux,
-        g_aux,
         display,
         context,
         size: opts.window_size,
@@ -70,7 +68,7 @@ where
 
     for _ in 0..opts.warmup {
         app.root.update(&mut app.u_aux);
-        app.root.draw(&mut app.display, &mut app.g_aux);
+        app.root.draw(&mut app.display, &mut app.u_aux.g_aux);
     }
 
     Ok(app)
@@ -120,8 +118,6 @@ where
     pub background: Color,
     /// Update auxiliary.
     pub u_aux: UAux,
-    /// Graphical auxiliary.
-    pub g_aux: GAux,
     /// Graphics display (Skia backend).
     pub display: skia::SkiaGraphicsDisplay,
     /// OpenGL context/window.
@@ -147,7 +143,6 @@ where
             mut root,
             background,
             mut u_aux,
-            mut g_aux,
             mut display,
             context,
             mut size,
@@ -172,14 +167,17 @@ where
                         &[
                             DisplayCommand::Save,
                             DisplayCommand::Clear(background),
-                            DisplayCommand::Scale(Vector::new(g_aux.scale, g_aux.scale)),
+                            DisplayCommand::Scale(Vector::new(
+                                u_aux.g_aux.scale,
+                                u_aux.g_aux.scale,
+                            )),
                         ],
                         display::ZOrder(std::i32::MIN),
                         false,
                         None,
                     );
 
-                    base::invoke_draw(&mut root, &mut display, &mut g_aux);
+                    base::invoke_draw(&mut root, &mut display, &mut u_aux.g_aux);
 
                     command_group_post.push(
                         &mut display,
@@ -200,7 +198,7 @@ where
                     event: WindowEvent::ScaleFactorChanged { scale_factor: hidpi_factor, .. },
                     ..
                 } => {
-                    g_aux.scale = hidpi_factor as _;
+                    u_aux.g_aux.scale = hidpi_factor as _;
                     let window_size = context.window().inner_size();
                     size = Size::new(window_size.width as _, window_size.height as _);
 
@@ -213,7 +211,7 @@ where
                     event: WindowEvent::CursorMoved { position, modifiers, .. },
                     ..
                 } => {
-                    let position = position.to_logical::<f64>(g_aux.scale as f64);
+                    let position = position.to_logical::<f64>(u_aux.g_aux.scale as f64);
                     let position = Point::new(position.x as _, position.y as _);
                     let modifiers = convert_modifiers(modifiers);
 
@@ -292,6 +290,7 @@ where
 pub struct UAux {
     pub window_queue: RcEventQueue<base::WindowEvent>,
     pub cursor: AbsolutePoint,
+    pub g_aux: GAux,
 }
 
 impl base::UpdateAuxiliary for UAux {
@@ -303,6 +302,16 @@ impl base::UpdateAuxiliary for UAux {
     #[inline]
     fn window_queue_mut(&mut self) -> &mut RcEventQueue<base::WindowEvent> {
         &mut self.window_queue
+    }
+
+    #[inline]
+    fn graphical(&self) -> &dyn base::GraphicalAuxiliary {
+        &self.g_aux
+    }
+
+    #[inline]
+    fn graphical_mut(&mut self) -> &mut dyn base::GraphicalAuxiliary {
+        &mut self.g_aux
     }
 }
 

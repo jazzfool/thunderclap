@@ -39,7 +39,7 @@ impl Primer {
             ];
 
             let fonts: Vec<(ResourceReference, FontInfo)> = fonts
-                .into_iter()
+                .iter()
                 .map(|font| -> Result<(ResourceReference, FontInfo), error::ThemeError> {
                     let font_info = FontInfo::from_data(font.clone(), 0)?;
                     let font_resource = display.new_resource(ResourceDescriptor::Font(
@@ -90,7 +90,7 @@ impl Primer {
                         style: draw::TextStyle::Regular,
                     },
                     button: draw::TypefaceStyle {
-                        typeface: typeface.clone(),
+                        typeface,
                         size: 12.0,
                         style: draw::TextStyle::Bold,
                     },
@@ -134,7 +134,7 @@ impl ButtonPainter {
     ) -> TextDisplayItem {
         let typeface = state.data.typeface.typeface.pick(state.data.typeface.style);
         let mut text_item = TextDisplayItem {
-            text: state.data.text.clone().into(),
+            text: state.data.text.clone(),
             font: typeface.0,
             font_info: typeface.1,
             size: state.data.typeface.size,
@@ -309,21 +309,21 @@ impl draw::Painter<state::CheckboxState> for CheckboxPainter {
 
         let (background, foreground, border, focus) = if state.data.checked {
             (
-                state.data.background.into(),
+                state.data.background,
                 draw::weaken(state.data.foreground, 0.1, state.data.contrast).into(),
                 draw::weaken(state.data.foreground, 0.4, state.data.contrast).into(),
                 state.data.focus.into(),
             )
         } else if state.interaction.contains(state::InteractionState::HOVERED) {
             (
-                draw::strengthen(state.data.background, 0.05, state.data.contrast).into(),
+                draw::strengthen(state.data.background, 0.05, state.data.contrast),
                 base::color_from_urgba(0, 0, 0, 0.0).into(),
                 draw::weaken(state.data.foreground, 0.4, state.data.contrast).into(),
                 state.data.focus.into(),
             )
         } else {
             (
-                state.data.background.into(),
+                state.data.background,
                 base::color_from_urgba(0, 0, 0, 0.0).into(),
                 draw::weaken(state.data.foreground, 0.4, state.data.contrast).into(),
                 state.data.focus.into(),

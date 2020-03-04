@@ -9,11 +9,9 @@ use {
     reclutch::{
         display::{DisplayCommand, Rect, Size, Vector},
         euclid::SideOffsets2D,
-        event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
+        event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener},
         prelude::*,
-        verbgraph as vg,
     },
-    std::marker::PhantomData,
 };
 
 #[derive(Debug)]
@@ -54,7 +52,6 @@ where
         self,
         _theme: &dyn draw::Theme,
         _u_aux: &mut U,
-        _g_aux: &mut G,
     ) -> MarginsWidget<U, G>
     where
         U: base::UpdateAuxiliary,
@@ -80,9 +77,7 @@ where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    fn derive_state(&self) -> () {
-        ()
-    }
+    fn derive_state(&self) {}
 
     fn on_transform(&mut self) {
         self.dirty = true;

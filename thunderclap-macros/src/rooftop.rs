@@ -54,7 +54,7 @@ fn parse_function(
     let dfl =
         if parameters.is_empty() { None } else { parameters.parse::<DataFieldList>()?.into() };
 
-    let fn_body = if fn_name.to_string() == "build" {
+    let fn_body = if fn_name == "build" {
         let body;
         syn::braced!(body in input);
         FunctionBody::View(body)
@@ -155,16 +155,13 @@ fn parse_view(
     }
 
     if !events.is_empty() {
-        terminals.push(
-            {
-                quote! {
-                    std::stringify!(#var_name) => event in #var_name.default_event_queue() => {
-                        #(#events)*
-                    }
+        terminals.push({
+            quote! {
+                std::stringify!(#var_name) => event in #var_name.default_event_queue() => {
+                    #(#events)*
                 }
             }
-            .into(),
-        );
+        });
     }
 
     let mut children = Vec::new();
@@ -345,7 +342,7 @@ impl RooftopData {
                     let mut #name = #crate_name::ui::WidgetConstructor::<U, G>::construct(#type_name {
                         #(#assignments)*
                         ..<#type_name as #crate_name::ui::WidgetConstructor<U, G>>::from_theme(theme)
-                    }, theme, u_aux, g_aux);
+                    }, theme, u_aux);
                 }
             })
             .collect();
@@ -403,7 +400,7 @@ impl RooftopData {
                         }
                     }
 
-                    pub fn construct<U, G>(self, theme: &dyn #crate_name::draw::Theme, u_aux: &mut U, g_aux: &mut G) -> #widget_name<U, G>
+                    pub fn construct<U, G>(self, theme: &dyn #crate_name::draw::Theme, u_aux: &mut U) -> #widget_name<U, G>
                     where
                         U: #crate_name::base::UpdateAuxiliary,
                         G: #crate_name::base::GraphicalAuxiliary,
@@ -456,7 +453,7 @@ impl RooftopData {
                             output_widget.update(u_aux);
                         }
 
-                        output_widget.widget_setup(theme, u_aux, g_aux);
+                        output_widget.widget_setup(theme, u_aux);
 
                         output_widget
 
@@ -470,7 +467,7 @@ impl RooftopData {
                     G: #crate_name::base::GraphicalAuxiliary,
                 {
                     #[doc = "Auto-generated function by `rooftop!`, called automatically."]
-                    fn widget_setup(&mut self, theme: &dyn #crate_name::draw::Theme, u_aux: &mut U, g_aux: &mut G) {
+                    fn widget_setup(&mut self, theme: &dyn #crate_name::draw::Theme, u_aux: &mut U) {
                         #setup
                     }
                 }

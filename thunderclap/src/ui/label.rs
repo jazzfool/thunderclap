@@ -10,11 +10,9 @@ use {
             center_horizontally, Color, DisplayCommand, DisplayListBuilder, DisplayText,
             GraphicsDisplay, Rect, TextDisplayItem,
         },
-        event::RcEventQueue,
         prelude::*,
         verbgraph as vg,
     },
-    std::marker::PhantomData,
 };
 
 /// Horizontal alignment of text.
@@ -61,7 +59,6 @@ where
         self,
         _theme: &dyn draw::Theme,
         _u_aux: &mut U,
-        _g_aux: &mut G,
     ) -> LabelWidget<U, G>
     where
         U: base::UpdateAuxiliary,

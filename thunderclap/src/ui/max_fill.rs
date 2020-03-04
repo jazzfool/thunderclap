@@ -8,11 +8,9 @@ use {
     indexmap::IndexMap,
     reclutch::{
         display::{DisplayCommand, Rect},
-        event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
+        event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener},
         prelude::*,
-        verbgraph as vg,
     },
-    std::marker::PhantomData,
 };
 
 struct ChildData {
@@ -47,7 +45,6 @@ where
         self,
         _theme: &dyn draw::Theme,
         _u_aux: &mut U,
-        _g_aux: &mut G,
     ) -> MaxFillWidget<U, G>
     where
         U: base::UpdateAuxiliary,
@@ -73,9 +70,7 @@ where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    fn derive_state(&self) -> () {
-        ()
-    }
+    fn derive_state(&self) {}
 
     fn on_transform(&mut self) {
         self.dirty = true;
@@ -185,7 +180,7 @@ where
                     continue;
                 }
 
-                if let Some(_) = data.evq.retrieve_newest() {
+                if data.evq.retrieve_newest().is_some() {
                     *dirty = true;
                 }
             }

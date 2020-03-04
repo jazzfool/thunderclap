@@ -173,7 +173,7 @@ where
     #[inline]
     fn remove_char(&mut self) {
         self.repaint();
-        if self.data.text.len() > 0 && self.data.cursor > 0 {
+        if !self.data.text.is_empty() && self.data.cursor > 0 {
             {
                 let cursor = self.data.cursor;
                 self.data.text.remove(cursor - 1);
@@ -231,12 +231,7 @@ where
         }
     }
 
-    fn construct(
-        self,
-        theme: &dyn draw::Theme,
-        u_aux: &mut U,
-        _g_aux: &mut G,
-    ) -> TextAreaWidget<U, G>
+    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U) -> TextAreaWidget<U, G>
     where
         U: base::UpdateAuxiliary + 'static,
         G: base::GraphicalAuxiliary + 'static,

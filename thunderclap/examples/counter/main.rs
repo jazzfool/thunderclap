@@ -2,7 +2,7 @@ use thunderclap::{
     app, base,
     reclutch::display::Color,
     themes::Primer,
-    ui::{self, Button, HStack, Label, Margins, ScrollBar, SideMargins, TextArea, VStack},
+    ui::{Button, HStack, Label, Margins, ScrollBar, SideMargins, TextArea, VStack},
 };
 
 #[macro_use]
@@ -51,9 +51,7 @@ rooftop! {
 fn main() {
     let app = app::create(
         |_g_aux, display| Primer::new(display).unwrap(),
-        |u_aux, g_aux, theme| {
-            Counter { ..Counter::from_theme(theme) }.construct(theme, u_aux, g_aux)
-        },
+        |u_aux, theme| Counter { ..Counter::from_theme(theme) }.construct(theme, u_aux),
         app::AppOptions { name: "Showcase".to_string(), ..Default::default() },
     )
     .unwrap();

@@ -1,18 +1,15 @@
 use {
     crate::{
-        base::{self, Repaintable, Resizable},
-        draw::{self, state, HasTheme},
+        base::{self, Repaintable},
+        draw::{self, state},
         geom::*,
         ui,
     },
     reclutch::{
-        display::{Color, CommandGroup, DisplayCommand, GraphicsDisplay, Rect, Size},
-        event::RcEventQueue,
-        prelude::*,
+        display::{Color, DisplayCommand, GraphicsDisplay, Rect, Size},
         verbgraph as vg,
         widget::Widget,
     },
-    std::marker::PhantomData,
 };
 
 /// Information about how far a scroll bar has been scrolled.
@@ -79,19 +76,14 @@ where
         }
     }
 
-    fn construct(
-        self,
-        theme: &dyn draw::Theme,
-        u_aux: &mut U,
-        g_aux: &mut G,
-    ) -> ScrollBarWidget<U, G>
+    fn construct(self, theme: &dyn draw::Theme, _u_aux: &mut U) -> ScrollBarWidget<U, G>
     where
         U: base::UpdateAuxiliary,
         G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
 
-        let mut graph = vg::verbgraph! {
+        let graph = vg::verbgraph! {
             ScrollBarWidget<U, G> as obj,
             U as _aux,
         };
@@ -102,7 +94,7 @@ where
             painter
                 .size_hint(state::ScrollBarState {
                     rect: AbsoluteRect::new(Default::default(), Size::new(10.0, 100.0).cast_unit()),
-                    data: data.clone(),
+                    data: *data,
                     scroll_bar: Default::default(),
                     interaction: state::InteractionState::empty(),
                 })
@@ -133,7 +125,7 @@ where
 
         state::ScrollBarState {
             rect: abs_rect,
-            data: self.data.clone(),
+            data: *self.data,
             scroll_bar: AbsoluteRect::new(
                 AbsolutePoint::new(
                     abs_rect.origin.x,
@@ -148,7 +140,6 @@ where
             ),
             interaction: self.interaction,
         }
-        .into()
     }
 
     fn on_transform(&mut self) {
@@ -200,7 +191,7 @@ where
         self.graph = Some(graph);
     }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut G) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut G) {
         let state = self.derive_state();
         let painter = &mut self.painter;
         self.command_group.push_with(

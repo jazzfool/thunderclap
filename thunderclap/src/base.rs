@@ -204,6 +204,10 @@ pub trait UpdateAuxiliary: 'static {
     fn window_queue(&self) -> &RcEventQueue<WindowEvent>;
     /// Returns the queue where window events (`WindowEvent`) are emitted, mutably.
     fn window_queue_mut(&mut self) -> &mut RcEventQueue<WindowEvent>;
+    /// Returns the respective graphical auxiliary.
+    fn graphical(&self) -> &dyn GraphicalAuxiliary;
+    /// Returns the respective graphical auxiliary mutably.
+    fn graphical_mut(&mut self) -> &mut dyn GraphicalAuxiliary;
 }
 
 /// Trait required for any type passed as the `GraphicalAux` type (seen as `G` in the widget type parameters)

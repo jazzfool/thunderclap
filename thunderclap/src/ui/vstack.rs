@@ -9,11 +9,9 @@ use {
     indexmap::IndexMap,
     reclutch::{
         display::{self, DisplayCommand, Rect, Size},
-        event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener, RcEventQueue},
+        event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener},
         prelude::*,
-        verbgraph as vg,
     },
-    std::marker::PhantomData,
 };
 
 /// Information about how a `VStack` child should be layed out.
@@ -78,12 +76,7 @@ where
         VStack { top_margin: 0.0, bottom_margin: 0.0, alignment: Align::Begin }
     }
 
-    fn construct(
-        self,
-        _theme: &dyn draw::Theme,
-        _u_aux: &mut U,
-        _g_aux: &mut G,
-    ) -> VStackWidget<U, G>
+    fn construct(self, _theme: &dyn draw::Theme, _u_aux: &mut U) -> VStackWidget<U, G>
     where
         U: base::UpdateAuxiliary,
         G: base::GraphicalAuxiliary,
@@ -108,9 +101,7 @@ where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    fn derive_state(&self) -> () {
-        ()
-    }
+    fn derive_state(&self) {}
 
     fn on_transform(&mut self) {
         self.dirty = true;

@@ -15,7 +15,7 @@ pub struct ButtonState {
 
 bitflags::bitflags! {
     pub struct InteractionState: u32 {
-        const HOVERED = 1 << 0;
+        const HOVERED = 1;
         const PRESSED = 1 << 1;
         const FOCUSED = 1 << 2;
     }

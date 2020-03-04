@@ -127,12 +127,7 @@ where
         }
     }
 
-    fn construct(
-        self,
-        theme: &dyn draw::Theme,
-        u_aux: &mut U,
-        _g_aux: &mut G,
-    ) -> CheckboxWidget<U, G> {
+    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U) -> CheckboxWidget<U, G> {
         let data = base::Observed::new(self);
 
         let mut graph = vg::verbgraph! {
@@ -180,7 +175,7 @@ where
     fn derive_state(&self) -> state::CheckboxState {
         state::CheckboxState {
             rect: self.abs_rect(),
-            data: self.data.clone(),
+            data: *self.data,
             interaction: self.interaction,
         }
     }

@@ -133,7 +133,7 @@ where
     G: base::GraphicalAuxiliary,
 {
     fn from_theme(theme: &dyn draw::Theme) -> Self;
-    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U, g_aux: &mut G) -> Self::Target;
+    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U) -> Self::Target;
 }
 
 /// Generates an unbound terminal which handles basic interactivity.

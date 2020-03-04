@@ -108,7 +108,7 @@ where
         }
     }
 
-    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U, _g_aux: &mut G) -> ButtonWidget<U, G>
+    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U) -> ButtonWidget<U, G>
     where
         U: base::UpdateAuxiliary,
         G: base::GraphicalAuxiliary,
