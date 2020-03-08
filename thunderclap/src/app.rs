@@ -1,7 +1,7 @@
 use {
     crate::{base, draw, error::AppError, geom::*},
     glutin::{
-        event::{self, Event, WindowEvent},
+        event::{self, DeviceEvent, Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
         window::WindowBuilder,
         ContextBuilder, PossiblyCurrent, WindowedContext,
@@ -152,6 +152,9 @@ where
             mut command_group_post,
         } = self;
 
+        let mut modifiers =
+            base::KeyModifiers { shift: false, ctrl: false, alt: false, logo: false };
+
         event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Wait;
 
@@ -207,13 +210,14 @@ where
                 Event::WindowEvent { event: WindowEvent::Resized(window_size), .. } => {
                     size = Size::new(window_size.width as _, window_size.height as _);
                 }
-                Event::WindowEvent {
-                    event: WindowEvent::CursorMoved { position, modifiers, .. },
-                    ..
+                Event::DeviceEvent {
+                    event: DeviceEvent::ModifiersChanged(key_modifiers), ..
                 } => {
+                    modifiers = convert_modifiers(key_modifiers);
+                }
+                Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
                     let position = position.to_logical::<f64>(u_aux.g_aux.scale as f64);
                     let position = Point::new(position.x as _, position.y as _);
-                    let modifiers = convert_modifiers(modifiers);
 
                     u_aux.cursor = position.cast_unit();
 
@@ -222,8 +226,7 @@ where
                     ));
                 }
                 Event::WindowEvent {
-                    event: WindowEvent::MouseInput { state, button, modifiers, .. },
-                    ..
+                    event: WindowEvent::MouseInput { state, button, .. }, ..
                 } => {
                     let mouse_button = match button {
                         event::MouseButton::Left => base::MouseButton::Left,
@@ -231,7 +234,6 @@ where
                         event::MouseButton::Right => base::MouseButton::Right,
                         _ => base::MouseButton::Left,
                     };
-                    let modifiers = convert_modifiers(modifiers);
 
                     u_aux.window_queue.emit_owned(base::WindowEvent::ClearFocus);
 
@@ -252,14 +254,13 @@ where
                 Event::WindowEvent {
                     event:
                         WindowEvent::KeyboardInput {
-                            input: event::KeyboardInput { virtual_keycode, state, modifiers, .. },
+                            input: event::KeyboardInput { virtual_keycode, state, .. },
                             ..
                         },
                     ..
                 } => {
                     if let Some(virtual_keycode) = virtual_keycode {
                         let key_input: base::KeyInput = virtual_keycode.into();
-                        let modifiers = convert_modifiers(modifiers);
 
                         u_aux.window_queue.emit_owned(match state {
                             event::ElementState::Pressed => base::WindowEvent::KeyPress(
