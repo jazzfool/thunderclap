@@ -590,7 +590,7 @@ pub fn rooftop(stream: TokenStream) -> TokenStream {
 /// ## Declaring and implementing
 /// ```ignore
 /// widget! {
-///     impl MyWidget {
+///     struct MyWidget {
 ///         // Every line in this block is optional
 ///
 ///         WidgetChildren, // Derive thunderclap::base::WidgetChildren
@@ -602,43 +602,28 @@ pub fn rooftop(stream: TokenStream) -> TokenStream {
 ///         OperatesVerbGraph, // Derive reclutch::verbgraph::OperatesVerbGraph, OptionVerbGraph field
 ///         StoresParentPosition, // Implement thunderclap::geom::StoresParentPosition, parent position field
 ///
-///         EventQueue<MyEvent>, // Implement thunderclap::ui::DefaultEventQueue, event queue
-///         State<MyWidgetState>, // Implement thunderclap::ui::DefaultWidgetData, observed state field
-///         Painter<StylishPainter>, // Implement thunderclap::draw::HasTheme, painter field
+///         <MyEvent> EventQueue, // Implement thunderclap::ui::DefaultEventQueue, event queue
+///         <MyWidgetState> State, // Implement thunderclap::ui::DefaultWidgetData, observed state field
+///         <StylishPainter> Painter, // Implement thunderclap::draw::HasTheme, painter field
 ///
-///         [ // Miscellaneous fields, supporting visibility and attributes.
+///         { // Miscellaneous fields, supporting visibility and attributes.
 ///             #[some_attribute]
 ///             pub public_name: String,
 ///             private_name: String,
-///         ],
+///         },
 ///     }
 /// }
 /// ```
 ///
 /// ## Creating
+/// `widget!` also declares a `<name>Builder` builder struct. Simply fill in the fields and invoke `.build()`. E.g.;
 /// ```ignore
-/// let my_widget = widget! {
-///     // NOTE: Only works in the same module where `MyWidget` was declared.
-///     Default MyWidget {
-///         // Every line in this block is optional.
+/// CustomWidgetBuilder {
+///     rect: Rect::new(/* ... */),
+///     graph: graph.into(),
 ///
-///         LayableWidget,
-///         DropNotifier,
-///         HasVisibility,
-///         Rectangular = Rect::default(),
-///         OperatesVerbGraph = VerbGraph::default(),
-///         StoresParentPosition,
-///
-///         EventQueue,
-///         State = Observed::new(MyWidgetState { something: 2, }),
-///         Painter = theme.stylish_painter(),
-///
-///         [
-///             public_name = "Michael Scott".into(),
-///             private_name = "Michael Scarn".into(),
-///         ],
-///     }
-/// };
+///     misc_field: "Hello!".into(),
+/// }.build()
 /// ```
 ///
 /// ## Max
@@ -646,16 +631,31 @@ pub fn rooftop(stream: TokenStream) -> TokenStream {
 /// Therefore, you can replace the first example with simply
 /// ```ignore
 /// widget! {
-///     impl MyWidget::MAX {
-///         EventQueue<MyEvent>,
-///         State<MyWidgetState>,
-///         Painter<StylishPainter>,
+///     struct MyWidget {
+///         widget::MAX,
 ///
-///         [
+///         <MyEvent> EventQueue,
+///         <MyWidgetState> State,
+///         <StylishPainter> Painter,
+///
+///         {
 ///             #[some_attribute]
 ///             pub public_name: String,
 ///             private_name: String,
-///         ],
+///         },
+///     }
+/// }
+/// ```
+///
+/// ## Generics
+/// Generics syntax is identical to Rust excluding support for a where clause;
+/// ```ignore
+/// widget! {
+///     struct GenericWidget<A: Debug + Display, B: ?Sized>
+///  /* where
+///         B: ?Sized, */ // unsupported syntax
+///     {
+///         // ... etc ...
 ///     }
 /// }
 /// ```
