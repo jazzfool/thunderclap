@@ -17,6 +17,15 @@ To accomplish this it provides three primary high-level components:
 - A theme API with a verbose typography and color scheme protocol.
 - A macro to emulate a declarative UI syntax for widget creation.
 
+The high-level UI code semantics are identical to that of XAML's.
+This implies several features;
+
+- Widgets that are explicitly given a name map to fields of the widget type (`x:Name="name"` becomes `as name`, then `self.name`).
+- Widget properties can be optionally set, falling back to a default value (`property="value"` becomes `property=value`).
+- Binding to events is done directly in the high-level syntax (`Event="handler"`becomes `@event { handler }`).
+
+The biggest difference is that XAML is stored in an external file, however Thunderclap parses input from a macro directly in code.
+
 ## Example
 
 There's also [an in-depth overview of the code below](https://github.com/jazzfool/thunderclap/wiki/Making-a-counter).
