@@ -189,12 +189,38 @@ impl Default for Visibility {
     }
 }
 
-/// Implemented by widgets which are capable of tracking visibility.
+/// Implemented by widgets which are capable of tracking visibility and have a preference on update propagation.
 pub trait HasVisibility {
     /// Changes the widget visibility.
     fn set_visibility(&mut self, visibility: Visibility);
     /// Returns the widget visibility.
     fn visibility(&self) -> Visibility;
+}
+
+/// Internal data tracked during updating.
+#[derive(Default, Debug, Clone)]
+pub struct InternalAuxiliary {
+    boundary_stack: Vec<AbsoluteRect>,
+}
+
+impl InternalAuxiliary {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    #[inline]
+    pub(crate) fn push_boundary(&mut self, boundary: AbsoluteRect) {
+        self.boundary_stack.push(boundary);
+    }
+
+    pub(crate) fn pop_boundary(&mut self) -> Option<AbsoluteRect> {
+        if self.boundary_stack.is_empty() {
+            None
+        } else {
+            self.boundary_stack.remove(self.boundary_stack.len() - 1).into()
+        }
+    }
 }
 
 /// Trait required for any type passed as the `UpdateAux` type (seen as `U` in the widget type parameters)
@@ -208,6 +234,10 @@ pub trait UpdateAuxiliary: 'static {
     fn graphical(&self) -> &dyn GraphicalAuxiliary;
     /// Returns the respective graphical auxiliary mutably.
     fn graphical_mut(&mut self) -> &mut dyn GraphicalAuxiliary;
+    /// Returns data required internally, immutably.
+    fn internal(&self) -> &InternalAuxiliary;
+    /// Returns data required internally, mutably.
+    fn internal_mut(&mut self) -> &mut InternalAuxiliary;
 }
 
 /// Trait required for any type passed as the `GraphicalAux` type (seen as `G` in the widget type parameters)
@@ -226,6 +256,7 @@ pub fn invoke_update<U: UpdateAuxiliary, G>(
     >,
     aux: &mut U,
 ) {
+    aux.internal_mut().push_boundary(widget.abs_bounds());
     // Iterate in reverse because most visually forefront widgets should get events first.
     for child in widget.children_mut().into_iter().rev() {
         match child.visibility() {
@@ -233,6 +264,7 @@ pub fn invoke_update<U: UpdateAuxiliary, G>(
             _ => child.update(aux),
         }
     }
+    aux.internal_mut().pop_boundary();
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -309,6 +341,9 @@ pub enum WindowEvent {
     /// The user moved the cursor.
     #[event_key(mouse_move)]
     MouseMove(ConsumableEvent<(AbsolutePoint, KeyModifiers)>),
+    /// The mouse wheel has been scrolled with a certain magnitude at a given cursor position.
+    #[event_key(mouse_scroll)]
+    MouseScroll(ConsumableEvent<(AbsolutePoint, f32)>),
     /// Emitted when a text input is received.
     #[event_key(text_input)]
     TextInput(ConsumableEvent<char>),
