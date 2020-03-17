@@ -16,12 +16,20 @@ use {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScrollPosition {
     /// The simple progression of the scrolling, from 0.0 to 1.0,
-    /// This is the most useful position, and typically the one you want.
+    /// This is the most useful position and typically the one you want.
     pub amount: f32,
-    /// The range (0.0 to 1.0) of the physical scroll bar.
+    /// The range (0.0 to 1.0) of the scroll bar.
     /// For example, 0.25..0.5 means that the top of the scroll bar is
     /// a quarter way down, and the bottom is halfway down.
     pub amount_range: (f32, f32),
+}
+
+impl ScrollPosition {
+    pub fn update_range(&mut self, document_length: f32, page_length: f32) {
+        let start_max = 1.0 - (page_length / document_length);
+        self.amount_range.0 = start_max * self.amount;
+        self.amount_range.1 = self.amount_range.0 + (page_length / document_length);
+    }
 }
 
 #[derive(Event, Debug, Clone, Copy, PartialEq)]
@@ -32,6 +40,31 @@ pub enum ScrollBarEvent {
     EndScroll,
     #[event_key(scroll)]
     Scroll(ScrollPosition),
+}
+
+impl<U, G> ui::InteractiveWidget for ScrollBarWidget<U, G>
+where
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
+{
+    #[inline(always)]
+    fn interaction(&mut self) -> &mut state::InteractionState {
+        &mut self.interaction
+    }
+
+    #[inline]
+    fn mouse_bounds(&self) -> RelativeRect {
+        self.painter.mouse_hint(self.rect)
+    }
+
+    #[inline(always)]
+    fn disabled(&self) -> bool {
+        false
+    }
+
+    fn on_interaction_event(&mut self, _event: ui::InteractionEvent) {
+        self.repaint();
+    }
 }
 
 /// A simple scroll bar.
@@ -76,17 +109,22 @@ where
         }
     }
 
-    fn construct(self, theme: &dyn draw::Theme, _u_aux: &mut U) -> ScrollBarWidget<U, G>
+    fn construct(self, theme: &dyn draw::Theme, u_aux: &mut U) -> ScrollBarWidget<U, G>
     where
         U: base::UpdateAuxiliary,
         G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
 
-        let graph = vg::verbgraph! {
+        let mut graph = vg::verbgraph! {
             ScrollBarWidget<U, G> as obj,
             U as _aux,
         };
+
+        graph = graph.add(
+            "interaction",
+            ui::basic_interaction_handler::<ScrollBarWidget<U, G>, U>().bind(u_aux.window_queue()),
+        );
 
         let painter = theme.scroll_bar();
         let rect = RelativeRect::new(
@@ -101,13 +139,16 @@ where
                 .cast_unit(),
         );
 
+        let mut scroll_position = ScrollPosition { amount: 0.0, amount_range: (0.0, 0.0) };
+        scroll_position.update_range(data.document_length, data.page_length);
+
         ScrollBarWidgetBuilder {
             rect,
             graph: graph.into(),
             data,
             painter,
 
-            scroll_position: ScrollPosition { amount: 0.0, amount_range: (0.0, 0.0) },
+            scroll_position,
             locked_width: rect.size.width,
             interaction: state::InteractionState::empty(),
         }
@@ -134,7 +175,9 @@ where
                 ),
                 Size::new(
                     abs_rect.size.width,
-                    abs_rect.size.height * self.scroll_position.amount_range.0,
+                    abs_rect.size.height
+                        * (self.scroll_position.amount_range.1
+                            - self.scroll_position.amount_range.0),
                 )
                 .cast_unit(),
             ),

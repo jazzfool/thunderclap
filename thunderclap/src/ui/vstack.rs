@@ -111,7 +111,7 @@ where
 
 use crate as thunderclap;
 crate::widget! {
-    #[doc = "Abstract layout widget which arranges children in a vertical list, possibly with top/bottom margins and horizontal alignment (see `VStackData`)."]
+    /// Abstract layout widget which arranges children in a vertical list, possibly with top/bottom margins and horizontal alignment (see `VStackData`).
     pub struct VStackWidget {
         widget::MAX,
 
@@ -194,8 +194,8 @@ where
 
 impl<U, G> Widget for VStackWidget<U, G>
 where
-    U: base::UpdateAuxiliary + 'static,
-    G: base::GraphicalAuxiliary + 'static,
+    U: base::UpdateAuxiliary,
+    G: base::GraphicalAuxiliary,
 {
     type UpdateAux = U;
     type GraphicalAux = G;

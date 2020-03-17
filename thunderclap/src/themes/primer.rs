@@ -522,7 +522,7 @@ impl draw::Painter<state::ScrollBarState> for ScrollBarPainter {
         builder.push_round_rectangle(
             state.rect.cast_unit(),
             [3.5; 4],
-            GraphicsDisplayPaint::Fill(draw::with_opacity(state.data.background, 0.75).into()),
+            GraphicsDisplayPaint::Fill(draw::with_opacity(foreground, 0.75).into()),
             None,
         );
 
@@ -540,7 +540,7 @@ impl draw::Painter<state::ScrollBarState> for ScrollBarPainter {
 
         // Scroll bar
         builder.push_round_rectangle(
-            state.rect.cast_unit(),
+            state.scroll_bar.inflate(-1.0, -1.0).cast_unit(),
             [3.5; 4],
             GraphicsDisplayPaint::Fill(foreground.into()),
             None,

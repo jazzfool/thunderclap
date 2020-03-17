@@ -88,6 +88,7 @@ where
             ui::InteractionEvent::Blur => {
                 self.event_queue.emit_owned(CheckboxEvent::Blur);
             }
+            _ => {}
         };
     }
 }

@@ -17,7 +17,7 @@ rooftop! {
             btn_color: Color = theme.data().scheme.control_outset,
         ) {
             Margins(margins=SideMargins::new_all_same(10.0)) {
-                ScrollBar(),
+                ScrollBar(document_length=100.0, page_length=30.0),
                 VStack(bottom_margin=5.0) {
                     Label(
                         text=bind(format!("Count: {}", bind.count).into()),

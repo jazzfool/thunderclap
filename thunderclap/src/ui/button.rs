@@ -67,6 +67,7 @@ where
             ui::InteractionEvent::EndHover(pos) => ButtonEvent::EndHover(pos),
             ui::InteractionEvent::Focus => ButtonEvent::Focus,
             ui::InteractionEvent::Blur => ButtonEvent::Blur,
+            _ => return,
         });
     }
 }

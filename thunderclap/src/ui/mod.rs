@@ -100,6 +100,7 @@ pub enum InteractionEvent {
     Released(AbsolutePoint),
     BeginHover(AbsolutePoint),
     EndHover(AbsolutePoint),
+    Scroll(AbsolutePoint, f32),
     Focus,
     Blur,
 }
@@ -181,6 +182,13 @@ pub fn basic_interaction_handler<W: InteractiveWidget, U: base::UpdateAuxiliary>
             } else if obj.interaction().contains(state::InteractionState::HOVERED) {
                 obj.interaction().remove(state::InteractionState::HOVERED);
                 obj.on_interaction_event(InteractionEvent::EndHover(event.get().0));
+            }
+        }
+
+        mouse_scroll => {
+            let bounds = obj.abs_convert_rect(obj.mouse_bounds());
+            if let Some((pos, mag)) = event.with(|(pos, _)| bounds.contains(*pos)) {
+
             }
         }
 
