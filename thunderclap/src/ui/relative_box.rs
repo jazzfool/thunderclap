@@ -173,7 +173,7 @@ where
         let rect = child.abs_rect();
 
         self.layout_child = Some(ChildData {
-            data: data.unwrap_or(RelativeBoxItem::center(Default::default())),
+            data: data.unwrap_or_else(|| RelativeBoxItem::center(Default::default())),
             evq,
             drop_listener: child.drop_event().listen(),
             rect,
@@ -183,7 +183,7 @@ where
     }
 
     fn remove(&mut self, child: &mut impl base::LayableWidget, restore_original: bool) {
-        if let Some(data) = self.layout_child {
+        if let Some(data) = &self.layout_child {
             child.listen_to_layout(None);
             if restore_original {
                 child.set_ctxt_rect(data.original_rect);

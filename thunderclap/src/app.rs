@@ -48,7 +48,12 @@ where
         })?;
 
     let g_aux = GAux { scale: hidpi_factor as _ };
-    let mut u_aux = UAux { window_queue: RcEventQueue::new(), cursor: Default::default(), g_aux };
+    let mut u_aux = UAux {
+        window_queue: RcEventQueue::new(),
+        cursor: Default::default(),
+        g_aux,
+        internal: base::InternalAuxiliary::new(),
+    };
 
     let theme = theme(&mut u_aux.g_aux, &mut display);
     let root = root(&mut u_aux, &theme);
@@ -292,6 +297,7 @@ pub struct UAux {
     pub window_queue: RcEventQueue<base::WindowEvent>,
     pub cursor: AbsolutePoint,
     pub g_aux: GAux,
+    internal: base::InternalAuxiliary,
 }
 
 impl base::UpdateAuxiliary for UAux {
@@ -313,6 +319,16 @@ impl base::UpdateAuxiliary for UAux {
     #[inline]
     fn graphical_mut(&mut self) -> &mut dyn base::GraphicalAuxiliary {
         &mut self.g_aux
+    }
+
+    #[inline]
+    fn internal(&self) -> &base::InternalAuxiliary {
+        &self.internal
+    }
+
+    #[inline]
+    fn internal_mut(&mut self) -> &mut base::InternalAuxiliary {
+        &mut self.internal
     }
 }
 

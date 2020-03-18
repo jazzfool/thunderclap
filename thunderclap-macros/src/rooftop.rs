@@ -74,6 +74,7 @@ struct WidgetNode {
     var_name: syn::Ident,
     data_assignments: Vec<DataAssignment>,
     children: Vec<WidgetNode>,
+    layout_item: syn::Expr,
 }
 
 impl WidgetNode {
@@ -89,8 +90,9 @@ impl WidgetNode {
                 .iter()
                 .map(|child| {
                     let layout = child.compile_layout();
+                    let layout_item = &child.layout_item;
                     quote! {
-                        None => #layout,
+                        #layout_item => #layout,
                     }
                 })
                 .collect();
@@ -117,11 +119,19 @@ fn parse_view(
     let data_assignments: syn::punctuated::Punctuated<_, syn::Token![,]> =
         assignments.parse_terminated(DataAssignment::parse)?;
     let mut data_assignments: Vec<_> = data_assignments.into_iter().collect();
+
     let var_name = if input.parse::<syn::Token![as]>().is_ok() {
         input.parse::<syn::Ident>()?
     } else {
         *count += 1;
         quote::format_ident!("unnamed_widget_{}", count)
+    };
+
+    let layout_item = if input.parse::<syn::Token![in]>().is_ok() {
+        let item = input.parse::<syn::Expr>()?;
+        syn::parse_quote!(Some(#item))
+    } else {
+        syn::parse_quote!(None)
     };
 
     for assignment in &data_assignments {
@@ -183,7 +193,7 @@ fn parse_view(
 
     let found_comma = input.parse::<syn::Token![,]>().is_ok();
 
-    Ok((WidgetNode { type_name, var_name, data_assignments, children }, found_comma))
+    Ok((WidgetNode { type_name, var_name, data_assignments, children, layout_item }, found_comma))
 }
 
 fn flatten_widget_node_tree(root: &WidgetNode, output: &mut Vec<WidgetNode>) {
@@ -521,7 +531,7 @@ impl RooftopData {
                     G: #crate_name::base::GraphicalAuxiliary,
                 {
                     fn on_transform(&mut self) {
-                        use #crate_name::{base::{Repaintable}, geom::ContextuallyRectangular};
+                        use #crate_name::{base::Repaintable, geom::ContextuallyRectangular};
                         self.repaint();
                         self.layout.notify(self.#root_name.abs_rect());
                     }
