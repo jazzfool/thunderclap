@@ -10,6 +10,7 @@ use {
         display::{DisplayCommand, Rect},
         event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener},
         prelude::*,
+        verbgraph as vg,
     },
 };
 
@@ -22,35 +23,49 @@ struct ChildData {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MaxFill {}
+pub struct Fill {
+    offset: RelativePoint,
+    size: Size,
+}
 
-impl<U, G> ui::WidgetDataTarget<U, G> for MaxFill
+impl<U, G> ui::WidgetDataTarget<U, G> for Fill
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
-    type Target = MaxFillWidget<U, G>;
+    type Target = FillWidget<U, G>;
 }
 
-impl<U, G> ui::WidgetConstructor<U, G> for MaxFill
+impl<U, G> ui::WidgetConstructor<U, G> for Fill
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
 {
     fn from_theme(_theme: &dyn draw::Theme) -> Self {
-        MaxFill {}
+        Fill { offset: Default::default(), size: Default::default() }
     }
 
-    fn construct(self, _theme: &dyn draw::Theme, _u_aux: &mut U) -> MaxFillWidget<U, G>
+    fn construct(self, _theme: &dyn draw::Theme, _u_aux: &mut U) -> FillWidget<U, G>
     where
         U: base::UpdateAuxiliary,
         G: base::GraphicalAuxiliary,
     {
         let data = base::Observed::new(self);
 
-        MaxFillWidgetBuilder {
+        let graph = vg::verbgraph! {
+            FillWidget<U, G> as obj,
+            U as _aux,
+            "rect" => _ev in &data.on_change => {
+                change => {
+                    obj.rect.origin = obj.data.position.cast_unit();
+                    obj.rect.size = obj.data.size.cast_unit();
+                }
+            }
+        };
+
+        FillWidgetBuilder {
             rect: Default::default(),
-            graph: None,
+            graph: graph.into(),
             data,
 
             rects: IndexMap::new(),
@@ -61,7 +76,7 @@ where
     }
 }
 
-impl<U, G> ui::core::CoreWidget<()> for MaxFillWidget<U, G>
+impl<U, G> ui::core::CoreWidget<()> for FillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
@@ -76,10 +91,10 @@ where
 
 use crate as thunderclap;
 crate::widget! {
-    pub struct MaxFillWidget {
+    pub struct FillWidget {
         widget::MAX,
 
-        <MaxFill> State,
+        <Fill> State,
 
         {
             rects: IndexMap<u64, ChildData>,
@@ -89,22 +104,7 @@ crate::widget! {
     }
 }
 
-impl<U, G> MaxFillWidget<U, G>
-where
-    U: base::UpdateAuxiliary,
-    G: base::GraphicalAuxiliary,
-{
-    fn resize_to_fit(&mut self) {
-        let mut max_rect = AbsoluteRect::default();
-        for (_, child) in &self.rects {
-            max_rect = max_rect.union(&child.rect);
-        }
-
-        self.set_size(max_rect.size.cast_unit());
-    }
-}
-
-impl<U, G> base::Layout for MaxFillWidget<U, G>
+impl<U, G> base::Layout for FillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
@@ -133,13 +133,10 @@ where
                 id,
             },
         );
-
-        self.resize_to_fit();
     }
 
     fn remove(&mut self, child: &mut impl base::LayableWidget, restore_original: bool) {
         if let Some(data) = child.layout_id().and_then(|id| self.rects.remove(&id)) {
-            self.dirty = true;
             child.listen_to_layout(None);
             if restore_original {
                 child.set_ctxt_rect(data.original_rect);
@@ -148,7 +145,7 @@ where
     }
 }
 
-impl<U, G> Widget for MaxFillWidget<U, G>
+impl<U, G> Widget for FillWidget<U, G>
 where
     U: base::UpdateAuxiliary,
     G: base::GraphicalAuxiliary,
@@ -173,7 +170,6 @@ where
             for (_, data) in &mut self.rects {
                 if !data.drop_listener.peek().is_empty() {
                     removals.push(data.id);
-                    *dirty = true;
                     continue;
                 }
 
@@ -187,7 +183,6 @@ where
         }
 
         if self.dirty {
-            self.resize_to_fit();
             let abs_rect = self.abs_rect();
             for (_, data) in &mut self.rects {
                 data.evq.emit_owned(abs_rect);

@@ -1,15 +1,16 @@
 use {
     crate::{base, draw, geom::*, ui},
     reclutch::{
-        display::{DisplayCommand, Point, Rect, Size},
+        display::{DisplayCommand, Rect, Size},
         prelude::*,
+        verbgraph as vg,
     },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SizedBox {
+    pub position: RelativePoint,
     pub size: Size,
-    pub offset: Point,
 }
 
 impl<U, G> ui::WidgetDataTarget<U, G> for SizedBox
@@ -26,15 +27,26 @@ where
     G: base::GraphicalAuxiliary,
 {
     fn from_theme(_theme: &dyn draw::Theme) -> Self {
-        SizedBox { size: Size::new(0.0, 0.0), offset: Point::new(0.0, 0.0) }
+        SizedBox { position: RelativePoint::new(0.0, 0.0), size: Size::new(0.0, 0.0) }
     }
 
     fn construct(self, _theme: &dyn draw::Theme, _u_aux: &mut U) -> SizedBoxWidget<U, G> {
         let data = base::Observed::new(self);
 
+        let graph = vg::verbgraph! {
+            SizedBoxWidget<U, G> as obj,
+            U as _aux,
+            "rect" => _ev in &data.on_change => {
+                change => {
+                    obj.rect.origin = obj.data.position.cast_unit();
+                    obj.rect.size = obj.data.size.cast_unit();
+                }
+            }
+        };
+
         SizedBoxWidgetBuilder {
-            rect: RelativeRect::new(data.get().offset.cast_unit(), data.get().size.cast_unit()),
-            graph: None,
+            rect: RelativeRect::new(data.get().position, data.get().size.cast_unit()),
+            graph: graph.into(),
             data,
         }
         .build()

@@ -206,7 +206,7 @@ where
         self.rect.cast_unit()
     }
 
-    fn update(&mut self, aux: &mut U) {
+    fn update(&mut self, _aux: &mut U) {
         if let Some(rect) = self.layout.receive() {
             self.set_ctxt_rect(rect);
             self.dirty = true;
@@ -222,17 +222,12 @@ where
         }
 
         if self.dirty {
-            let mut new_rect = None;
+            let abs_rect = self.abs_rect();
             if let Some(child) = &mut self.layout_child {
-                let parent_rect = aux
-                    .internal()
-                    .top_boundary()
-                    .expect("RelativeBoxWidget cannot be the root widget.");
-
                 let new_size = if let Some(size) = child.data.size {
                     let mut new_size = Size::new(
-                        parent_rect.size.width * size.relative.0,
-                        parent_rect.size.height * size.relative.1,
+                        abs_rect.size.width * size.relative.0,
+                        abs_rect.size.height * size.relative.1,
                     );
 
                     new_size.width += size.real.width;
@@ -247,8 +242,8 @@ where
                 };
 
                 let mut new_position = AbsolutePoint::new(
-                    parent_rect.size.width * child.data.offset.relative.0,
-                    parent_rect.size.height * child.data.offset.relative.1,
+                    abs_rect.size.width * child.data.offset.relative.0,
+                    abs_rect.size.height * child.data.offset.relative.1,
                 );
 
                 new_position.x += child.data.offset.real.x;
@@ -257,14 +252,9 @@ where
                 new_position.x += new_size.width * child.data.offset.post_relative.0;
                 new_position.y += new_size.height * child.data.offset.post_relative.1;
 
-                new_rect = AbsoluteRect::new(new_position, new_size.cast_unit()).into();
+                child.rect = AbsoluteRect::new(new_position, new_size.cast_unit());
 
-                child.evq.emit_owned(new_rect.unwrap());
-                child.rect = new_rect.unwrap();
-            }
-
-            if let Some(new_rect) = new_rect {
-                self.set_ctxt_rect(new_rect);
+                child.evq.emit_owned(child.rect);
             }
         }
     }
