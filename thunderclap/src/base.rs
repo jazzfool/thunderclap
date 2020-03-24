@@ -221,6 +221,18 @@ impl InternalAuxiliary {
             self.boundary_stack.remove(self.boundary_stack.len() - 1).into()
         }
     }
+
+    /// Returns the latest widget boundary.
+    #[inline]
+    pub fn top_boundary(&self) -> Option<AbsoluteRect> {
+        self.boundary_stack.last().cloned()
+    }
+
+    /// Returns all the widget boundaries.
+    #[inline]
+    pub fn boundaries(&self) -> &[AbsoluteRect] {
+        &self.boundary_stack
+    }
 }
 
 /// Trait required for any type passed as the `UpdateAux` type (seen as `U` in the widget type parameters)

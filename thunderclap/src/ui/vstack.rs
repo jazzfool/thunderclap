@@ -76,11 +76,7 @@ where
         VStack { top_margin: 0.0, bottom_margin: 0.0, alignment: Align::Begin }
     }
 
-    fn construct(self, _theme: &dyn draw::Theme, _u_aux: &mut U) -> VStackWidget<U, G>
-    where
-        U: base::UpdateAuxiliary,
-        G: base::GraphicalAuxiliary,
-    {
+    fn construct(self, _theme: &dyn draw::Theme, _u_aux: &mut U) -> VStackWidget<U, G> {
         let data = base::Observed::new(self);
 
         VStackWidgetBuilder {

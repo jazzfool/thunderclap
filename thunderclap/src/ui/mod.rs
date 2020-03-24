@@ -9,6 +9,7 @@ pub mod margins;
 pub mod max_fill;
 pub mod relative_box;
 pub mod scroll_bar;
+pub mod sized_box;
 pub mod text_area;
 pub mod vstack;
 
@@ -17,7 +18,7 @@ pub mod core;
 
 pub use {
     button::*, checkbox::*, container::*, hstack::*, label::*, margins::*, max_fill::*,
-    relative_box::*, scroll_bar::*, text_area::*, vstack::*,
+    relative_box::*, scroll_bar::*, sized_box::*, text_area::*, vstack::*,
 };
 
 use {
