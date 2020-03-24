@@ -1,14 +1,12 @@
 use {
-    super::Align,
     crate::{
-        base::{self, Resizable},
+        base::{self},
         draw,
         geom::*,
         ui,
     },
-    indexmap::IndexMap,
     reclutch::{
-        display::{self, DisplayCommand, Rect, Size, Vector},
+        display::{DisplayCommand, Rect, Size, Vector},
         event::{bidir_single::Queue as BidirSingleEventQueue, RcEventListener},
         prelude::*,
     },
@@ -16,7 +14,7 @@ use {
 
 /// A 2D position based on a relative offset and an absolute offset.
 /// The `relative` offset is expressed as a fraction of the corresponding parent dimension for each component in `(x, y)`.
-/// The `post_relative` offset is expressed as a fraction of the result of the `relative` and `real` calculated size from `FractionSize`.
+/// The `post_relative` offset is expressed as a fraction of the result of the `relative`, `post_relative` and `real` calculated size from `FractionSize`.
 /// The `real` offset is a concrete size in DPI pixels which is added onto the offset calculated from `relative`.
 ///
 /// For example, `FractionalPosition { relative: (0.3, 0.1), post_relative: (-0.5, 0.0), real: Vector::new(5, 30) }` for a child with a computed size of `50 x 50`
@@ -43,23 +41,25 @@ pub struct FractionalSize {
     pub real: Size,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct RelativeBoxItem {
     /// The offset from the `anchor`.
     pub offset: FractionalPosition,
     /// The size of the item.
-    pub size: FractionalSize,
+    /// If this is `None`, then the size will be inferred from the child.
+    pub size: Option<FractionalSize>,
 }
 
 impl RelativeBoxItem {
     /// Returns a new `RelativeBoxItem` which will center the item in the parent.
-    pub fn center(size: FractionalSize) -> Self {
+    pub fn center(size: impl Into<Option<FractionalSize>>) -> Self {
         RelativeBoxItem {
             offset: FractionalPosition {
                 relative: (0.5, 0.5),
                 post_relative: (-0.5, -0.5),
                 real: Default::default(),
             },
-            size,
+            size: size.into(),
         }
     }
 
@@ -69,7 +69,7 @@ impl RelativeBoxItem {
     }
 
     /// Sets the `size` value.
-    pub fn size(self, size: FractionalSize) -> RelativeBoxItem {
+    pub fn size(self, size: Option<FractionalSize>) -> RelativeBoxItem {
         RelativeBoxItem { size, ..self }
     }
 }
@@ -80,11 +80,13 @@ struct ChildData {
     drop_listener: RcEventListener<base::DropEvent>,
     rect: AbsoluteRect,
     original_rect: AbsoluteRect,
-    id: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RelativeBox;
+pub struct RelativeBox {
+    /// Whether the `RelativeBox` should clamp the position/size to the parent or not.
+    pub allow_out_of_bounds: bool,
+}
 
 impl<U, G> ui::WidgetDataTarget<U, G> for RelativeBox
 where
@@ -100,7 +102,7 @@ where
     G: base::GraphicalAuxiliary,
 {
     fn from_theme(_theme: &dyn draw::Theme) -> Self {
-        RelativeBox
+        RelativeBox { allow_out_of_bounds: false }
     }
 
     fn construct(self, _theme: &dyn draw::Theme, _u_aux: &mut U) -> Self::Target {
@@ -173,12 +175,11 @@ where
         let rect = child.abs_rect();
 
         self.layout_child = Some(ChildData {
-            data: data.unwrap_or_else(|| RelativeBoxItem::center(Default::default())),
+            data: data.unwrap_or_else(|| RelativeBoxItem::center(None)),
             evq,
             drop_listener: child.drop_event().listen(),
             rect,
             original_rect: rect,
-            id: 0,
         });
     }
 
@@ -200,4 +201,71 @@ where
     type UpdateAux = U;
     type GraphicalAux = G;
     type DisplayObject = DisplayCommand;
+
+    fn bounds(&self) -> Rect {
+        self.rect.cast_unit()
+    }
+
+    fn update(&mut self, aux: &mut U) {
+        if let Some(rect) = self.layout.receive() {
+            self.set_ctxt_rect(rect);
+            self.dirty = true;
+        }
+
+        if let Some(child) = &mut self.layout_child {
+            if !child.drop_listener.peek().is_empty() {
+                self.layout_child = None;
+            } else if let Some(new_ev) = child.evq.retrieve_newest() {
+                self.dirty = true;
+                child.rect = new_ev;
+            }
+        }
+
+        if self.dirty {
+            let mut new_rect = None;
+            if let Some(child) = &mut self.layout_child {
+                let parent_rect = aux
+                    .internal()
+                    .top_boundary()
+                    .expect("RelativeBoxWidget cannot be the root widget.");
+
+                let new_size = if let Some(size) = child.data.size {
+                    let mut new_size = Size::new(
+                        parent_rect.size.width * size.relative.0,
+                        parent_rect.size.height * size.relative.1,
+                    );
+
+                    new_size.width += size.real.width;
+                    new_size.height += size.real.height;
+
+                    new_size.width += new_size.width * size.post_relative.0;
+                    new_size.height += new_size.height * size.post_relative.1;
+
+                    new_size
+                } else {
+                    child.rect.size.cast_unit()
+                };
+
+                let mut new_position = AbsolutePoint::new(
+                    parent_rect.size.width * child.data.offset.relative.0,
+                    parent_rect.size.height * child.data.offset.relative.1,
+                );
+
+                new_position.x += child.data.offset.real.x;
+                new_position.y += child.data.offset.real.y;
+
+                new_position.x += new_size.width * child.data.offset.post_relative.0;
+                new_position.y += new_size.height * child.data.offset.post_relative.1;
+
+                new_rect = AbsoluteRect::new(new_position, new_size.cast_unit()).into();
+
+                child.evq.emit_owned(new_rect.unwrap());
+                child.rect = new_rect.unwrap();
+            }
+
+            if let Some(new_rect) = new_rect {
+                self.set_ctxt_rect(new_rect);
+            }
+        }
+    }
 }
