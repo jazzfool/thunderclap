@@ -36,7 +36,7 @@ where
         let graph = vg::verbgraph! {
             SizedBoxWidget<U, G> as obj,
             U as _aux,
-            "rect" => _ev in &data.on_change => {
+            "data" => _ev in &data.on_change => {
                 change => {
                     obj.rect.origin = obj.data.position.cast_unit();
                     obj.rect.size = obj.data.size.cast_unit();
